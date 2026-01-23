@@ -1,0 +1,401 @@
+{
+  "name": "windev-helper",
+  "displayName": "WinDev Helper",
+  "description": "Build beautiful, performant WinUI apps with VS Code. Debug, build, package, and deploy Windows apps powered by the Windows App SDK.",
+  "version": "1.0.0",
+  "publisher": "windev-helper",
+  "icon": "images/icon.png",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/windev-helper/windev-helper"
+  },
+  "engines": {
+    "vscode": "^1.108.1"
+  },
+  "categories": [
+    "Programming Languages",
+    "Debuggers",
+    "Other"
+  ],
+  "keywords": [
+    "WinUI",
+    "Windows",
+    "Windows App SDK",
+    "MSIX",
+    "XAML",
+    ".NET",
+    "C#"
+  ],
+  "activationEvents": [
+    "workspaceContains:**/*.csproj",
+    "onLanguage:csharp",
+    "onLanguage:xaml"
+  ],
+  "main": "./dist/extension.js",
+  "extensionDependencies": [
+    "ms-dotnettools.csharp",
+    "ms-dotnettools.csdevkit"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "windev-helper.createProject",
+        "title": "Create WinUI Project",
+        "category": "WinUI"
+      },
+      {
+        "command": "windev-helper.createLibrary",
+        "title": "Create WinUI Library",
+        "category": "WinUI"
+      },
+      {
+        "command": "windev-helper.addPage",
+        "title": "Add New Page",
+        "category": "WinUI"
+      },
+      {
+        "command": "windev-helper.addUserControl",
+        "title": "Add New User Control",
+        "category": "WinUI"
+      },
+      {
+        "command": "windev-helper.addWindow",
+        "title": "Add New Window",
+        "category": "WinUI"
+      },
+      {
+        "command": "windev-helper.buildProject",
+        "title": "Build Project",
+        "category": "WinUI"
+      },
+      {
+        "command": "windev-helper.rebuildProject",
+        "title": "Rebuild Project",
+        "category": "WinUI"
+      },
+      {
+        "command": "windev-helper.cleanProject",
+        "title": "Clean Project",
+        "category": "WinUI"
+      },
+      {
+        "command": "windev-helper.debugProject",
+        "title": "Debug Project",
+        "category": "WinUI"
+      },
+      {
+        "command": "windev-helper.runWithoutDebugging",
+        "title": "Run Without Debugging",
+        "category": "WinUI"
+      },
+      {
+        "command": "windev-helper.createMsixPackage",
+        "title": "Create MSIX Package",
+        "category": "WinUI"
+      },
+      {
+        "command": "windev-helper.signPackage",
+        "title": "Sign Package",
+        "category": "WinUI"
+      },
+      {
+        "command": "windev-helper.generateCertificate",
+        "title": "Generate Development Certificate",
+        "category": "WinUI"
+      },
+      {
+        "command": "windev-helper.installCertificate",
+        "title": "Install Certificate",
+        "category": "WinUI"
+      },
+      {
+        "command": "windev-helper.createDebugIdentity",
+        "title": "Create Debug Identity",
+        "category": "WinUI"
+      },
+      {
+        "command": "windev-helper.generateManifest",
+        "title": "Generate App Manifest",
+        "category": "WinUI"
+      },
+      {
+        "command": "windev-helper.openManifest",
+        "title": "Open App Manifest",
+        "category": "WinUI"
+      },
+      {
+        "command": "windev-helper.restorePackages",
+        "title": "Restore Packages",
+        "category": "WinUI"
+      },
+      {
+        "command": "windev-helper.updatePackages",
+        "title": "Update Packages",
+        "category": "WinUI"
+      },
+      {
+        "command": "windev-helper.initializeProject",
+        "title": "Initialize Project with Windows SDK",
+        "category": "WinUI"
+      },
+      {
+        "command": "windev-helper.selectBuildConfiguration",
+        "title": "Select Build Configuration",
+        "category": "WinUI"
+      },
+      {
+        "command": "windev-helper.selectPlatform",
+        "title": "Select Target Platform",
+        "category": "WinUI"
+      },
+      {
+        "command": "windev-helper.installTemplates",
+        "title": "Install WinUI Templates",
+        "category": "WinUI"
+      },
+      {
+        "command": "windev-helper.checkWinAppCli",
+        "title": "Check WinApp CLI Installation",
+        "category": "WinUI"
+      }
+    ],
+    "configuration": {
+      "title": "WinDev Helper",
+      "properties": {
+        "windevHelper.defaultConfiguration": {
+          "type": "string",
+          "default": "Debug",
+          "enum": [
+            "Debug",
+            "Release"
+          ],
+          "description": "Default build configuration for WinUI projects."
+        },
+        "windevHelper.defaultPlatform": {
+          "type": "string",
+          "default": "x64",
+          "enum": [
+            "x86",
+            "x64",
+            "ARM64"
+          ],
+          "description": "Default target platform for WinUI projects."
+        },
+        "windevHelper.winAppCliPath": {
+          "type": "string",
+          "default": "",
+          "description": "Path to the winapp CLI executable. Leave empty to use the CLI from PATH."
+        },
+        "windevHelper.autoRestoreOnOpen": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically restore NuGet packages when opening a WinUI project."
+        },
+        "windevHelper.showStatusBarItems": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show build configuration and platform selectors in the status bar."
+        },
+        "windevHelper.certificatePath": {
+          "type": "string",
+          "default": "",
+          "description": "Default path to the certificate file for signing packages."
+        }
+      }
+    },
+    "menus": {
+      "explorer/context": [
+        {
+          "command": "windev-helper.addPage",
+          "when": "explorerResourceIsFolder && resourceFilename != 'bin' && resourceFilename != 'obj'",
+          "group": "winui@1"
+        },
+        {
+          "command": "windev-helper.addUserControl",
+          "when": "explorerResourceIsFolder && resourceFilename != 'bin' && resourceFilename != 'obj'",
+          "group": "winui@2"
+        },
+        {
+          "command": "windev-helper.addWindow",
+          "when": "explorerResourceIsFolder && resourceFilename != 'bin' && resourceFilename != 'obj'",
+          "group": "winui@3"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "windev-helper.buildProject",
+          "when": "windevHelper.isWinUIProject"
+        },
+        {
+          "command": "windev-helper.rebuildProject",
+          "when": "windevHelper.isWinUIProject"
+        },
+        {
+          "command": "windev-helper.cleanProject",
+          "when": "windevHelper.isWinUIProject"
+        },
+        {
+          "command": "windev-helper.debugProject",
+          "when": "windevHelper.isWinUIProject"
+        },
+        {
+          "command": "windev-helper.runWithoutDebugging",
+          "when": "windevHelper.isWinUIProject"
+        },
+        {
+          "command": "windev-helper.createMsixPackage",
+          "when": "windevHelper.isWinUIProject"
+        }
+      ]
+    },
+    "keybindings": [
+      {
+        "command": "windev-helper.buildProject",
+        "key": "ctrl+shift+b",
+        "when": "windevHelper.isWinUIProject"
+      },
+      {
+        "command": "windev-helper.debugProject",
+        "key": "f5",
+        "when": "windevHelper.isWinUIProject && !inDebugMode"
+      }
+    ],
+    "taskDefinitions": [
+      {
+        "type": "winui",
+        "required": [
+          "task"
+        ],
+        "properties": {
+          "task": {
+            "type": "string",
+            "description": "The WinUI task to execute (build, rebuild, clean, package)"
+          },
+          "configuration": {
+            "type": "string",
+            "description": "Build configuration (Debug or Release)"
+          },
+          "platform": {
+            "type": "string",
+            "description": "Target platform (x86, x64, ARM64)"
+          }
+        }
+      }
+    ],
+    "problemMatchers": [
+      {
+        "name": "winui",
+        "owner": "winui",
+        "fileLocation": [
+          "relative",
+          "${workspaceFolder}"
+        ],
+        "pattern": {
+          "regexp": "^(.*)\\((\\d+),(\\d+)\\):\\s+(error|warning)\\s+(.*):\\s+(.*)$",
+          "file": 1,
+          "line": 2,
+          "column": 3,
+          "severity": 4,
+          "code": 5,
+          "message": 6
+        }
+      }
+    ],
+    "debuggers": [
+      {
+        "type": "winui",
+        "label": "WinUI",
+        "languages": [
+          "csharp"
+        ],
+        "configurationAttributes": {
+          "launch": {
+            "required": [
+              "project"
+            ],
+            "properties": {
+              "project": {
+                "type": "string",
+                "description": "Path to the .csproj file"
+              },
+              "configuration": {
+                "type": "string",
+                "default": "Debug",
+                "description": "Build configuration"
+              },
+              "platform": {
+                "type": "string",
+                "default": "x64",
+                "description": "Target platform"
+              },
+              "args": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Command line arguments"
+              }
+            }
+          }
+        },
+        "configurationSnippets": [
+          {
+            "label": "WinUI: Launch",
+            "description": "Launch and debug a WinUI application",
+            "body": {
+              "name": "WinUI: Launch",
+              "type": "winui",
+              "request": "launch",
+              "project": "${workspaceFolder}/${1:MyApp}.csproj",
+              "configuration": "${2:Debug}",
+              "platform": "${3:x64}"
+            }
+          }
+        ]
+      }
+    ],
+    "views": {
+      "explorer": [
+        {
+          "id": "windevHelper.projectExplorer",
+          "name": "WinUI Project",
+          "when": "windevHelper.isWinUIProject",
+          "contextualTitle": "WinUI"
+        }
+      ]
+    },
+    "viewsWelcome": [
+      {
+        "view": "windevHelper.projectExplorer",
+        "contents": "No WinUI project detected.\n[Create WinUI Project](command:windev-helper.createProject)\n[Install WinUI Templates](command:windev-helper.installTemplates)"
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run package",
+    "compile": "npm run check-types && npm run lint && node esbuild.js",
+    "watch": "npm-run-all -p watch:*",
+    "watch:esbuild": "node esbuild.js --watch",
+    "watch:tsc": "tsc --noEmit --watch --project tsconfig.json",
+    "package": "npm run check-types && npm run lint && node esbuild.js --production",
+    "compile-tests": "tsc -p . --outDir out",
+    "watch-tests": "tsc -p . -w --outDir out",
+    "pretest": "npm run compile-tests && npm run compile && npm run lint",
+    "check-types": "tsc --noEmit",
+    "lint": "eslint src",
+    "test": "vscode-test"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.108.1",
+    "@types/mocha": "^10.0.10",
+    "@types/node": "22.x",
+    "typescript-eslint": "^8.52.0",
+    "eslint": "^9.39.2",
+    "esbuild": "^0.27.2",
+    "npm-run-all": "^4.1.5",
+    "typescript": "^5.9.3",
+    "@vscode/test-cli": "^0.0.12",
+    "@vscode/test-electron": "^2.5.2"
+  }
+}
