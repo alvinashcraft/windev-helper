@@ -274,7 +274,7 @@ export class TemplateManager {
      */
     private async checkTemplatesInstalled(): Promise<boolean> {
         try {
-            const output = await this.executeCommand('dotnet new list winui');
+            const output = await this.executeCommand('dotnet new list winui', undefined, true);
             return output.includes('winui') || output.includes('WinUI');
         } catch {
             return false;
@@ -284,19 +284,23 @@ export class TemplateManager {
     /**
      * Executes a command in the terminal
      */
-    private executeCommand(command: string, cwd?: string): Promise<string> {
+    private executeCommand(command: string, cwd?: string, silent: boolean = false): Promise<string> {
         return new Promise((resolve, reject) => {
             const workingDir = cwd || vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
             
-            this.outputChannel.appendLine(`> ${command}`);
-            this.outputChannel.show();
+            if (!silent) {
+                this.outputChannel.appendLine(`> ${command}`);
+                this.outputChannel.show();
+            }
 
             cp.exec(command, { cwd: workingDir }, (error, stdout, stderr) => {
-                if (stdout) {
-                    this.outputChannel.appendLine(stdout);
-                }
-                if (stderr) {
-                    this.outputChannel.appendLine(stderr);
+                if (!silent) {
+                    if (stdout) {
+                        this.outputChannel.appendLine(stdout);
+                    }
+                    if (stderr) {
+                        this.outputChannel.appendLine(stderr);
+                    }
                 }
                 if (error) {
                     reject(error);

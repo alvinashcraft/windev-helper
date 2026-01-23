@@ -42,122 +42,122 @@
       {
         "command": "windev-helper.createProject",
         "title": "Create WinUI Project",
-        "category": "WinUI"
+        "category": "WinDev"
       },
       {
         "command": "windev-helper.createLibrary",
         "title": "Create WinUI Library",
-        "category": "WinUI"
+        "category": "WinDev"
       },
       {
         "command": "windev-helper.addPage",
         "title": "Add New Page",
-        "category": "WinUI"
+        "category": "WinDev"
       },
       {
         "command": "windev-helper.addUserControl",
         "title": "Add New User Control",
-        "category": "WinUI"
+        "category": "WinDev"
       },
       {
         "command": "windev-helper.addWindow",
         "title": "Add New Window",
-        "category": "WinUI"
+        "category": "WinDev"
       },
       {
         "command": "windev-helper.buildProject",
         "title": "Build Project",
-        "category": "WinUI"
+        "category": "WinDev"
       },
       {
         "command": "windev-helper.rebuildProject",
         "title": "Rebuild Project",
-        "category": "WinUI"
+        "category": "WinDev"
       },
       {
         "command": "windev-helper.cleanProject",
         "title": "Clean Project",
-        "category": "WinUI"
+        "category": "WinDev"
       },
       {
         "command": "windev-helper.debugProject",
         "title": "Debug Project",
-        "category": "WinUI"
+        "category": "WinDev"
       },
       {
         "command": "windev-helper.runWithoutDebugging",
         "title": "Run Without Debugging",
-        "category": "WinUI"
+        "category": "WinDev"
       },
       {
         "command": "windev-helper.createMsixPackage",
         "title": "Create MSIX Package",
-        "category": "WinUI"
+        "category": "WinDev"
       },
       {
         "command": "windev-helper.signPackage",
         "title": "Sign Package",
-        "category": "WinUI"
+        "category": "WinDev"
       },
       {
         "command": "windev-helper.generateCertificate",
         "title": "Generate Development Certificate",
-        "category": "WinUI"
+        "category": "WinDev"
       },
       {
         "command": "windev-helper.installCertificate",
         "title": "Install Certificate",
-        "category": "WinUI"
+        "category": "WinDev"
       },
       {
         "command": "windev-helper.createDebugIdentity",
         "title": "Create Debug Identity",
-        "category": "WinUI"
+        "category": "WinDev"
       },
       {
         "command": "windev-helper.generateManifest",
         "title": "Generate App Manifest",
-        "category": "WinUI"
+        "category": "WinDev"
       },
       {
         "command": "windev-helper.openManifest",
         "title": "Open App Manifest",
-        "category": "WinUI"
+        "category": "WinDev"
       },
       {
         "command": "windev-helper.restorePackages",
         "title": "Restore Packages",
-        "category": "WinUI"
+        "category": "WinDev"
       },
       {
         "command": "windev-helper.updatePackages",
         "title": "Update Packages",
-        "category": "WinUI"
+        "category": "WinDev"
       },
       {
         "command": "windev-helper.initializeProject",
         "title": "Initialize Project with Windows SDK",
-        "category": "WinUI"
+        "category": "WinDev"
       },
       {
         "command": "windev-helper.selectBuildConfiguration",
         "title": "Select Build Configuration",
-        "category": "WinUI"
+        "category": "WinDev"
       },
       {
         "command": "windev-helper.selectPlatform",
         "title": "Select Target Platform",
-        "category": "WinUI"
+        "category": "WinDev"
       },
       {
         "command": "windev-helper.installTemplates",
         "title": "Install WinUI Templates",
-        "category": "WinUI"
+        "category": "WinDev"
       },
       {
         "command": "windev-helper.checkWinAppCli",
         "title": "Check WinApp CLI Installation",
-        "category": "WinUI"
+        "category": "WinDev"
       }
     ],
     "configuration": {

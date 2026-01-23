@@ -19,15 +19,52 @@ export class BuildManager {
     private _currentConfiguration: BuildConfiguration;
     private _currentPlatform: BuildPlatform;
     private buildProcess: cp.ChildProcess | undefined;
+    private configChangeDisposable: vscode.Disposable;
 
     constructor(winAppCli: WinAppCli) {
         this.winAppCli = winAppCli;
         this.outputChannel = vscode.window.createOutputChannel('WinUI Build');
         
         // Load defaults from configuration
+        this._currentConfiguration = this.getConfigurationSetting();
+        this._currentPlatform = this.getPlatformSetting();
+
+        // Listen for configuration changes
+        this.configChangeDisposable = vscode.workspace.onDidChangeConfiguration((e) => {
+            if (e.affectsConfiguration('windevHelper.defaultConfiguration')) {
+                this._currentConfiguration = this.getConfigurationSetting();
+            }
+            if (e.affectsConfiguration('windevHelper.defaultPlatform')) {
+                this._currentPlatform = this.getPlatformSetting();
+            }
+        });
+    }
+
+    /**
+     * Gets the configuration setting with proper type handling
+     */
+    private getConfigurationSetting(): BuildConfiguration {
         const config = vscode.workspace.getConfiguration('windevHelper');
-        this._currentConfiguration = config.get<BuildConfiguration>('defaultConfiguration') || 'Debug';
-        this._currentPlatform = config.get<BuildPlatform>('defaultPlatform') || 'x64';
+        const value = config.get<string>('defaultConfiguration');
+        if (value === 'Release') {
+            return 'Release';
+        }
+        return 'Debug';
+    }
+
+    /**
+     * Gets the platform setting with proper type handling
+     */
+    private getPlatformSetting(): BuildPlatform {
+        const config = vscode.workspace.getConfiguration('windevHelper');
+        const value = config.get<string>('defaultPlatform');
+        if (value === 'x86') {
+            return 'x86';
+        }
+        if (value === 'ARM64') {
+            return 'ARM64';
+        }
+        return 'x64';
     }
 
     /**
@@ -245,5 +282,6 @@ export class BuildManager {
     public dispose(): void {
         this.cancelBuild();
         this.outputChannel.dispose();
+        this.configChangeDisposable.dispose();
     }
 }
