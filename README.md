@@ -7,7 +7,7 @@ The **WinDev Helper** extension gives you the tools you need to build beautiful,
 
 This extension leverages **winapp**, the Windows App Development CLI, to provide a seamless development experience for WinUI apps in VS Code.
 
-![WinDev Helper Extension](images/hero.png)
+![WinDev Helper Extension](images/icon.png)
 
 ## Features
 
