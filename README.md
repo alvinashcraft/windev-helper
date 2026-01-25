@@ -1,6 +1,6 @@
 # WinDev Helper - A WinUI Extension for VS Code
 
-[![Visual Studio Marketplace Version](https://img.shields.io/visual-studio-marketplace/v/windev-helper.windev-helper)](https://marketplace.visualstudio.com/items?itemName=windev-helper.windev-helper)
+[![Visual Studio Marketplace Version](https://img.shields.io/visual-studio-marketplace/v/alvinashcraft.windev-helper)](https://marketplace.visualstudio.com/items?itemName=alvinashcraft.windev-helper)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 The **WinDev Helper** extension gives you the tools you need to build beautiful, performant, native Windows apps with WinUI 3 and the Windows App SDK. Built on top of the C# and C# Dev Kit extensions, it supercharges your .NET development with powerful IntelliSense, an intuitive Solution Explorer, package management, and more.
