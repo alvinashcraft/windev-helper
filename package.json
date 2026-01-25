@@ -65,6 +65,11 @@
         "category": "WinDev"
       },
       {
+        "command": "windev-helper.addViewModel",
+        "title": "Add New ViewModel",
+        "category": "WinDev"
+      },
+      {
         "command": "windev-helper.buildProject",
         "title": "Build Project",
         "category": "WinDev"
@@ -220,6 +225,33 @@
           "command": "windev-helper.addWindow",
           "when": "explorerResourceIsFolder && resourceFilename != 'bin' && resourceFilename != 'obj'",
           "group": "winui@3"
+        },
+        {
+          "command": "windev-helper.addViewModel",
+          "when": "explorerResourceIsFolder && resourceFilename != 'bin' && resourceFilename != 'obj'",
+          "group": "winui@4"
+        }
+      ],
+      "csharp.solutionExplorer.context": [
+        {
+          "command": "windev-helper.addPage",
+          "when": "csharp.solutionExplorer.itemType == 'folder' || csharp.solutionExplorer.itemType == 'project'",
+          "group": "winui@1"
+        },
+        {
+          "command": "windev-helper.addUserControl",
+          "when": "csharp.solutionExplorer.itemType == 'folder' || csharp.solutionExplorer.itemType == 'project'",
+          "group": "winui@2"
+        },
+        {
+          "command": "windev-helper.addWindow",
+          "when": "csharp.solutionExplorer.itemType == 'folder' || csharp.solutionExplorer.itemType == 'project'",
+          "group": "winui@3"
+        },
+        {
+          "command": "windev-helper.addViewModel",
+          "when": "csharp.solutionExplorer.itemType == 'folder' || csharp.solutionExplorer.itemType == 'project'",
+          "group": "winui@4"
         }
       ],
       "commandPalette": [

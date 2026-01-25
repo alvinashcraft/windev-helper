@@ -86,6 +86,12 @@ function registerCommands(context: vscode.ExtensionContext) {
         })
     );
 
+    context.subscriptions.push(
+        vscode.commands.registerCommand('windev-helper.addViewModel', async (uri?: vscode.Uri) => {
+            await templateManager.addViewModel(uri);
+        })
+    );
+
     // Build commands
     context.subscriptions.push(
         vscode.commands.registerCommand('windev-helper.buildProject', async () => {
