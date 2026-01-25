@@ -6,31 +6,38 @@ import * as vscode from 'vscode';
 import * as cp from 'child_process';
 import * as path from 'path';
 import * as fs from 'fs';
+import { CONFIG, OUTPUT_CHANNELS } from './constants';
 
 /**
  * Wrapper for the Windows App Development CLI (winapp)
  * Provides methods to interact with the CLI for various WinUI development tasks
  */
 export class WinAppCli {
-    private outputChannel: vscode.OutputChannel;
-    private winAppPath: string;
+    private readonly outputChannel: vscode.OutputChannel;
+    private readonly winAppPath: string;
 
     constructor() {
-        this.outputChannel = vscode.window.createOutputChannel('WinApp CLI');
+        this.outputChannel = vscode.window.createOutputChannel(OUTPUT_CHANNELS.WINAPP_CLI);
         this.winAppPath = this.getCliPath();
     }
 
     /**
      * Gets the path to the winapp CLI executable
+     * @returns The CLI path from configuration or default
      */
     private getCliPath(): string {
-        const config = vscode.workspace.getConfiguration('windevHelper');
-        const customPath = config.get<string>('winAppCliPath');
+        const config = vscode.workspace.getConfiguration(CONFIG.SECTION);
+        const customPath = config.get<string>(CONFIG.WINAPP_CLI_PATH);
         return customPath || 'winapp';
     }
 
     /**
      * Executes a winapp CLI command
+     * @param command - The CLI command to execute
+     * @param args - Arguments to pass to the command
+     * @param cwd - Optional working directory
+     * @returns Promise<string> - The command output
+     * @throws Error if no workspace folder or command fails
      */
     public async execute(command: string, args: string[] = [], cwd?: string): Promise<string> {
         return new Promise((resolve, reject) => {
@@ -41,23 +48,46 @@ export class WinAppCli {
                 return;
             }
 
-            const fullCommand = `${this.winAppPath} ${command} ${args.join(' ')}`;
-            this.outputChannel.appendLine(`> ${fullCommand}`);
+            const fullArgs = [command, ...args];
+            const displayCommand = `${this.winAppPath} ${fullArgs.join(' ')}`;
+            this.outputChannel.appendLine(`> ${displayCommand}`);
             this.outputChannel.show();
 
-            cp.exec(fullCommand, { cwd: workingDir }, (error, stdout, stderr) => {
-                if (stdout) {
-                    this.outputChannel.appendLine(stdout);
-                }
-                if (stderr) {
-                    this.outputChannel.appendLine(stderr);
-                }
-                if (error) {
-                    this.outputChannel.appendLine(`Error: ${error.message}`);
-                    reject(error);
-                } else {
+            // Use spawn with shell: false for security
+            const process = cp.spawn(this.winAppPath, fullArgs, {
+                cwd: workingDir,
+                shell: false,
+                windowsHide: true
+            });
+
+            let stdout = '';
+            let stderr = '';
+
+            process.stdout?.on('data', (data) => {
+                const text = data.toString();
+                stdout += text;
+                this.outputChannel.append(text);
+            });
+
+            process.stderr?.on('data', (data) => {
+                const text = data.toString();
+                stderr += text;
+                this.outputChannel.append(text);
+            });
+
+            process.on('close', (code) => {
+                if (code === 0) {
                     resolve(stdout);
+                } else {
+                    const errorMessage = stderr || `Command failed with exit code ${code}`;
+                    this.outputChannel.appendLine(`Error: ${errorMessage}`);
+                    reject(new Error(errorMessage));
                 }
+            });
+
+            process.on('error', (error) => {
+                this.outputChannel.appendLine(`Error: ${error.message}`);
+                reject(error);
             });
         });
     }
@@ -172,14 +202,31 @@ export class WinAppCli {
     public async package(options: PackageOptions): Promise<void> {
         try {
             const args: string[] = [];
+            // Input folder is a positional argument (required)
             if (options.inputDir) {
-                args.push('-i', options.inputDir);
+                args.push(options.inputDir);
             }
+            // Use long-form options as per CLI spec
             if (options.outputPath) {
-                args.push('-o', options.outputPath);
+                args.push('--output', options.outputPath);
             }
             if (options.manifestPath) {
-                args.push('-m', options.manifestPath);
+                args.push('--manifest', options.manifestPath);
+            }
+            if (options.certPath) {
+                args.push('--cert', options.certPath);
+            }
+            if (options.certPassword) {
+                args.push('--cert-password', options.certPassword);
+            }
+            if (options.generateCert) {
+                args.push('--generate-cert');
+            }
+            if (options.installCert) {
+                args.push('--install-cert');
+            }
+            if (options.selfContained) {
+                args.push('--self-contained');
             }
             await this.execute('package', args);
             vscode.window.showInformationMessage('MSIX package created successfully.');
@@ -307,6 +354,11 @@ export interface PackageOptions {
     inputDir?: string;
     outputPath?: string;
     manifestPath?: string;
+    certPath?: string;
+    certPassword?: string;
+    generateCert?: boolean;
+    installCert?: boolean;
+    selfContained?: boolean;
 }
 
 export interface CertificateOptions {

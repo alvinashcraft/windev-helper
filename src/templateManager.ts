@@ -6,15 +6,16 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as cp from 'child_process';
 import * as fs from 'fs';
+import { OUTPUT_CHANNELS } from './constants';
 
 /**
  * Manages WinUI project and item templates
  */
 export class TemplateManager {
-    private outputChannel: vscode.OutputChannel;
+    private readonly outputChannel: vscode.OutputChannel;
 
     constructor() {
-        this.outputChannel = vscode.window.createOutputChannel('WinUI Templates');
+        this.outputChannel = vscode.window.createOutputChannel(OUTPUT_CHANNELS.TEMPLATES);
     }
 
     /**
@@ -283,6 +284,10 @@ export class TemplateManager {
             cancellable: false
         }, async () => {
             try {
+                // Always ensure global usings are configured for MVVM support
+                // This ensures Pages, Controls, and Windows have access to common namespaces
+                await this.ensureGlobalUsings(workspaceRoot);
+
                 await this.executeCommand(`dotnet new ${template} -n ${itemName}`, viewTargetDir);
                 
                 // Open the created XAML file
@@ -305,7 +310,7 @@ export class TemplateManager {
     /**
      * Adds a new ViewModel to the project (standalone, without a view)
      */
-    public async addViewModel(uri?: vscode.Uri): Promise<void> {
+    public async addViewModel(_uri?: vscode.Uri): Promise<void> {
         const viewModelName = await vscode.window.showInputBox({
             prompt: 'Enter ViewModel name',
             placeHolder: 'MyViewModel',
@@ -413,7 +418,8 @@ export class TemplateManager {
     }
 
     /**
-     * Ensures MVVM Toolkit is installed and BaseViewModel exists
+     * Ensures MVVM Toolkit is installed and global usings are configured
+     * @param workspaceRoot - The workspace root path
      */
     private async ensureMvvmInfrastructure(workspaceRoot: string): Promise<void> {
         // Check if CommunityToolkit.Mvvm is referenced
@@ -428,6 +434,9 @@ export class TemplateManager {
             }
         }
 
+        // Ensure global usings are configured
+        await this.ensureGlobalUsings(workspaceRoot);
+
         // Check if BaseViewModel exists
         const baseViewModelPath = path.join(workspaceRoot, 'ViewModels', 'BaseViewModel.cs');
         const baseViewModelExists = await this.fileExists(baseViewModelPath);
@@ -438,9 +447,95 @@ export class TemplateManager {
     }
 
     /**
+     * Ensures global usings file exists with required MVVM imports
+     * @param workspaceRoot - The workspace root path
+     */
+    private async ensureGlobalUsings(workspaceRoot: string): Promise<void> {
+        const namespace = await this.detectNamespace(workspaceRoot);
+        
+        // Common locations for global usings file
+        const possiblePaths = [
+            path.join(workspaceRoot, 'Imports.cs'),
+            path.join(workspaceRoot, 'GlobalUsings.cs'),
+            path.join(workspaceRoot, 'Usings.cs')
+        ];
+
+        let globalUsingsPath: string | undefined;
+        let existingContent = '';
+
+        // Check if any global usings file exists
+        for (const filePath of possiblePaths) {
+            if (await this.fileExists(filePath)) {
+                globalUsingsPath = filePath;
+                try {
+                    existingContent = await fs.promises.readFile(filePath, 'utf8');
+                } catch {
+                    existingContent = '';
+                }
+                break;
+            }
+        }
+
+        // Required global usings for MVVM and Views
+        const requiredUsings = [
+            'global using CommunityToolkit.Mvvm.ComponentModel;',
+            'global using CommunityToolkit.Mvvm.Input;',
+            `global using ${namespace}.ViewModels;`,
+            `global using ${namespace}.Views;`
+        ];
+
+        // If no file exists, create Imports.cs
+        if (!globalUsingsPath) {
+            globalUsingsPath = path.join(workspaceRoot, 'Imports.cs');
+            const content = this.generateGlobalUsingsContent(namespace);
+            await fs.promises.writeFile(globalUsingsPath, content, 'utf8');
+            this.outputChannel.appendLine(`Created global usings file: ${globalUsingsPath}`);
+            return;
+        }
+
+        // Check if required usings are present and add missing ones
+        const missingUsings: string[] = [];
+        for (const usingStatement of requiredUsings) {
+            // Check if the using (or a variation) is already present
+            const usingPattern = usingStatement.replace('global using ', '').replace(';', '');
+            if (!existingContent.includes(usingPattern)) {
+                missingUsings.push(usingStatement);
+            }
+        }
+
+        if (missingUsings.length > 0) {
+            // Append missing usings to the file
+            const additionalContent = '\n' + missingUsings.join('\n') + '\n';
+            await fs.promises.appendFile(globalUsingsPath, additionalContent, 'utf8');
+            this.outputChannel.appendLine(`Added missing global usings to: ${globalUsingsPath}`);
+        }
+    }
+
+    /**
+     * Generates the content for a new global usings file
+     * @param namespace - The project namespace
+     * @returns The file content
+     */
+    private generateGlobalUsingsContent(namespace: string): string {
+        return `// Global using directives for ${namespace}
+// This file contains global using statements that are available throughout the project.
+
+global using CommunityToolkit.Mvvm.ComponentModel;
+global using CommunityToolkit.Mvvm.Input;
+global using CommunityToolkit.Mvvm.Messaging;
+
+global using ${namespace}.ViewModels;
+global using ${namespace}.Views;
+
+global using Microsoft.UI.Xaml;
+global using Microsoft.UI.Xaml.Controls;
+`;
+    }
+
+    /**
      * Checks if CommunityToolkit.Mvvm is referenced in the project
      */
-    private async checkMvvmToolkitInstalled(workspaceRoot: string): Promise<boolean> {
+    private async checkMvvmToolkitInstalled(_workspaceRoot: string): Promise<boolean> {
         try {
             const csprojFiles = await vscode.workspace.findFiles('**/*.csproj', '**/bin/**', 1);
             if (csprojFiles.length > 0) {
@@ -467,24 +562,35 @@ export class TemplateManager {
 
     /**
      * Creates the BaseViewModel class
+     * @param workspaceRoot - The workspace root path
      */
     private async createBaseViewModel(workspaceRoot: string): Promise<void> {
         const viewModelsDir = path.join(workspaceRoot, 'ViewModels');
         await fs.promises.mkdir(viewModelsDir, { recursive: true });
 
         const namespace = await this.detectNamespace(workspaceRoot);
-        const baseViewModelContent = `namespace ${namespace}.ViewModels
+        
+        // Note: Using statements are provided via global usings in Imports.cs
+        const baseViewModelContent = `namespace ${namespace}.ViewModels;
+
+/// <summary>
+/// Base class for all ViewModels in the application.
+/// Inherits from ObservableObject to provide INotifyPropertyChanged support.
+/// </summary>
+public partial class BaseViewModel : ObservableObject
 {
-    public partial class BaseViewModel : ObservableObject
+    /// <summary>
+    /// Initializes a new instance of the <see cref="BaseViewModel"/> class.
+    /// </summary>
+    public BaseViewModel()
     {
-        public BaseViewModel()
-        {
-
-        }
-
-        [ObservableProperty]
-        private string _title = string.Empty;
     }
+
+    /// <summary>
+    /// Gets or sets the title for this ViewModel.
+    /// </summary>
+    [ObservableProperty]
+    private string _title = string.Empty;
 }
 `;
 
@@ -523,19 +629,28 @@ export class TemplateManager {
 
     /**
      * Generates ViewModel class content
+     * @param viewModelName - The name of the ViewModel class
+     * @param namespace - The namespace for the ViewModel
+     * @returns The generated C# code
      */
     private generateViewModelContent(viewModelName: string, namespace: string): string {
         // Derive a title from the ViewModel name (e.g., MainViewModel -> Main, SettingsViewModel -> Settings)
         const title = viewModelName.replace(/ViewModel$/, '');
 
-        return `namespace ${namespace}
+        // Note: Using statements are provided via global usings in Imports.cs
+        return `namespace ${namespace};
+
+/// <summary>
+/// ViewModel for the ${title} view.
+/// </summary>
+public partial class ${viewModelName} : BaseViewModel
 {
-    public partial class ${viewModelName} : BaseViewModel
+    /// <summary>
+    /// Initializes a new instance of the <see cref="${viewModelName}"/> class.
+    /// </summary>
+    public ${viewModelName}()
     {
-        public ${viewModelName}()
-        {
-            Title = "${title}";
-        }
+        Title = "${title}";
     }
 }
 `;

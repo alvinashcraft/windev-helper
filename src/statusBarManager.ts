@@ -3,44 +3,56 @@
 // Licensed under the MIT License.
 
 import * as vscode from 'vscode';
+import { BuildManager, BuildConfiguration, BuildPlatform } from './buildManager';
+import { COMMANDS } from './constants';
 
 /**
  * Manages status bar items for build configuration and platform selection
  */
 export class StatusBarManager {
-    private context: vscode.ExtensionContext;
-    private configurationItem: vscode.StatusBarItem;
-    private platformItem: vscode.StatusBarItem;
-    private currentConfiguration: string = 'Debug';
-    private currentPlatform: string = 'x64';
+    private readonly buildManager: BuildManager;
+    private readonly configurationItem: vscode.StatusBarItem;
+    private readonly platformItem: vscode.StatusBarItem;
+    private readonly disposables: vscode.Disposable[] = [];
 
-    constructor(context: vscode.ExtensionContext) {
-        this.context = context;
+    constructor(context: vscode.ExtensionContext, buildManager: BuildManager) {
+        this.buildManager = buildManager;
 
         // Create configuration status bar item
         this.configurationItem = vscode.window.createStatusBarItem(
             vscode.StatusBarAlignment.Left,
             100
         );
-        this.configurationItem.command = 'windev-helper.selectBuildConfiguration';
+        this.configurationItem.command = COMMANDS.SELECT_BUILD_CONFIGURATION;
         this.configurationItem.tooltip = 'Click to change build configuration';
-        this.updateConfigurationDisplay();
 
         // Create platform status bar item
         this.platformItem = vscode.window.createStatusBarItem(
             vscode.StatusBarAlignment.Left,
             99
         );
-        this.platformItem.command = 'windev-helper.selectPlatform';
+        this.platformItem.command = COMMANDS.SELECT_PLATFORM;
         this.platformItem.tooltip = 'Click to change target platform';
-        this.updatePlatformDisplay();
 
-        // Register disposables
+        // Initialize display with current values from BuildManager
+        this.updateConfigurationDisplay(this.buildManager.currentConfiguration);
+        this.updatePlatformDisplay(this.buildManager.currentPlatform);
+
+        // Subscribe to BuildManager events
+        this.disposables.push(
+            this.buildManager.onConfigurationChanged((config) => {
+                this.updateConfigurationDisplay(config);
+            })
+        );
+        this.disposables.push(
+            this.buildManager.onPlatformChanged((platform) => {
+                this.updatePlatformDisplay(platform);
+            })
+        );
+
+        // Register disposables with extension context
         context.subscriptions.push(this.configurationItem);
         context.subscriptions.push(this.platformItem);
-
-        // Load saved values
-        this.loadSavedValues();
     }
 
     /**
@@ -60,55 +72,20 @@ export class StatusBarManager {
     }
 
     /**
-     * Updates the current configuration
-     */
-    public updateConfiguration(configuration: string): void {
-        this.currentConfiguration = configuration;
-        this.updateConfigurationDisplay();
-        this.saveValues();
-    }
-
-    /**
-     * Updates the current platform
-     */
-    public updatePlatform(platform: string): void {
-        this.currentPlatform = platform;
-        this.updatePlatformDisplay();
-        this.saveValues();
-    }
-
-    /**
      * Updates the configuration display
+     * @param configuration - The current build configuration
      */
-    private updateConfigurationDisplay(): void {
-        const icon = this.currentConfiguration === 'Debug' ? '$(bug)' : '$(package)';
-        this.configurationItem.text = `${icon} ${this.currentConfiguration}`;
+    private updateConfigurationDisplay(configuration: BuildConfiguration): void {
+        const icon = configuration === 'Debug' ? '$(bug)' : '$(package)';
+        this.configurationItem.text = `${icon} ${configuration}`;
     }
 
     /**
      * Updates the platform display
+     * @param platform - The current target platform
      */
-    private updatePlatformDisplay(): void {
-        this.platformItem.text = `$(circuit-board) ${this.currentPlatform}`;
-    }
-
-    /**
-     * Loads saved values from workspace state
-     */
-    private loadSavedValues(): void {
-        const config = vscode.workspace.getConfiguration('windevHelper');
-        this.currentConfiguration = config.get<string>('defaultConfiguration') || 'Debug';
-        this.currentPlatform = config.get<string>('defaultPlatform') || 'x64';
-        this.updateConfigurationDisplay();
-        this.updatePlatformDisplay();
-    }
-
-    /**
-     * Saves current values to workspace state
-     */
-    private saveValues(): void {
-        // Values are saved through the workspace configuration
-        // when user explicitly changes settings
+    private updatePlatformDisplay(platform: BuildPlatform): void {
+        this.platformItem.text = `$(circuit-board) ${platform}`;
     }
 
     /**
@@ -117,5 +94,6 @@ export class StatusBarManager {
     public dispose(): void {
         this.configurationItem.dispose();
         this.platformItem.dispose();
+        this.disposables.forEach(d => d.dispose());
     }
 }

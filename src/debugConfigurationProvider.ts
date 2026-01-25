@@ -6,13 +6,14 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import { WinUIProjectManager } from './projectManager';
 import { BuildManager } from './buildManager';
+import { DEBUG_TYPES } from './constants';
 
 /**
  * Provides debug configurations for WinUI applications
  */
 export class DebugConfigurationProvider implements vscode.DebugConfigurationProvider {
-    private projectManager: WinUIProjectManager;
-    private buildManager: BuildManager;
+    private readonly projectManager: WinUIProjectManager;
+    private readonly buildManager: BuildManager;
 
     constructor(projectManager: WinUIProjectManager, buildManager: BuildManager) {
         this.projectManager = projectManager;
@@ -21,11 +22,15 @@ export class DebugConfigurationProvider implements vscode.DebugConfigurationProv
 
     /**
      * Resolves a debug configuration before use
+     * @param folder - The workspace folder
+     * @param config - The debug configuration
+     * @param token - Cancellation token
+     * @returns The resolved configuration or undefined
      */
     async resolveDebugConfiguration(
-        folder: vscode.WorkspaceFolder | undefined,
+        _folder: vscode.WorkspaceFolder | undefined,
         config: vscode.DebugConfiguration,
-        token?: vscode.CancellationToken
+        _token?: vscode.CancellationToken
     ): Promise<vscode.DebugConfiguration | undefined> {
         // If no configuration provided, create a default one
         if (!config.type && !config.request && !config.name) {
@@ -35,10 +40,10 @@ export class DebugConfigurationProvider implements vscode.DebugConfigurationProv
                 return undefined;
             }
 
-            config.type = 'coreclr';
+            config.type = DEBUG_TYPES.CORECLR;
             config.name = 'WinUI: Launch';
             config.request = 'launch';
-            config.preLaunchTask = 'build';
+            // Don't set preLaunchTask - we'll build in resolveDebugConfigurationWithSubstitutedVariables
             config.program = await this.getExecutablePath(project);
             config.cwd = path.dirname(project.fsPath);
             config.console = 'internalConsole';
@@ -50,14 +55,18 @@ export class DebugConfigurationProvider implements vscode.DebugConfigurationProv
 
     /**
      * Resolves a debug configuration with full details
+     * @param folder - The workspace folder
+     * @param config - The debug configuration
+     * @param token - Cancellation token
+     * @returns The resolved configuration or undefined
      */
     async resolveDebugConfigurationWithSubstitutedVariables(
-        folder: vscode.WorkspaceFolder | undefined,
+        _folder: vscode.WorkspaceFolder | undefined,
         config: vscode.DebugConfiguration,
-        token?: vscode.CancellationToken
+        _token?: vscode.CancellationToken
     ): Promise<vscode.DebugConfiguration | undefined> {
         // For winui type, convert to coreclr
-        if (config.type === 'winui') {
+        if (config.type === DEBUG_TYPES.WINUI) {
             const projectPath = config.project || this.projectManager.currentProject?.fsPath;
             
             if (!projectPath) {
@@ -76,7 +85,7 @@ export class DebugConfigurationProvider implements vscode.DebugConfigurationProv
             const executablePath = await this.getExecutablePath(vscode.Uri.file(projectPath));
             
             return {
-                type: 'coreclr',
+                type: DEBUG_TYPES.CORECLR,
                 name: config.name || 'WinUI: Launch',
                 request: 'launch',
                 program: executablePath,
@@ -93,14 +102,17 @@ export class DebugConfigurationProvider implements vscode.DebugConfigurationProv
 
     /**
      * Provides initial debug configurations
+     * @param folder - The workspace folder
+     * @param token - Cancellation token
+     * @returns Array of debug configurations
      */
     provideDebugConfigurations(
-        folder: vscode.WorkspaceFolder | undefined,
-        token?: vscode.CancellationToken
+        _folder: vscode.WorkspaceFolder | undefined,
+        _token?: vscode.CancellationToken
     ): vscode.ProviderResult<vscode.DebugConfiguration[]> {
         return [
             {
-                type: 'winui',
+                type: DEBUG_TYPES.WINUI,
                 name: 'WinUI: Launch',
                 request: 'launch',
                 project: '${workspaceFolder}/${fileBasenameNoExtension}.csproj',
@@ -112,28 +124,16 @@ export class DebugConfigurationProvider implements vscode.DebugConfigurationProv
 
     /**
      * Gets the executable path for the project
+     * @param projectUri - URI to the project file
+     * @returns The full path to the executable
      */
     private async getExecutablePath(projectUri: vscode.Uri): Promise<string> {
         const projectInfo = await this.projectManager.getProjectInfo();
-        const projectDir = path.dirname(projectUri.fsPath);
         const projectName = path.basename(projectUri.fsPath, '.csproj');
         
-        const configuration = this.buildManager.currentConfiguration;
-        const platform = this.buildManager.currentPlatform;
-        const targetFramework = projectInfo?.targetFramework || 'net8.0-windows10.0.19041.0';
-        const runtimeIdentifier = this.buildManager.getRuntimeIdentifier();
+        const targetFramework = projectInfo?.targetFramework;
+        const outputPath = this.buildManager.getOutputPath(projectUri.fsPath, targetFramework);
 
-        // Construct the output path
-        const outputPath = path.join(
-            projectDir,
-            'bin',
-            platform,
-            configuration,
-            targetFramework,
-            runtimeIdentifier,
-            `${projectName}.exe`
-        );
-
-        return outputPath;
+        return path.join(outputPath, `${projectName}.exe`);
     }
 }

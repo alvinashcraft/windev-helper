@@ -6,17 +6,18 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
 import { WinAppCli, CertificateOptions, SignOptions } from './winAppCli';
+import { CONFIG, OUTPUT_CHANNELS, DEFAULTS } from './constants';
 
 /**
  * Manages MSIX packaging, signing, and NuGet operations
  */
 export class PackageManager {
-    private winAppCli: WinAppCli;
-    private outputChannel: vscode.OutputChannel;
+    private readonly winAppCli: WinAppCli;
+    private readonly outputChannel: vscode.OutputChannel;
 
     constructor(winAppCli: WinAppCli) {
         this.winAppCli = winAppCli;
-        this.outputChannel = vscode.window.createOutputChannel('WinUI Packaging');
+        this.outputChannel = vscode.window.createOutputChannel(OUTPUT_CHANNELS.PACKAGING);
     }
 
     /**
@@ -94,7 +95,7 @@ export class PackageManager {
                 await this.winAppCli.package({
                     inputDir: projectDir,
                     outputPath: outputUri.fsPath,
-                    manifestPath: manifestPath
+                    ...(manifestPath && { manifestPath })
                 });
 
                 const action = await vscode.window.showInformationMessage(
@@ -116,6 +117,7 @@ export class PackageManager {
 
     /**
      * Signs an MSIX package
+     * @param packagePath - Optional path to the package file
      */
     public async signPackage(packagePath?: string): Promise<void> {
         // Get package path if not provided
@@ -137,8 +139,8 @@ export class PackageManager {
         }
 
         // Get certificate path
-        const config = vscode.workspace.getConfiguration('windevHelper');
-        let certPath = config.get<string>('certificatePath');
+        const config = vscode.workspace.getConfiguration(CONFIG.SECTION);
+        let certPath = config.get<string>(CONFIG.CERTIFICATE_PATH);
 
         if (!certPath) {
             const certUri = await vscode.window.showOpenDialog({
@@ -177,7 +179,7 @@ export class PackageManager {
                     inputPath: packagePath,
                     certPath: certPath,
                     password: password,
-                    timestampUrl: 'http://timestamp.digicert.com'
+                    timestampUrl: DEFAULTS.TIMESTAMP_URL
                 };
 
                 await this.winAppCli.sign(options);
@@ -189,6 +191,7 @@ export class PackageManager {
 
     /**
      * Generates a development certificate
+     * @returns Promise that resolves when certificate generation is complete
      */
     public async generateCertificate(): Promise<void> {
         // Get subject name

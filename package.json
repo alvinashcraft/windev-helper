@@ -28,8 +28,7 @@
     "C#"
   ],
   "activationEvents": [
-    "workspaceContains:**/*.csproj",
-    "onLanguage:csharp",
+    "workspaceContains:**/Package.appxmanifest",
     "onLanguage:xaml"
   ],
   "main": "./dist/extension.js",
@@ -385,22 +384,6 @@
             }
           }
         ]
-      }
-    ],
-    "views": {
-      "explorer": [
-        {
-          "id": "windevHelper.projectExplorer",
-          "name": "WinUI Project",
-          "when": "windevHelper.isWinUIProject",
-          "contextualTitle": "WinUI"
-        }
-      ]
-    },
-    "viewsWelcome": [
-      {
-        "view": "windevHelper.projectExplorer",
-        "contents": "No WinUI project detected.\n[Create WinUI Project](command:windev-helper.createProject)\n[Install WinUI Templates](command:windev-helper.installTemplates)"
       }
     ]
   },

@@ -6,6 +6,7 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as cp from 'child_process';
 import { WinAppCli } from './winAppCli';
+import { CONFIG, OUTPUT_CHANNELS, DEFAULTS } from './constants';
 
 export type BuildConfiguration = 'Debug' | 'Release';
 export type BuildPlatform = 'x86' | 'x64' | 'ARM64';
@@ -14,16 +15,27 @@ export type BuildPlatform = 'x86' | 'x64' | 'ARM64';
  * Manages build operations for WinUI projects
  */
 export class BuildManager {
-    private winAppCli: WinAppCli;
-    private outputChannel: vscode.OutputChannel;
+    private readonly outputChannel: vscode.OutputChannel;
     private _currentConfiguration: BuildConfiguration;
     private _currentPlatform: BuildPlatform;
     private buildProcess: cp.ChildProcess | undefined;
-    private configChangeDisposable: vscode.Disposable;
+    private readonly configChangeDisposable: vscode.Disposable;
 
-    constructor(winAppCli: WinAppCli) {
-        this.winAppCli = winAppCli;
-        this.outputChannel = vscode.window.createOutputChannel('WinUI Build');
+    // Event emitters for configuration changes
+    private readonly _onConfigurationChanged = new vscode.EventEmitter<BuildConfiguration>();
+    private readonly _onPlatformChanged = new vscode.EventEmitter<BuildPlatform>();
+
+    /** Fired when build configuration changes */
+    public readonly onConfigurationChanged = this._onConfigurationChanged.event;
+    /** Fired when target platform changes */
+    public readonly onPlatformChanged = this._onPlatformChanged.event;
+
+    /**
+     * Creates a new BuildManager instance
+     * @param _winAppCli - WinAppCli instance (reserved for future use)
+     */
+    constructor(_winAppCli: WinAppCli) {
+        this.outputChannel = vscode.window.createOutputChannel(OUTPUT_CHANNELS.BUILD);
         
         // Load defaults from configuration
         this._currentConfiguration = this.getConfigurationSetting();
@@ -31,11 +43,19 @@ export class BuildManager {
 
         // Listen for configuration changes
         this.configChangeDisposable = vscode.workspace.onDidChangeConfiguration((e) => {
-            if (e.affectsConfiguration('windevHelper.defaultConfiguration')) {
-                this._currentConfiguration = this.getConfigurationSetting();
+            if (e.affectsConfiguration(`${CONFIG.SECTION}.${CONFIG.DEFAULT_CONFIGURATION}`)) {
+                const newConfig = this.getConfigurationSetting();
+                if (newConfig !== this._currentConfiguration) {
+                    this._currentConfiguration = newConfig;
+                    this._onConfigurationChanged.fire(this._currentConfiguration);
+                }
             }
-            if (e.affectsConfiguration('windevHelper.defaultPlatform')) {
-                this._currentPlatform = this.getPlatformSetting();
+            if (e.affectsConfiguration(`${CONFIG.SECTION}.${CONFIG.DEFAULT_PLATFORM}`)) {
+                const newPlatform = this.getPlatformSetting();
+                if (newPlatform !== this._currentPlatform) {
+                    this._currentPlatform = newPlatform;
+                    this._onPlatformChanged.fire(this._currentPlatform);
+                }
             }
         });
     }
@@ -44,27 +64,27 @@ export class BuildManager {
      * Gets the configuration setting with proper type handling
      */
     private getConfigurationSetting(): BuildConfiguration {
-        const config = vscode.workspace.getConfiguration('windevHelper');
-        const value = config.get<string>('defaultConfiguration');
+        const config = vscode.workspace.getConfiguration(CONFIG.SECTION);
+        const value = config.get<string>(CONFIG.DEFAULT_CONFIGURATION);
         if (value === 'Release') {
             return 'Release';
         }
-        return 'Debug';
+        return DEFAULTS.CONFIGURATION;
     }
 
     /**
      * Gets the platform setting with proper type handling
      */
     private getPlatformSetting(): BuildPlatform {
-        const config = vscode.workspace.getConfiguration('windevHelper');
-        const value = config.get<string>('defaultPlatform');
+        const config = vscode.workspace.getConfiguration(CONFIG.SECTION);
+        const value = config.get<string>(CONFIG.DEFAULT_PLATFORM);
         if (value === 'x86') {
             return 'x86';
         }
         if (value === 'ARM64') {
             return 'ARM64';
         }
-        return 'x64';
+        return DEFAULTS.PLATFORM;
     }
 
     /**
@@ -129,6 +149,11 @@ export class BuildManager {
 
     /**
      * Runs a dotnet CLI command
+     * @param command - The dotnet command to run (build, clean, run, publish)
+     * @param projectUri - Optional URI to the project file
+     * @param showOutput - Whether to show output in the output channel
+     * @param additionalArgs - Additional arguments to pass to dotnet
+     * @returns Promise<boolean> - True if the command succeeded
      */
     private async runDotnetCommand(
         command: string, 
@@ -146,26 +171,29 @@ export class BuildManager {
                 return;
             }
 
-            const args = [
-                command,
-                projectPath ? `"${projectPath}"` : '',
-                '-c', this._currentConfiguration,
-                '-p:Platform=' + this._currentPlatform,
-                ...additionalArgs
-            ].filter(Boolean);
+            // Build args array without shell quoting - let spawn handle it
+            const args: string[] = [command];
+            if (projectPath) {
+                args.push(projectPath);
+            }
+            args.push('-c', this._currentConfiguration);
+            args.push(`-p:Platform=${this._currentPlatform}`);
+            args.push(...additionalArgs);
 
-            const fullCommand = `dotnet ${args.join(' ')}`;
+            const displayCommand = `dotnet ${args.join(' ')}`;
             
             if (showOutput) {
                 this.outputChannel.clear();
-                this.outputChannel.appendLine(`> ${fullCommand}`);
+                this.outputChannel.appendLine(`> ${displayCommand}`);
                 this.outputChannel.appendLine('');
                 this.outputChannel.show();
             }
 
+            // Use shell: false for security - avoids command injection
             this.buildProcess = cp.spawn('dotnet', args, {
                 cwd: workingDir,
-                shell: true
+                shell: false,
+                windowsHide: true
             });
 
             this.buildProcess.stdout?.on('data', (data) => {
@@ -223,8 +251,9 @@ export class BuildManager {
             title: 'Build Configuration'
         });
 
-        if (selected) {
+        if (selected && selected !== this._currentConfiguration) {
             this._currentConfiguration = selected as BuildConfiguration;
+            this._onConfigurationChanged.fire(this._currentConfiguration);
             vscode.window.showInformationMessage(`Build configuration set to ${selected}`);
         }
     }
@@ -239,8 +268,9 @@ export class BuildManager {
             title: 'Target Platform'
         });
 
-        if (selected) {
+        if (selected && selected !== this._currentPlatform) {
             this._currentPlatform = selected as BuildPlatform;
+            this._onPlatformChanged.fire(this._currentPlatform);
             vscode.window.showInformationMessage(`Target platform set to ${selected}`);
         }
     }
@@ -263,15 +293,19 @@ export class BuildManager {
 
     /**
      * Gets the output path for the current build
+     * @param projectPath - Path to the project file
+     * @param targetFramework - Optional target framework (defaults to net8.0-windows10.0.19041.0)
+     * @returns The full path to the build output directory
      */
-    public getOutputPath(projectPath: string): string {
+    public getOutputPath(projectPath: string, targetFramework?: string): string {
         const projectDir = path.dirname(projectPath);
+        const tfm = targetFramework || DEFAULTS.TARGET_FRAMEWORK;
         return path.join(
             projectDir, 
             'bin', 
             this._currentPlatform, 
             this._currentConfiguration, 
-            `net8.0-windows10.0.19041.0`,
+            tfm,
             this.getRuntimeIdentifier()
         );
     }
@@ -283,5 +317,7 @@ export class BuildManager {
         this.cancelBuild();
         this.outputChannel.dispose();
         this.configChangeDisposable.dispose();
+        this._onConfigurationChanged.dispose();
+        this._onPlatformChanged.dispose();
     }
 }

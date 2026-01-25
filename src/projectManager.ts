@@ -6,6 +6,7 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
 import { WinAppCli } from './winAppCli';
+import { CONTEXT_KEYS, FILE_PATTERNS, PROJECT_INDICATORS } from './constants';
 
 /**
  * Manages WinUI project detection and operations
@@ -39,6 +40,7 @@ export class WinUIProjectManager {
 
     /**
      * Detects if the current workspace contains a WinUI project
+     * @returns Promise<boolean> - True if a WinUI project was detected
      */
     public async detectWinUIProject(): Promise<boolean> {
         const workspaceFolders = vscode.workspace.workspaceFolders;
@@ -48,7 +50,7 @@ export class WinUIProjectManager {
         }
 
         // Look for .csproj files
-        const csprojFiles = await vscode.workspace.findFiles('**/*.csproj', '**/bin/**');
+        const csprojFiles = await vscode.workspace.findFiles(FILE_PATTERNS.CSPROJ, '**/bin/**');
         
         for (const csprojFile of csprojFiles) {
             if (await this.isWinUIProjectFile(csprojFile)) {
@@ -64,19 +66,36 @@ export class WinUIProjectManager {
 
     /**
      * Checks if a .csproj file is a WinUI project
+     * @param csprojUri - URI to the .csproj file
+     * @returns Promise<boolean> - True if this is a WinUI project
      */
     private async isWinUIProjectFile(csprojUri: vscode.Uri): Promise<boolean> {
         try {
             const content = await fs.promises.readFile(csprojUri.fsPath, 'utf8');
             
             // Check for WinUI indicators
-            const hasUseWinUI = content.includes('<UseWinUI>true</UseWinUI>');
-            const hasWindowsAppSdk = content.includes('Microsoft.WindowsAppSDK');
-            const hasWinUIReference = content.includes('Microsoft.WinUI');
-            const hasWindowsTarget = /<TargetFramework>.*windows.*<\/TargetFramework>/i.test(content);
+            const hasUseWinUI = content.includes(PROJECT_INDICATORS.USE_WINUI);
+            const hasWindowsAppSdk = content.includes(PROJECT_INDICATORS.WINDOWS_APP_SDK);
+            const hasWinUIReference = content.includes(PROJECT_INDICATORS.WINUI_REFERENCE);
+            const hasWindowsTarget = PROJECT_INDICATORS.WINDOWS_TARGET_REGEX.test(content);
 
             return hasUseWinUI || hasWindowsAppSdk || hasWinUIReference || hasWindowsTarget;
-        } catch {
+        } catch (error) {
+            // Log specific error types for debugging
+            if (error instanceof Error) {
+                if ('code' in error) {
+                    const nodeError = error as NodeJS.ErrnoException;
+                    if (nodeError.code === 'ENOENT') {
+                        console.warn(`Project file not found: ${csprojUri.fsPath}`);
+                    } else if (nodeError.code === 'EACCES') {
+                        console.error(`Permission denied reading: ${csprojUri.fsPath}`);
+                    } else {
+                        console.error(`Error reading project file ${csprojUri.fsPath}: ${nodeError.code}`);
+                    }
+                } else {
+                    console.error(`Error reading project file ${csprojUri.fsPath}: ${error.message}`);
+                }
+            }
             return false;
         }
     }
@@ -96,10 +115,11 @@ export class WinUIProjectManager {
 
     /**
      * Sets the WinUI project context
+     * @param value - Whether a WinUI project is detected
      */
     private setIsWinUIProject(value: boolean): void {
         this._isWinUIProject = value;
-        vscode.commands.executeCommand('setContext', 'windevHelper.isWinUIProject', value);
+        vscode.commands.executeCommand('setContext', CONTEXT_KEYS.IS_WINUI_PROJECT, value);
     }
 
     /**
@@ -158,6 +178,7 @@ export class WinUIProjectManager {
 
     /**
      * Gets project information from the .csproj file
+     * @returns Promise<ProjectInfo | undefined> - The project info or undefined if not available
      */
     public async getProjectInfo(): Promise<ProjectInfo | undefined> {
         if (!this._currentProject) {
@@ -167,14 +188,18 @@ export class WinUIProjectManager {
         try {
             const content = await fs.promises.readFile(this._currentProject.fsPath, 'utf8');
             
+            const targetFramework = this.extractXmlValue(content, 'TargetFramework');
+            const windowsAppSdkVersion = this.extractPackageVersion(content, 'Microsoft.WindowsAppSDK');
+            const windowsSdkVersion = this.extractPackageVersion(content, 'Microsoft.Windows.SDK.BuildTools');
+            
             const info: ProjectInfo = {
                 path: this._currentProject.fsPath,
                 name: this.getProjectName() || 'Unknown',
-                targetFramework: this.extractXmlValue(content, 'TargetFramework'),
                 platforms: this.extractXmlValue(content, 'Platforms')?.split(';') || ['x64'],
                 runtimeIdentifiers: this.extractXmlValue(content, 'RuntimeIdentifiers')?.split(';') || [],
-                windowsAppSdkVersion: this.extractPackageVersion(content, 'Microsoft.WindowsAppSDK'),
-                windowsSdkVersion: this.extractPackageVersion(content, 'Microsoft.Windows.SDK.BuildTools')
+                ...(targetFramework && { targetFramework }),
+                ...(windowsAppSdkVersion && { windowsAppSdkVersion }),
+                ...(windowsSdkVersion && { windowsSdkVersion })
             };
 
             return info;
