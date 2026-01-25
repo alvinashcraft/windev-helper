@@ -60,13 +60,16 @@ npm test
 ```
 windev-helper/
 ├── src/
-│   ├── extension.ts          # Extension entry point
+│   ├── extension.ts          # Extension entry point (uses ServiceLocator)
+│   ├── serviceLocator.ts     # Dependency injection container
+│   ├── constants.ts          # Centralized constants and configuration keys
+│   ├── cancellation.ts       # Cancellation utilities for async operations
 │   ├── winAppCli.ts          # WinApp CLI wrapper
 │   ├── projectManager.ts     # Project detection and management
-│   ├── buildManager.ts       # Build operations
+│   ├── buildManager.ts       # Build operations (with cancellation support)
 │   ├── packageManager.ts     # MSIX packaging
-│   ├── templateManager.ts    # Project/item templates
-│   ├── statusBarManager.ts   # Status bar items
+│   ├── templateManager.ts    # Project/item templates (with MVVM setup)
+│   ├── statusBarManager.ts   # Status bar items (event-based sync)
 │   ├── debugConfigurationProvider.ts  # Debug configuration
 │   └── test/
 │       └── extension.test.ts # Tests
@@ -76,6 +79,13 @@ windev-helper/
 ├── tsconfig.json             # TypeScript configuration
 └── README.md                 # Main readme
 ```
+
+### Key Architecture Patterns
+
+- **Service Locator**: All managers are accessed via `ServiceLocator.instance` for cleaner dependency management
+- **Event-Based Communication**: `BuildManager` emits events, `StatusBarManager` subscribes
+- **Cancellation Support**: Long-running operations accept `CancellationToken` parameters
+- **Global Usings**: Template manager automatically sets up MVVM imports
 
 ---
 

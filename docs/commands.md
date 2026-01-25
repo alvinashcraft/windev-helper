@@ -48,6 +48,8 @@ dotnet new winuilib -n LibraryName
 
 ## Item Template Commands
 
+All item template commands automatically configure MVVM support by ensuring the project has an `Imports.cs` file with global usings for CommunityToolkit.Mvvm.
+
 ### WinUI: Add New Page
 
 **Command ID:** `windev-helper.addPage`
@@ -59,6 +61,7 @@ Adds a new XAML page to your project.
 1. Right-click a folder in Explorer and select this command, or run from Command Palette
 2. Enter the page name (without extension)
 3. Creates `PageName.xaml` and `PageName.xaml.cs`
+4. Automatically adds `Imports.cs` with MVVM global usings if not present
 
 **Equivalent CLI:**
 
@@ -79,6 +82,7 @@ Adds a new XAML user control to your project.
 1. Right-click a folder or use Command Palette
 2. Enter the control name
 3. Creates `ControlName.xaml` and `ControlName.xaml.cs`
+4. Automatically adds `Imports.cs` with MVVM global usings if not present
 
 **Equivalent CLI:**
 
@@ -99,6 +103,7 @@ Adds a new window to your project.
 1. Right-click a folder or use Command Palette
 2. Enter the window name
 3. Creates `WindowName.xaml` and `WindowName.xaml.cs`
+4. Automatically adds `Imports.cs` with MVVM global usings if not present
 
 **Equivalent CLI:**
 
@@ -109,6 +114,8 @@ dotnet new winui-window -n WindowName
 ---
 
 ## Build Commands
+
+Build commands support cancellation - you can cancel long-running builds using the cancel button in the progress notification.
 
 ### WinUI: Build Project
 

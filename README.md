@@ -37,6 +37,7 @@ This extension leverages **winapp**, the Windows App Development CLI, to provide
 - Create new WinUI 3 projects with optional MVVM support
 - Create WinUI class libraries
 - Add new Pages, Windows, and User Controls to your project
+- **Automatic MVVM setup** - Global usings for CommunityToolkit.Mvvm are automatically added when creating views
 - Powered by [WinUI Templates](https://github.com/egvijayanand/winui-templates)
 
 ### 🛠️ App Manifest Management

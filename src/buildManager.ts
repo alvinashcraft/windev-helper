@@ -102,32 +102,48 @@ export class BuildManager {
     }
 
     /**
-     * Builds the WinUI project
+     * Builds the WinUI project with optional cancellation support
+     * @param projectUri - Optional URI to the project file
+     * @param token - Optional cancellation token
+     * @returns Promise<boolean> - True if the build succeeded
      */
-    public async build(projectUri?: vscode.Uri): Promise<boolean> {
-        return this.runDotnetCommand('build', projectUri);
+    public async build(projectUri?: vscode.Uri, token?: vscode.CancellationToken): Promise<boolean> {
+        return this.runDotnetCommand('build', projectUri, true, [], token);
     }
 
     /**
-     * Rebuilds the WinUI project (clean + build)
+     * Rebuilds the WinUI project (clean + build) with optional cancellation support
+     * @param projectUri - Optional URI to the project file
+     * @param token - Optional cancellation token
+     * @returns Promise<boolean> - True if the rebuild succeeded
      */
-    public async rebuild(projectUri?: vscode.Uri): Promise<boolean> {
-        const cleanSuccess = await this.clean(projectUri);
+    public async rebuild(projectUri?: vscode.Uri, token?: vscode.CancellationToken): Promise<boolean> {
+        const cleanSuccess = await this.clean(projectUri, token);
         if (!cleanSuccess) {
             return false;
         }
-        return this.build(projectUri);
+        
+        // Check if cancelled after clean
+        if (token?.isCancellationRequested) {
+            return false;
+        }
+        
+        return this.build(projectUri, token);
     }
 
     /**
-     * Cleans the WinUI project
+     * Cleans the WinUI project with optional cancellation support
+     * @param projectUri - Optional URI to the project file
+     * @param token - Optional cancellation token
+     * @returns Promise<boolean> - True if the clean succeeded
      */
-    public async clean(projectUri?: vscode.Uri): Promise<boolean> {
-        return this.runDotnetCommand('clean', projectUri);
+    public async clean(projectUri?: vscode.Uri, token?: vscode.CancellationToken): Promise<boolean> {
+        return this.runDotnetCommand('clean', projectUri, true, [], token);
     }
 
     /**
      * Runs the project without debugging
+     * @param projectUri - Optional URI to the project file
      */
     public async runWithoutDebugging(projectUri?: vscode.Uri): Promise<void> {
         const buildSuccess = await this.build(projectUri);
@@ -140,28 +156,44 @@ export class BuildManager {
     }
 
     /**
-     * Publishes the project
+     * Publishes the project with optional cancellation support
+     * @param projectUri - Optional URI to the project file
+     * @param runtimeIdentifier - Optional runtime identifier
+     * @param token - Optional cancellation token
+     * @returns Promise<boolean> - True if the publish succeeded
      */
-    public async publish(projectUri?: vscode.Uri, runtimeIdentifier?: string): Promise<boolean> {
+    public async publish(
+        projectUri?: vscode.Uri, 
+        runtimeIdentifier?: string,
+        token?: vscode.CancellationToken
+    ): Promise<boolean> {
         const rid = runtimeIdentifier || this.getRuntimeIdentifier();
-        return this.runDotnetCommand('publish', projectUri, true, ['-r', rid, '--self-contained']);
+        return this.runDotnetCommand('publish', projectUri, true, ['-r', rid, '--self-contained'], token);
     }
 
     /**
-     * Runs a dotnet CLI command
+     * Runs a dotnet CLI command with cancellation support
      * @param command - The dotnet command to run (build, clean, run, publish)
      * @param projectUri - Optional URI to the project file
      * @param showOutput - Whether to show output in the output channel
      * @param additionalArgs - Additional arguments to pass to dotnet
+     * @param token - Optional cancellation token
      * @returns Promise<boolean> - True if the command succeeded
      */
     private async runDotnetCommand(
         command: string, 
         projectUri?: vscode.Uri, 
         showOutput: boolean = true,
-        additionalArgs: string[] = []
+        additionalArgs: string[] = [],
+        token?: vscode.CancellationToken
     ): Promise<boolean> {
         return new Promise((resolve) => {
+            // Check if already cancelled
+            if (token?.isCancellationRequested) {
+                resolve(false);
+                return;
+            }
+
             const projectPath = projectUri?.fsPath || '';
             const workingDir = projectPath ? path.dirname(projectPath) : vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
             
@@ -196,6 +228,17 @@ export class BuildManager {
                 windowsHide: true
             });
 
+            // Handle cancellation
+            let cancellationListener: vscode.Disposable | undefined;
+            if (token) {
+                cancellationListener = token.onCancellationRequested(() => {
+                    this.cancelBuild();
+                    if (showOutput) {
+                        this.outputChannel.appendLine('Build cancelled by user.');
+                    }
+                });
+            }
+
             this.buildProcess.stdout?.on('data', (data) => {
                 if (showOutput) {
                     this.outputChannel.append(data.toString());
@@ -208,20 +251,29 @@ export class BuildManager {
                 }
             });
 
-            this.buildProcess.on('close', (code) => {
+            this.buildProcess.on('close', (code, signal) => {
+                cancellationListener?.dispose();
+                
+                const wasCancelled = signal === 'SIGTERM' || token?.isCancellationRequested;
+                
                 if (showOutput) {
                     this.outputChannel.appendLine('');
-                    if (code === 0) {
+                    if (wasCancelled) {
+                        this.outputChannel.appendLine('Build was cancelled.');
+                    } else if (code === 0) {
                         this.outputChannel.appendLine(`Build succeeded.`);
                     } else {
                         this.outputChannel.appendLine(`Build failed with exit code ${code}.`);
                     }
                 }
                 this.buildProcess = undefined;
-                resolve(code === 0);
+                
+                // Return false if cancelled or failed
+                resolve(!wasCancelled && code === 0);
             });
 
             this.buildProcess.on('error', (error) => {
+                cancellationListener?.dispose();
                 if (showOutput) {
                     this.outputChannel.appendLine(`Error: ${error.message}`);
                 }
@@ -236,8 +288,7 @@ export class BuildManager {
      */
     public cancelBuild(): void {
         if (this.buildProcess) {
-            this.buildProcess.kill();
-            this.outputChannel.appendLine('Build cancelled.');
+            this.buildProcess.kill('SIGTERM');
         }
     }
 

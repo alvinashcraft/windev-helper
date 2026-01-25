@@ -3,53 +3,23 @@
 // Licensed under the MIT License.
 
 import * as vscode from 'vscode';
-import { WinUIProjectManager } from './projectManager';
-import { WinAppCli } from './winAppCli';
-import { BuildManager } from './buildManager';
-import { PackageManager } from './packageManager';
-import { TemplateManager } from './templateManager';
-import { StatusBarManager } from './statusBarManager';
 import { DebugConfigurationProvider } from './debugConfigurationProvider';
+import { ServiceLocator } from './serviceLocator';
 import { COMMANDS, CONFIG, DEBUG_TYPES } from './constants';
 
-let projectManager: WinUIProjectManager;
-let winAppCli: WinAppCli;
-let buildManager: BuildManager;
-let packageManager: PackageManager | undefined;
-let templateManager: TemplateManager | undefined;
-let statusBarManager: StatusBarManager;
-
-/**
- * Lazily gets or creates the PackageManager instance
- */
-function getPackageManager(): PackageManager {
-    if (!packageManager) {
-        packageManager = new PackageManager(winAppCli);
-    }
-    return packageManager;
-}
-
-/**
- * Lazily gets or creates the TemplateManager instance
- */
-function getTemplateManager(): TemplateManager {
-    if (!templateManager) {
-        templateManager = new TemplateManager();
-    }
-    return templateManager;
-}
+let services: ServiceLocator;
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
     console.log('WinDev Helper extension is now active');
 
-    // Initialize core managers synchronously
-    winAppCli = new WinAppCli();
-    projectManager = new WinUIProjectManager(context, winAppCli);
-    buildManager = new BuildManager(winAppCli);
-    statusBarManager = new StatusBarManager(context, buildManager);
+    // Initialize the service locator
+    services = ServiceLocator.initialize(context);
 
     // Register debug configuration provider
-    const debugProvider = new DebugConfigurationProvider(projectManager, buildManager);
+    const debugProvider = new DebugConfigurationProvider(
+        services.projectManager, 
+        services.buildManager
+    );
     context.subscriptions.push(
         vscode.debug.registerDebugConfigurationProvider(DEBUG_TYPES.WINUI, debugProvider)
     );
@@ -63,7 +33,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     // Update status bar based on configuration
     const config = vscode.workspace.getConfiguration(CONFIG.SECTION);
     if (config.get<boolean>(CONFIG.SHOW_STATUS_BAR_ITEMS)) {
-        statusBarManager.show();
+        services.statusBarManager.show();
     }
 }
 
@@ -72,13 +42,13 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
  */
 function initializeInBackground(): void {
     // Detect WinUI project and optionally restore packages
-    projectManager.detectWinUIProject()
+    services.projectManager.detectWinUIProject()
         .then(async (isWinUI) => {
             if (isWinUI) {
                 const config = vscode.workspace.getConfiguration(CONFIG.SECTION);
                 if (config.get<boolean>(CONFIG.AUTO_RESTORE_ON_OPEN)) {
                     try {
-                        await getPackageManager().restorePackages();
+                        await services.packageManager.restorePackages();
                     } catch (err) {
                         console.error('Auto-restore failed:', err);
                     }
@@ -94,57 +64,57 @@ function registerCommands(context: vscode.ExtensionContext): void {
     // Project creation commands
     context.subscriptions.push(
         vscode.commands.registerCommand(COMMANDS.CREATE_PROJECT, async () => {
-            await getTemplateManager().createProject();
+            await services.templateManager.createProject();
         })
     );
 
     context.subscriptions.push(
         vscode.commands.registerCommand(COMMANDS.CREATE_LIBRARY, async () => {
-            await getTemplateManager().createLibrary();
+            await services.templateManager.createLibrary();
         })
     );
 
     // Item templates
     context.subscriptions.push(
         vscode.commands.registerCommand(COMMANDS.ADD_PAGE, async (uri?: vscode.Uri) => {
-            await getTemplateManager().addPage(uri);
+            await services.templateManager.addPage(uri);
         })
     );
 
     context.subscriptions.push(
         vscode.commands.registerCommand(COMMANDS.ADD_USER_CONTROL, async (uri?: vscode.Uri) => {
-            await getTemplateManager().addUserControl(uri);
+            await services.templateManager.addUserControl(uri);
         })
     );
 
     context.subscriptions.push(
         vscode.commands.registerCommand(COMMANDS.ADD_WINDOW, async (uri?: vscode.Uri) => {
-            await getTemplateManager().addWindow(uri);
+            await services.templateManager.addWindow(uri);
         })
     );
 
     context.subscriptions.push(
         vscode.commands.registerCommand(COMMANDS.ADD_VIEW_MODEL, async (uri?: vscode.Uri) => {
-            await getTemplateManager().addViewModel(uri);
+            await services.templateManager.addViewModel(uri);
         })
     );
 
     // Build commands
     context.subscriptions.push(
         vscode.commands.registerCommand(COMMANDS.BUILD_PROJECT, async () => {
-            await buildManager.build(projectManager.currentProject);
+            await services.buildManager.build(services.projectManager.currentProject);
         })
     );
 
     context.subscriptions.push(
         vscode.commands.registerCommand(COMMANDS.REBUILD_PROJECT, async () => {
-            await buildManager.rebuild(projectManager.currentProject);
+            await services.buildManager.rebuild(services.projectManager.currentProject);
         })
     );
 
     context.subscriptions.push(
         vscode.commands.registerCommand(COMMANDS.CLEAN_PROJECT, async () => {
-            await buildManager.clean(projectManager.currentProject);
+            await services.buildManager.clean(services.projectManager.currentProject);
         })
     );
 
@@ -155,116 +125,114 @@ function registerCommands(context: vscode.ExtensionContext): void {
                 type: DEBUG_TYPES.WINUI,
                 name: 'WinUI: Debug',
                 request: 'launch',
-                project: projectManager.currentProject?.fsPath,
-                configuration: buildManager.currentConfiguration,
-                platform: buildManager.currentPlatform
+                project: services.projectManager.currentProject?.fsPath,
+                configuration: services.buildManager.currentConfiguration,
+                platform: services.buildManager.currentPlatform
             });
         })
     );
 
     context.subscriptions.push(
         vscode.commands.registerCommand(COMMANDS.RUN_WITHOUT_DEBUGGING, async () => {
-            await buildManager.runWithoutDebugging(projectManager.currentProject);
+            await services.buildManager.runWithoutDebugging(services.projectManager.currentProject);
         })
     );
 
     // Package commands
     context.subscriptions.push(
         vscode.commands.registerCommand(COMMANDS.CREATE_MSIX_PACKAGE, async () => {
-            await getPackageManager().createMsixPackage(projectManager.currentProject);
+            await services.packageManager.createMsixPackage(services.projectManager.currentProject);
         })
     );
 
     context.subscriptions.push(
         vscode.commands.registerCommand(COMMANDS.SIGN_PACKAGE, async () => {
-            await getPackageManager().signPackage();
+            await services.packageManager.signPackage();
         })
     );
 
     context.subscriptions.push(
         vscode.commands.registerCommand(COMMANDS.GENERATE_CERTIFICATE, async () => {
-            await getPackageManager().generateCertificate();
+            await services.packageManager.generateCertificate();
         })
     );
 
     context.subscriptions.push(
         vscode.commands.registerCommand(COMMANDS.INSTALL_CERTIFICATE, async () => {
-            await getPackageManager().installCertificate();
+            await services.packageManager.installCertificate();
         })
     );
 
     // Identity and manifest commands
     context.subscriptions.push(
         vscode.commands.registerCommand(COMMANDS.CREATE_DEBUG_IDENTITY, async () => {
-            await getPackageManager().createDebugIdentity(projectManager.currentProject);
+            await services.packageManager.createDebugIdentity(services.projectManager.currentProject);
         })
     );
 
     context.subscriptions.push(
         vscode.commands.registerCommand(COMMANDS.GENERATE_MANIFEST, async () => {
-            await getPackageManager().generateManifest(projectManager.currentProject);
+            await services.packageManager.generateManifest(services.projectManager.currentProject);
         })
     );
 
     context.subscriptions.push(
         vscode.commands.registerCommand(COMMANDS.OPEN_MANIFEST, async () => {
-            await projectManager.openManifest();
+            await services.projectManager.openManifest();
         })
     );
 
     // Package management commands
     context.subscriptions.push(
         vscode.commands.registerCommand(COMMANDS.RESTORE_PACKAGES, async () => {
-            await getPackageManager().restorePackages();
+            await services.packageManager.restorePackages();
         })
     );
 
     context.subscriptions.push(
         vscode.commands.registerCommand(COMMANDS.UPDATE_PACKAGES, async () => {
-            await getPackageManager().updatePackages();
+            await services.packageManager.updatePackages();
         })
     );
 
     // Initialization commands
     context.subscriptions.push(
         vscode.commands.registerCommand(COMMANDS.INITIALIZE_PROJECT, async () => {
-            await winAppCli.init();
+            await services.winAppCli.init();
         })
     );
 
     // Configuration commands
     context.subscriptions.push(
         vscode.commands.registerCommand(COMMANDS.SELECT_BUILD_CONFIGURATION, async () => {
-            await buildManager.selectConfiguration();
+            await services.buildManager.selectConfiguration();
         })
     );
 
     context.subscriptions.push(
         vscode.commands.registerCommand(COMMANDS.SELECT_PLATFORM, async () => {
-            await buildManager.selectPlatform();
+            await services.buildManager.selectPlatform();
         })
     );
 
     // Template commands
     context.subscriptions.push(
         vscode.commands.registerCommand(COMMANDS.INSTALL_TEMPLATES, async () => {
-            await getTemplateManager().installTemplates();
+            await services.templateManager.installTemplates();
         })
     );
 
     // CLI commands
     context.subscriptions.push(
         vscode.commands.registerCommand(COMMANDS.CHECK_WINAPP_CLI, async () => {
-            await winAppCli.checkInstallation();
+            await services.winAppCli.checkInstallation();
         })
     );
 }
 
 export function deactivate(): void {
-    // Dispose all managers that have resources
-    statusBarManager?.dispose();
-    buildManager?.dispose();
-    packageManager?.dispose();
-    templateManager?.dispose();
-    winAppCli?.dispose();
+    // Dispose all services through the service locator
+    if (ServiceLocator.isInitialized) {
+        services.dispose();
+    }
 }

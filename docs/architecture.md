@@ -11,6 +11,9 @@ This document provides an overview of the WinDev Helper extension architecture f
 │                         extension.ts                             │
 │                     (Entry Point & Command Registration)         │
 ├─────────────────────────────────────────────────────────────────┤
+│                       Service Locator                            │
+│                    (Dependency Injection)                        │
+├─────────────────────────────────────────────────────────────────┤
 │                           Managers                               │
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐             │
 │  │   Project   │  │    Build    │  │   Package   │             │
@@ -20,6 +23,11 @@ This document provides an overview of the WinDev Helper extension architecture f
 │  │  Template   │  │  StatusBar  │  │    Debug    │             │
 │  │   Manager   │  │   Manager   │  │   Provider  │             │
 │  └─────────────┘  └─────────────┘  └─────────────┘             │
+├─────────────────────────────────────────────────────────────────┤
+│                       Utilities                                  │
+│  ┌─────────────┐  ┌─────────────┐                               │
+│  │  Constants  │  │ Cancellation│                               │
+│  └─────────────┘  └─────────────┘                               │
 ├─────────────────────────────────────────────────────────────────┤
 │                        WinApp CLI                                │
 │                    (CLI Wrapper Layer)                           │
@@ -31,23 +39,84 @@ This document provides an overview of the WinDev Helper extension architecture f
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-## Components
+## Core Components
+
+### Service Locator (`serviceLocator.ts`)
+
+The extension uses a service locator pattern for dependency injection, providing:
+
+- **Lazy initialization** - Services are created on-demand
+- **Centralized access** - Single point of access to all services
+- **Proper lifecycle management** - Coordinated disposal of all services
+
+```typescript
+class ServiceLocator {
+    // Singleton access
+    static initialize(context: vscode.ExtensionContext): ServiceLocator
+    static get instance(): ServiceLocator
+    static get isInitialized(): boolean
+    
+    // Core services (eagerly initialized when accessed)
+    get winAppCli(): WinAppCli
+    get projectManager(): WinUIProjectManager
+    get buildManager(): BuildManager
+    get statusBarManager(): StatusBarManager
+    
+    // Lazy services (initialized on first access)
+    get packageManager(): PackageManager
+    get templateManager(): TemplateManager
+    
+    // Lifecycle
+    dispose(): void
+}
+```
+
+### Constants (`constants.ts`)
+
+Centralized configuration and magic strings:
+
+```typescript
+// Context keys for when clauses
+export const CONTEXT_KEYS = { IS_WINUI_PROJECT: 'windevHelper.isWinUIProject' }
+
+// Configuration section and property names
+export const CONFIG = { SECTION: 'windevHelper', ... }
+
+// Command identifiers
+export const COMMANDS = { BUILD_PROJECT: 'windev-helper.buildProject', ... }
+
+// Output channel names, debug types, file patterns, defaults
+export const OUTPUT_CHANNELS = { ... }
+export const DEBUG_TYPES = { ... }
+export const FILE_PATTERNS = { ... }
+export const DEFAULTS = { ... }
+```
 
 ### Extension Entry Point (`extension.ts`)
 
 The main entry point that:
 
-- Activates on workspace containing `.csproj` files
-- Initializes all manager components
-- Registers commands with VS Code
-- Sets up event handlers and watchers
+- Initializes the service locator on activation
+- Registers commands with VS Code using the service locator
+- Performs non-blocking background initialization
+- Properly disposes all services on deactivation
 
 ```typescript
 export async function activate(context: vscode.ExtensionContext) {
-    // Initialize managers
-    winAppCli = new WinAppCli();
-    projectManager = new WinUIProjectManager(context, winAppCli);
-    // ... register commands
+    // Initialize the service locator
+    services = ServiceLocator.initialize(context);
+    
+    // Register debug provider and commands
+    // ...
+    
+    // Non-blocking background initialization
+    initializeInBackground();
+}
+
+export function deactivate() {
+    if (ServiceLocator.isInitialized) {
+        services.dispose();
+    }
 }
 ```
 
@@ -104,7 +173,7 @@ class WinUIProjectManager {
 
 ### Build Manager (`buildManager.ts`)
 
-Manages build operations and configuration:
+Manages build operations and configuration with cancellation support:
 
 ```typescript
 class BuildManager {
@@ -112,13 +181,62 @@ class BuildManager {
     currentConfiguration: BuildConfiguration  // Debug | Release
     currentPlatform: BuildPlatform            // x86 | x64 | ARM64
     
-    // Methods
-    build(project: vscode.Uri): Promise<boolean>
-    rebuild(project: vscode.Uri): Promise<boolean>
-    clean(project: vscode.Uri): Promise<boolean>
+    // Events (for StatusBarManager integration)
+    onConfigurationChanged: vscode.Event<BuildConfiguration>
+    onPlatformChanged: vscode.Event<BuildPlatform>
+    
+    // Methods with optional cancellation token
+    build(project: vscode.Uri, token?: CancellationToken): Promise<boolean>
+    rebuild(project: vscode.Uri, token?: CancellationToken): Promise<boolean>
+    clean(project: vscode.Uri, token?: CancellationToken): Promise<boolean>
+    publish(project: vscode.Uri, rid?: string, token?: CancellationToken): Promise<boolean>
     runWithoutDebugging(project: vscode.Uri): Promise<void>
-    publish(project: vscode.Uri): Promise<boolean>
+    
+    // Build control
+    cancelBuild(): void
 }
+```
+
+**Cancellation Support:**
+
+Build operations accept an optional `CancellationToken` parameter, allowing users to cancel long-running builds. When cancelled:
+- The child process is terminated with SIGTERM
+- The build returns `false`
+- Output channel displays "Build was cancelled"
+```
+
+### Cancellation Utilities (`cancellation.ts`)
+
+Provides utilities for cancellable async operations:
+
+```typescript
+// Result type for cancellable operations
+interface CancellableResult<T> {
+    success: boolean
+    value?: T
+    cancelled: boolean
+    error?: Error
+}
+
+// Run a child process with cancellation support
+function runCancellableProcess(
+    command: string,
+    args: string[],
+    options: SpawnOptions,
+    token?: CancellationToken
+): Promise<CancellableResult<string>>
+
+// Show progress with cancellation button
+function withCancellableProgress<T>(
+    title: string,
+    task: (progress: Progress, token: CancellationToken) => Promise<T>
+): Promise<T | undefined>
+
+// Cancellable timeout utility
+function cancellableTimeout(
+    ms: number,
+    token: CancellationToken
+): Promise<boolean>
 ```
 
 ### Package Manager (`packageManager.ts`)
@@ -143,7 +261,7 @@ class PackageManager {
 
 ### Template Manager (`templateManager.ts`)
 
-Manages project and item template operations:
+Manages project and item template operations with automatic global usings support:
 
 ```typescript
 class TemplateManager {
@@ -155,19 +273,26 @@ class TemplateManager {
     createProject(): Promise<void>
     createLibrary(): Promise<void>
     
-    // Item templates
+    // Item templates (auto-adds global usings for MVVM)
     addPage(uri?: vscode.Uri): Promise<void>
     addUserControl(uri?: vscode.Uri): Promise<void>
     addWindow(uri?: vscode.Uri): Promise<void>
 }
 ```
 
+**Global Usings Management:**
+
+When adding Pages, Controls, or Windows, the template manager automatically:
+1. Checks for existing `Imports.cs` file
+2. Creates it if missing with CommunityToolkit.Mvvm imports
+3. Ensures MVVM patterns work without manual using statements
+
 ### Status Bar Manager (`statusBarManager.ts`)
 
-Manages status bar UI elements:
+Manages status bar UI elements with event-based synchronization:
 
 ```typescript
-class StatusBarManager {
+class StatusBarManager implements vscode.Disposable {
     // Display
     show(): void
     hide(): void
@@ -175,6 +300,9 @@ class StatusBarManager {
     // Updates
     updateConfiguration(config: string): void
     updatePlatform(platform: string): void
+    
+    // Event subscription (called from extension.ts)
+    subscribeToEvents(buildManager: BuildManager): void
 }
 ```
 
@@ -182,6 +310,14 @@ class StatusBarManager {
 
 - Configuration selector (Debug/Release)
 - Platform selector (x86/x64/ARM64)
+
+**Event-Based Synchronization:**
+
+The StatusBarManager subscribes to BuildManager events to stay in sync:
+```typescript
+services.statusBarManager.subscribeToEvents(services.buildManager);
+// Now status bar auto-updates when build config/platform changes
+```
 
 ### Debug Configuration Provider (`debugConfigurationProvider.ts`)
 
@@ -204,7 +340,7 @@ class DebugConfigurationProvider implements vscode.DebugConfigurationProvider {
 
 1. User presses F5
 2. Provider creates/resolves configuration
-3. Build manager builds the project
+3. Runs `preLaunchTask: "winui: build"` (builds the project)
 4. Converts `winui` type to `coreclr`
 5. VS Code launches the debugger
 

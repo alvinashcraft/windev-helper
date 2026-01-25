@@ -132,6 +132,20 @@ MyControls/
 
 ## Item Templates
 
+When adding item templates (Pages, User Controls, Windows) through VS Code, the extension automatically ensures MVVM support by creating or updating an `Imports.cs` file with global usings for CommunityToolkit.Mvvm. This enables ObservableObject, RelayCommand, and other MVVM patterns without manual using statements.
+
+### Automatic MVVM Setup
+
+When you add any view item, the extension:
+
+1. Checks if `Imports.cs` exists in the project root
+2. If missing, creates it with:
+   ```csharp
+   global using CommunityToolkit.Mvvm.ComponentModel;
+   global using CommunityToolkit.Mvvm.Input;
+   ```
+3. Runs the template command to generate the XAML files
+
 ### XAML Page
 
 **Template:** `winui-page`
