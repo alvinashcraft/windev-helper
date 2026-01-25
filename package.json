@@ -3,13 +3,23 @@
   "displayName": "WinDev Helper",
   "description": "Build beautiful, performant WinUI apps with VS Code. Debug, build, package, and deploy Windows apps powered by the Windows App SDK.",
   "version": "1.0.0",
-  "publisher": "windev-helper",
+  "publisher": "alvinashcraft",
   "icon": "images/icon.png",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/windev-helper/windev-helper"
+    "url": "https://github.com/alvinashcraft/windev-helper.git"
   },
+  "bugs": {
+    "url": "https://github.com/alvinashcraft/windev-helper/issues"
+  },
+  "homepage": "https://github.com/alvinashcraft/windev-helper#readme",
+  "readme": "README.md",
+  "galleryBanner": {
+    "color": "#0078D4",
+    "theme": "dark"
+  },
+  "qna": "marketplace",
   "engines": {
     "vscode": "^1.108.1"
   },
