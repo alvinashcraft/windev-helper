@@ -5,6 +5,7 @@
 import * as vscode from 'vscode';
 import * as cp from 'child_process';
 import * as path from 'path';
+import * as fs from 'fs';
 
 /**
  * Wrapper for the Windows App Development CLI (winapp)
@@ -82,28 +83,73 @@ export class WinAppCli {
     }
 
     /**
-     * Initialize project with Windows SDK and App SDK
+     * Check if winapp.yaml exists in the workspace
      */
-    public async init(projectPath?: string): Promise<void> {
+    public isInitialized(workspacePath?: string): boolean {
+        const workingDir = workspacePath || vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+        if (!workingDir) {
+            return false;
+        }
+        const winappYamlPath = path.join(workingDir, 'winapp.yaml');
+        return fs.existsSync(winappYamlPath);
+    }
+
+    /**
+     * Initialize project with Windows SDK and App SDK
+     * @param projectPath Optional path to the project directory
+     * @param skipPrompts If true, uses --no-prompt flag to skip interactive prompts (default: true for non-interactive execution)
+     */
+    public async init(projectPath?: string, skipPrompts: boolean = true): Promise<boolean> {
         try {
-            const args = projectPath ? [projectPath] : [];
+            const args: string[] = [];
+            if (skipPrompts) {
+                args.push('--no-prompt');
+            }
+            if (projectPath) {
+                args.push(projectPath);
+            }
             await this.execute('init', args);
             vscode.window.showInformationMessage('Project initialized with Windows SDK successfully.');
+            return true;
         } catch (error) {
             vscode.window.showErrorMessage(`Failed to initialize project: ${error}`);
+            return false;
         }
     }
 
     /**
      * Restore packages and dependencies
+     * Returns true if restore was successful or skipped, false if failed
      */
-    public async restore(projectPath?: string): Promise<void> {
+    public async restore(projectPath?: string): Promise<boolean> {
+        const workingDir = projectPath || vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+
+        // Check if winapp.yaml exists before attempting restore
+        if (!this.isInitialized(workingDir)) {
+            const action = await vscode.window.showWarningMessage(
+                'WinApp workspace not initialized. winapp.yaml not found. Would you like to initialize it now?',
+                'Initialize',
+                'Skip'
+            );
+
+            if (action === 'Initialize') {
+                const initSuccess = await this.init(projectPath);
+                if (!initSuccess) {
+                    return false;
+                }
+            } else {
+                return false;
+            }
+        }
+
         try {
             const args = projectPath ? [projectPath] : [];
             await this.execute('restore', args);
             vscode.window.showInformationMessage('Packages restored successfully.');
+            return true;
         } catch (error) {
             vscode.window.showErrorMessage(`Failed to restore packages: ${error}`);
+            return false;
         }
     }
 
