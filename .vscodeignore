@@ -1,14 +1,41 @@
+# VS Code and development
 .vscode/**
 .vscode-test/**
+.vscode-test.mjs
+.github/**
+
+# Source files (bundled via esbuild)
+src/**
 out/**
 node_modules/**
-src/**
-.gitignore
-.yarnrc
+
+# Build configuration
 esbuild.js
-vsc-extension-quickstart.md
 **/tsconfig.json
 **/eslint.config.mjs
+.eslintcache
+
+# Documentation (README.md and LICENSE are kept)
+docs/**
+
+# Git files
+.git/**
+.gitignore
+
+# Package files
+*.vsix
+.yarnrc
+package-lock.json
+
+# Source maps and TypeScript files
 **/*.map
 **/*.ts
+!**/*.d.ts
+
+# Test and coverage
+coverage/**
+.nyc_output/**
+
+# Misc
+vsc-extension-quickstart.md
 **/.vscode-test.*
