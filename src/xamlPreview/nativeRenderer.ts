@@ -132,9 +132,9 @@ export class NativeXamlRenderer implements IXamlRenderer {
     private findRendererExecutable(): string | null {
         // Check for the renderer in the extension's native-renderer folder
         const possiblePaths = [
-            // Development: built locally
-            path.join(this.extensionPath, 'native-renderer', 'XamlPreviewHost', 'bin', 'Release', 'net8.0-windows10.0.19041.0', 'win-x64', 'publish', 'XamlPreviewHost.exe'),
-            path.join(this.extensionPath, 'native-renderer', 'XamlPreviewHost', 'bin', 'Debug', 'net8.0-windows10.0.19041.0', 'win-x64', 'XamlPreviewHost.exe'),
+            // Development: built locally (.NET 10)
+            path.join(this.extensionPath, 'native-renderer', 'XamlPreviewHost', 'bin', 'Release', 'net10.0-windows10.0.19041.0', 'win-x64', 'publish', 'XamlPreviewHost.exe'),
+            path.join(this.extensionPath, 'native-renderer', 'XamlPreviewHost', 'bin', 'Debug', 'net10.0-windows10.0.19041.0', 'win-x64', 'XamlPreviewHost.exe'),
             // Production: bundled with extension
             path.join(this.extensionPath, 'bin', 'XamlPreviewHost.exe'),
         ];
