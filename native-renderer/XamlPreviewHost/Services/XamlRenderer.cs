@@ -158,18 +158,15 @@ public class XamlRenderer
             // Apply loaded resources to the element
             if (element is FrameworkElement frameElement && _appResources != null)
             {
-                foreach (var key in _appResources.Keys)
+                foreach (var key in _appResources.Keys.Where(key => !frameElement.Resources.ContainsKey(key)))
                 {
-                    if (!frameElement.Resources.ContainsKey(key))
+                    try
                     {
-                        try
-                        {
-                            frameElement.Resources[key] = _appResources[key];
-                        }
-                        catch
-                        {
-                            // Skip resources that can't be added
-                        }
+                        frameElement.Resources[key] = _appResources[key];
+                    }
+                    catch
+                    {
+                        // Skip resources that can't be added
                     }
                 }
             }
@@ -528,18 +525,15 @@ public class XamlRenderer
                 var appDict = LoadResourceDictionary(resourcesXaml, "App.xaml", warnings);
                 if (appDict != null)
                 {
-                    foreach (var key in appDict.Keys)
+                    foreach (var key in appDict.Keys.Where(key => !_appResources.ContainsKey(key)))
                     {
-                        if (!_appResources.ContainsKey(key))
+                        try
                         {
-                            try
-                            {
-                                _appResources[key] = appDict[key];
-                            }
-                            catch
-                            {
-                                // Skip
-                            }
+                            _appResources[key] = appDict[key];
+                        }
+                        catch
+                        {
+                            // Skip
                         }
                     }
                     Console.Error.WriteLine($"[XamlRenderer] Loaded {appDict.Count} resources from App.xaml");
