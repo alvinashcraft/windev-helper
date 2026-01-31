@@ -158,18 +158,15 @@ public class XamlRenderer
             // Apply loaded resources to the element
             if (element is FrameworkElement frameElement && _appResources != null)
             {
-                foreach (var key in _appResources.Keys)
+                foreach (var key in _appResources.Keys.Where(key => !frameElement.Resources.ContainsKey(key)))
                 {
-                    if (!frameElement.Resources.ContainsKey(key))
+                    try
                     {
-                        try
-                        {
-                            frameElement.Resources[key] = _appResources[key];
-                        }
-                        catch
-                        {
-                            // Skip resources that can't be added
-                        }
+                        frameElement.Resources[key] = _appResources[key];
+                    }
+                    catch
+                    {
+                        // Skip resources that can't be added
                     }
                 }
             }
