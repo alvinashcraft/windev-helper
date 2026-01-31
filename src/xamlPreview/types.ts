@@ -70,6 +70,10 @@ export interface RenderSuccess {
     imageWidth?: number;
     /** Rendered image height in pixels (for image type) */
     imageHeight?: number;
+    /** Layout width in DIPs for element bounds scaling (for image type) */
+    layoutWidth?: number;
+    /** Layout height in DIPs for element bounds scaling (for image type) */
+    layoutHeight?: number;
     /** Element mappings for click-to-source */
     elementMappings: ElementMapping[];
     /** Non-fatal warnings */

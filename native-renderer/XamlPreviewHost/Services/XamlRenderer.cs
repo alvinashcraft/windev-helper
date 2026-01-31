@@ -207,9 +207,9 @@ public class XamlRenderer
                 (uint)renderTarget.PixelWidth, 
                 (uint)renderTarget.PixelHeight);
 
-            // Build element mappings
+            // Build element mappings with bounds relative to the container (which is what gets rendered)
             var elements = new List<ElementInfo>();
-            BuildElementMappings(element, elements, 0, 0);
+            BuildElementMappings(container, element, elements);
 
             // Add binding summary to warnings if any bindings found
             if (bindings.Count > 0)
@@ -226,6 +226,9 @@ public class XamlRenderer
                 ImageBase64 = Convert.ToBase64String(pngBytes),
                 ImageWidth = renderTarget.PixelWidth,
                 ImageHeight = renderTarget.PixelHeight,
+                // Report layout size (DIPs) for element bounds scaling, not pixel size
+                LayoutWidth = options.Width,
+                LayoutHeight = options.Height,
                 Elements = elements.ToArray(),
                 Warnings = warnings.ToArray(),
                 RenderTimeMs = stopwatch.ElapsedMilliseconds
@@ -650,41 +653,65 @@ public class XamlRenderer
     /// <summary>
     /// Build element mappings by walking the visual tree.
     /// </summary>
-    private void BuildElementMappings(DependencyObject obj, List<ElementInfo> elements, double offsetX, double offsetY)
+    private void BuildElementMappings(UIElement rootElement, UIElement currentElement, List<ElementInfo> elements)
     {
-        if (obj is not UIElement uiElement) return;
-
-        var transform = uiElement.TransformToVisual(null);
-        var bounds = transform.TransformBounds(new Windows.Foundation.Rect(
-            0, 0,
-            uiElement is FrameworkElement fe ? fe.ActualWidth : 0,
-            uiElement is FrameworkElement fe2 ? fe2.ActualHeight : 0));
-
-        var elementId = $"el-{_elementCounter++}";
-        var name = uiElement is FrameworkElement fwe ? fwe.Name : null;
-        var typeName = uiElement.GetType().Name;
-
-        elements.Add(new ElementInfo
+        if (currentElement is not FrameworkElement fe) 
         {
-            Id = elementId,
-            Name = string.IsNullOrEmpty(name) ? null : name,
-            Type = typeName,
-            Bounds = new BoundsInfo
+            // Still recurse into non-FrameworkElement children
+            int childCount = VisualTreeHelper.GetChildrenCount(currentElement);
+            for (int i = 0; i < childCount; i++)
             {
-                X = bounds.X,
-                Y = bounds.Y,
-                Width = bounds.Width,
-                Height = bounds.Height
-            },
-            XamlLine = 0,
-            XamlColumn = 0
-        });
+                var child = VisualTreeHelper.GetChild(currentElement, i);
+                if (child is UIElement childElement)
+                {
+                    BuildElementMappings(rootElement, childElement, elements);
+                }
+            }
+            return;
+        }
 
-        int childCount = VisualTreeHelper.GetChildrenCount(obj);
-        for (int i = 0; i < childCount; i++)
+        try
         {
-            var child = VisualTreeHelper.GetChild(obj, i);
-            BuildElementMappings(child, elements, offsetX, offsetY);
+            // Transform bounds relative to the root element (the rendered container)
+            var transform = fe.TransformToVisual(rootElement);
+            var bounds = transform.TransformBounds(new Windows.Foundation.Rect(
+                0, 0,
+                fe.ActualWidth,
+                fe.ActualHeight));
+
+            var elementId = $"el-{_elementCounter++}";
+            var name = fe.Name;
+            var typeName = fe.GetType().Name;
+
+            elements.Add(new ElementInfo
+            {
+                Id = elementId,
+                Name = string.IsNullOrEmpty(name) ? null : name,
+                Type = typeName,
+                Bounds = new BoundsInfo
+                {
+                    X = bounds.X,
+                    Y = bounds.Y,
+                    Width = bounds.Width,
+                    Height = bounds.Height
+                },
+                XamlLine = 0,  // TODO: Implement XAML source location tracking
+                XamlColumn = 0
+            });
+        }
+        catch
+        {
+            // Transform can fail if element is not in visual tree yet
+        }
+
+        int count = VisualTreeHelper.GetChildrenCount(currentElement);
+        for (int i = 0; i < count; i++)
+        {
+            var child = VisualTreeHelper.GetChild(currentElement, i);
+            if (child is UIElement childElement)
+            {
+                BuildElementMappings(rootElement, childElement, elements);
+            }
         }
     }
 
@@ -776,6 +803,10 @@ public class RenderResult
     public string? ImageBase64 { get; set; }
     public int ImageWidth { get; set; }
     public int ImageHeight { get; set; }
+    /// <summary>Layout width in DIPs (for element bounds scaling)</summary>
+    public double LayoutWidth { get; set; }
+    /// <summary>Layout height in DIPs (for element bounds scaling)</summary>
+    public double LayoutHeight { get; set; }
     public ElementInfo[]? Elements { get; set; }
     public string[]? Warnings { get; set; }
     public long RenderTimeMs { get; set; }

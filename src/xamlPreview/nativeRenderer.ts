@@ -36,6 +36,8 @@ interface NativeRenderResponse {
     imageBase64?: string;
     imageWidth?: number;
     imageHeight?: number;
+    layoutWidth?: number;
+    layoutHeight?: number;
     elements?: Array<{
         id: string;
         name?: string;
@@ -362,6 +364,8 @@ export class NativeXamlRenderer implements IXamlRenderer {
                 data: response.imageBase64 || '',
                 ...(response.imageWidth !== undefined && { imageWidth: response.imageWidth }),
                 ...(response.imageHeight !== undefined && { imageHeight: response.imageHeight }),
+                ...(response.layoutWidth !== undefined && { layoutWidth: response.layoutWidth }),
+                ...(response.layoutHeight !== undefined && { layoutHeight: response.layoutHeight }),
                 elementMappings: (response.elements || []).map(el => ({
                     id: el.id,
                     ...(el.name !== undefined && { name: el.name }),

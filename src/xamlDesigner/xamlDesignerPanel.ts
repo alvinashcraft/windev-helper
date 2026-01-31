@@ -5,7 +5,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import { XamlParser, XamlElement } from './xamlParser';
-import { XamlPreviewController, RenderResult, RendererStatus } from '../xamlPreview';
+import { XamlPreviewController, RenderResult, RendererStatus, ElementMapping } from '../xamlPreview';
 
 /**
  * Manages the XAML designer preview webview panel
@@ -247,20 +247,180 @@ export class XamlDesignerPanel {
             }
         }
 
+        // Correlate native renderer elements with parsed XAML to get source locations
+        const mappingsWithLocations = this.correlateElementsWithParsedXaml(result.elementMappings);
+
+        // Debug: log element mappings with stringified bounds
+        console.log('[XAML Preview] Element mappings:', mappingsWithLocations.length);
+        for (const m of mappingsWithLocations.slice(0, 5)) {
+            console.log(`  - ${m.tagName}: line=${m.line}, bounds=`, m.bounds);
+        }
+
         this.panel.webview.postMessage({
             type: 'updateImagePreview',
             imageData: result.data,
             imageWidth: result.imageWidth,
             imageHeight: result.imageHeight,
+            layoutWidth: result.layoutWidth,
+            layoutHeight: result.layoutHeight,
             renderTimeMs: result.renderTimeMs,
-            mappings: result.elementMappings.map(m => ({
+            mappings: mappingsWithLocations
+        });
+    }
+
+    /**
+     * Correlate native renderer elements with parsed XAML to get source locations.
+     * Handles implicit elements (e.g., TextBlock inside Button with Content="Text")
+     * by falling back to parent element locations.
+     */
+    private correlateElementsWithParsedXaml(elementMappings: ElementMapping[]): Array<{
+        elementId: string;
+        line: number;
+        column: number;
+        bounds: { x: number; y: number; width: number; height: number };
+        tagName: string;
+        parentElementId?: string;
+    }> {
+        if (!this.lastParsedRoot) {
+            // No parsed XAML, return original mappings with 0 line/column
+            return elementMappings.map(m => ({
                 elementId: m.id,
                 line: m.xamlLine,
                 column: m.xamlColumn,
                 bounds: m.bounds,
                 tagName: m.type
-            }))
-        });
+            }));
+        }
+
+        // Build a flat list of parsed elements in document order with parent info
+        const parsedElements: Array<{ 
+            tagName: string; 
+            line: number; 
+            column: number; 
+            name?: string;
+            hasContent?: boolean;
+            parent?: XamlElement;
+        }> = [];
+        this.collectParsedElements(this.lastParsedRoot, parsedElements);
+
+        // Match by type in order (both native and parsed traverse in similar order)
+        const result: Array<{
+            elementId: string;
+            line: number;
+            column: number;
+            bounds: { x: number; y: number; width: number; height: number };
+            tagName: string;
+            parentElementId?: string;
+        }> = [];
+
+        // Track which parsed elements we've used and the last matched parent element
+        const usedParsedIndices = new Set<number>();
+        // Track element hierarchy: when we can't match, use parent's location
+        const elementStack: Array<{ elementId: string; line: number; column: number; tagName: string }> = [];
+
+        for (const m of elementMappings) {
+            let matchedLine = 0;
+            let matchedColumn = 0;
+            let parentElementId: string | undefined;
+
+            // Try to match by x:Name first if available
+            if (m.name) {
+                const nameMatch = parsedElements.findIndex((p, i) => 
+                    !usedParsedIndices.has(i) && p.name === m.name && p.tagName === m.type
+                );
+                if (nameMatch >= 0) {
+                    matchedLine = parsedElements[nameMatch].line;
+                    matchedColumn = parsedElements[nameMatch].column;
+                    usedParsedIndices.add(nameMatch);
+                }
+            }
+
+            // Fall back to matching by type in order
+            if (matchedLine === 0) {
+                const typeMatch = parsedElements.findIndex((p, i) => 
+                    !usedParsedIndices.has(i) && p.tagName === m.type
+                );
+                if (typeMatch >= 0) {
+                    matchedLine = parsedElements[typeMatch].line;
+                    matchedColumn = parsedElements[typeMatch].column;
+                    usedParsedIndices.add(typeMatch);
+                }
+            }
+
+            // If still no match, this is likely an implicit element (e.g., TextBlock inside Button)
+            // Use the most recent matched parent's location
+            if (matchedLine === 0 && elementStack.length > 0) {
+                // Find a suitable parent - look for container types like Button, ContentControl, etc.
+                for (let i = elementStack.length - 1; i >= 0; i--) {
+                    const parent = elementStack[i];
+                    // Content controls that can have implicit children
+                    const contentControlTypes = ['Button', 'ToggleButton', 'AppBarButton', 'AppBarToggleButton',
+                        'HyperlinkButton', 'RepeatButton', 'RadioButton', 'CheckBox', 'ContentControl',
+                        'ContentPresenter', 'Border', 'ScrollViewer', 'Viewbox', 'Frame'];
+                    if (contentControlTypes.includes(parent.tagName) || 
+                        parent.tagName.endsWith('Button') || 
+                        parent.tagName === 'ContentControl') {
+                        matchedLine = parent.line;
+                        matchedColumn = parent.column;
+                        parentElementId = parent.elementId;
+                        break;
+                    }
+                }
+                // If no content control parent found, use the immediate previous element
+                if (matchedLine === 0 && elementStack.length > 0) {
+                    const parent = elementStack[elementStack.length - 1];
+                    matchedLine = parent.line;
+                    matchedColumn = parent.column;
+                    parentElementId = parent.elementId;
+                }
+            }
+
+            const entry = {
+                elementId: m.id,
+                line: matchedLine,
+                column: matchedColumn,
+                bounds: m.bounds,
+                tagName: m.type,
+                ...(parentElementId && { parentElementId })
+            };
+            result.push(entry);
+
+            // Track matched elements for parent fallback
+            if (matchedLine > 0 && !parentElementId) {
+                // Only push to stack if this was a direct match (not a parent fallback)
+                elementStack.push({
+                    elementId: m.id,
+                    line: matchedLine,
+                    column: matchedColumn,
+                    tagName: m.type
+                });
+            }
+        }
+
+        return result;
+    }
+
+    /**
+     * Recursively collect parsed elements in document order
+     */
+    private collectParsedElements(
+        element: XamlElement,
+        result: Array<{ tagName: string; line: number; column: number; name?: string }>
+    ): void {
+        const name = element.attributes.get('x:Name') || element.attributes.get('Name');
+        const entry: { tagName: string; line: number; column: number; name?: string } = {
+            tagName: element.tagName,
+            line: element.sourceLocation.startLine,
+            column: element.sourceLocation.startColumn
+        };
+        if (name) {
+            entry.name = name;
+        }
+        result.push(entry);
+
+        for (const child of element.children) {
+            this.collectParsedElements(child, result);
+        }
     }
 
     /**
@@ -504,6 +664,7 @@ export class XamlDesignerPanel {
             min-height: calc(100vh - 50px);
             display: flex;
             justify-content: center;
+            align-items: flex-start;
         }
 
         #preview-content {
@@ -511,6 +672,7 @@ export class XamlDesignerPanel {
             border-radius: 8px;
             overflow: visible;
             position: relative;
+            display: inline-block;
         }
 
         #preview-image {
@@ -740,16 +902,64 @@ export class XamlDesignerPanel {
             switch (message.type) {
                 case 'updateImagePreview':
                     elementMappings = message.mappings || [];
+                    const imageWidth = message.imageWidth || 800;
+                    const imageHeight = message.imageHeight || 600;
+                    // Use layoutWidth for scaling bounds (DIPs) to match displayed size
+                    const layoutWidth = message.layoutWidth || imageWidth;
+                    const layoutHeight = message.layoutHeight || imageHeight;
                     
                     // Show info bar for bindings and warnings
                     updateInfoBar(message.warnings || []);
                     
-                    // For native preview, just show the image without overlays
-                    // Element click detection is not yet supported for native renderer
-                    let html = '<img id="preview-image" src="data:image/png;base64,' + message.imageData + '" />';
-                    
-                    previewContent.innerHTML = html;
+                    // Create image first, then add overlays after it loads to get correct scale
+                    previewContent.innerHTML = '<img id="preview-image" src="data:image/png;base64,' + message.imageData + '" />';
                     previewContent.style.position = 'relative';
+                    
+                    const img = document.getElementById('preview-image');
+                    img.onload = function() {
+                        // Calculate scale factor based on displayed size vs layout size (DIPs)
+                        const displayedWidth = img.offsetWidth;
+                        const displayedHeight = img.offsetHeight;
+                        const scale = displayedWidth / layoutWidth;
+                        
+                        console.log('[XAML Preview] Image scale:', {
+                            imageWidth: imageWidth,
+                            imageHeight: imageHeight,
+                            layoutWidth: layoutWidth,
+                            layoutHeight: layoutHeight,
+                            displayedWidth: displayedWidth,
+                            displayedHeight: displayedHeight,
+                            scale: scale
+                        });
+                        
+                        // Add element overlays with scaled positions
+                        const minSize = 5;
+                        for (let i = 1; i < elementMappings.length; i++) {
+                            const m = elementMappings[i];
+                            if (m.bounds && m.bounds.width >= minSize && m.bounds.height >= minSize) {
+                                const overlay = document.createElement('div');
+                                overlay.className = 'element-overlay';
+                                overlay.id = m.elementId;
+                                overlay.style.left = (m.bounds.x * scale) + 'px';
+                                overlay.style.top = (m.bounds.y * scale) + 'px';
+                                overlay.style.width = (m.bounds.width * scale) + 'px';
+                                overlay.style.height = (m.bounds.height * scale) + 'px';
+                                overlay.dataset.line = m.line;
+                                overlay.dataset.column = m.column || 1;
+                                overlay.dataset.type = m.tagName || '';
+                                if (m.parentElementId) {
+                                    overlay.dataset.parentElementId = m.parentElementId;
+                                }
+                                overlay.onclick = function(event) { handleOverlayClick(event, overlay); };
+                                previewContent.appendChild(overlay);
+                                
+                                console.log('[XAML Preview] Overlay:', m.tagName, 
+                                    'original:', m.bounds, 
+                                    'scaled:', { x: m.bounds.x * scale, y: m.bounds.y * scale, w: m.bounds.width * scale, h: m.bounds.height * scale },
+                                    m.parentElementId ? 'parent:' + m.parentElementId : '');
+                            }
+                        }
+                    };
                     
                     renderTime.textContent = message.renderTimeMs ? message.renderTimeMs + 'ms' : '';
                     break;
@@ -795,10 +1005,20 @@ export class XamlDesignerPanel {
                     break;
 
                 case 'selectElement':
-                    const mapping = elementMappings.find(m => m.line === message.line);
-                    if (mapping) {
-                        selectElementById(mapping.elementId);
-                        const el = document.getElementById(mapping.elementId);
+                    // Find the best matching element for the given line
+                    // Prefer elements that directly match (no parentElementId) over implicit children
+                    let bestMapping = null;
+                    for (const m of elementMappings) {
+                        if (m.line === message.line) {
+                            // If no best yet, or current doesn't have a parent but best does
+                            if (!bestMapping || (!m.parentElementId && bestMapping.parentElementId)) {
+                                bestMapping = m;
+                            }
+                        }
+                    }
+                    if (bestMapping) {
+                        selectElementById(bestMapping.elementId);
+                        const el = document.getElementById(bestMapping.elementId);
                         if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
                     }
                     break;

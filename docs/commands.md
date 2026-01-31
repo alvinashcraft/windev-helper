@@ -113,6 +113,33 @@ dotnet new winui-window -n WindowName
 
 ---
 
+## XAML Preview Commands (Preview Feature)
+
+> ⚠️ These commands are for the preview feature in WinDev Helper 2.x.
+
+### WinUI: Open XAML Preview
+
+**Command ID:** `windev-helper.openXamlDesigner`
+
+Opens the native XAML preview panel for the current XAML file.
+
+**Usage:**
+
+1. Open a `.xaml` file in the editor
+2. Run this command from the Command Palette
+3. The preview panel opens beside your editor
+
+**Features:**
+
+- Real-time preview using the WinUI 3 rendering engine
+- Click elements to navigate to their XAML definition
+- Cursor position syncs between editor and preview
+- Supports light and dark themes
+
+**Note:** The native renderer is only available on Windows.
+
+---
+
 ## Build Commands
 
 Build commands support cancellation - you can cancel long-running builds using the cancel button in the progress notification.

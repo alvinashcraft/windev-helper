@@ -227,6 +227,8 @@ public class PipeServer : IDisposable
                     ImageBase64 = result.ImageBase64,
                     ImageWidth = result.ImageWidth,
                     ImageHeight = result.ImageHeight,
+                    LayoutWidth = result.LayoutWidth,
+                    LayoutHeight = result.LayoutHeight,
                     Elements = result.Elements,
                     Warnings = result.Warnings,
                     RenderTimeMs = result.RenderTimeMs,
@@ -301,6 +303,8 @@ public class RenderResponse
     public string? ImageBase64 { get; set; }
     public int? ImageWidth { get; set; }
     public int? ImageHeight { get; set; }
+    public double? LayoutWidth { get; set; }
+    public double? LayoutHeight { get; set; }
     public ElementInfo[]? Elements { get; set; }
     public string[]? Warnings { get; set; }
     public long? RenderTimeMs { get; set; }

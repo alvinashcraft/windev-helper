@@ -2,6 +2,8 @@
 
 Welcome to the WinDev Helper extension documentation. This folder contains detailed guides and reference materials for using the extension.
 
+> ⚠️ **Preview Release**: Documentation for version 2.x includes experimental features like native XAML preview.
+
 ## Contents
 
 - [Getting Started](getting-started.md) - Quick start guide for new users
@@ -11,6 +13,7 @@ Welcome to the WinDev Helper extension documentation. This folder contains detai
 - [Templates](templates.md) - Project and item templates guide
 - [Debugging](debugging.md) - Debugging WinUI apps
 - [Packaging](packaging.md) - Creating and signing MSIX packages
+- [XAML Preview](XAML_NATIVE_PREVIEW_DESIGN.md) - Native XAML preview feature (Preview)
 - [Contributing](CONTRIBUTING.md) - How to contribute to this project
 - [Architecture](architecture.md) - Extension architecture overview
 
@@ -18,7 +21,7 @@ Welcome to the WinDev Helper extension documentation. This folder contains detai
 
 - [Main README](../README.md)
 - [Changelog](../CHANGELOG.md)
-- [GitHub Repository](https://github.com/windev-helper/windev-helper)
+- [GitHub Repository](https://github.com/alvinashcraft/windev-helper)
 
 ## External Resources
 

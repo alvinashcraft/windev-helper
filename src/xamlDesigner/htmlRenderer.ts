@@ -1138,7 +1138,9 @@ export class XamlHtmlRenderer {
      * Check if a value is a binding expression
      */
     private isBindingExpression(value: string): boolean {
-        if (!value) return false;
+        if (!value) {
+            return false;
+        }
         const trimmed = value.trim();
         return trimmed.startsWith('{Binding') || 
                trimmed.startsWith('{x:Bind') ||
@@ -1150,7 +1152,9 @@ export class XamlHtmlRenderer {
      * Extract the binding path from a binding expression
      */
     private extractBindingPath(value: string): string {
-        if (!value) return '';
+        if (!value) {
+            return '';
+        }
         const trimmed = value.trim();
         
         // Match patterns like {Binding Path}, {x:Bind Path}, {x:Bind Path, Mode=...}
@@ -1172,7 +1176,9 @@ export class XamlHtmlRenderer {
      * Format a text value, showing a placeholder for binding expressions
      */
     private formatTextOrBinding(value: string, _propertyName: string = 'value'): string {
-        if (!value) return '';
+        if (!value) {
+            return '';
+        }
         
         if (this.isBindingExpression(value)) {
             const bindingPath = this.extractBindingPath(value);
