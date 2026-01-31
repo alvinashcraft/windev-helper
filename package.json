@@ -172,6 +172,12 @@
         "command": "windev-helper.checkWinAppCli",
         "title": "Check WinApp CLI Installation",
         "category": "WinDev"
+      },
+      {
+        "command": "windev-helper.openXamlPreview",
+        "title": "Open XAML Preview",
+        "category": "WinDev",
+        "icon": "$(preview)"
       }
     ],
     "configuration": {
@@ -215,6 +221,31 @@
           "type": "string",
           "default": "",
           "description": "Default path to the certificate file for signing packages."
+        },
+        "windevHelper.preview.renderer": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "native",
+            "html"
+          ],
+          "default": "auto",
+          "description": "XAML preview renderer. 'auto' uses native WinUI on Windows, HTML elsewhere."
+        },
+        "windevHelper.preview.updateDelay": {
+          "type": "number",
+          "default": 300,
+          "description": "Delay in milliseconds before updating preview after XAML changes."
+        },
+        "windevHelper.preview.width": {
+          "type": "number",
+          "default": 800,
+          "description": "Default width for native XAML preview rendering."
+        },
+        "windevHelper.preview.height": {
+          "type": "number",
+          "default": 600,
+          "description": "Default height for native XAML preview rendering."
         }
       }
     },
@@ -287,6 +318,17 @@
         {
           "command": "windev-helper.createMsixPackage",
           "when": "windevHelper.isWinUIProject"
+        },
+        {
+          "command": "windev-helper.openXamlPreview",
+          "when": "resourceExtname == .xaml || editorLangId == xaml"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "windev-helper.openXamlPreview",
+          "when": "resourceExtname == .xaml || editorLangId == xaml",
+          "group": "navigation"
         }
       ]
     },
@@ -300,6 +342,11 @@
         "command": "windev-helper.debugProject",
         "key": "f5",
         "when": "windevHelper.isWinUIProject && !inDebugMode"
+      },
+      {
+        "command": "windev-helper.openXamlPreview",
+        "key": "ctrl+shift+v",
+        "when": "resourceExtname == .xaml || editorLangId == xaml"
       }
     ],
     "taskDefinitions": [

@@ -5,8 +5,8 @@
 import * as vscode from 'vscode';
 import { IXamlRenderer, RenderOptions, RenderResult, RendererType, RendererStatus } from './types';
 import { NativeXamlRenderer } from './nativeRenderer';
+import { HtmlXamlRenderer } from './htmlFallbackRenderer';
 // import { AzureXamlRenderer } from './azureRenderer';  // Future
-// import { HtmlXamlRenderer } from './htmlRenderer';    // Migrate from existing
 
 /**
  * Manages XAML preview renderers and routes requests to the appropriate one
@@ -35,13 +35,13 @@ export class XamlPreviewController implements vscode.Disposable {
         const nativeRenderer = new NativeXamlRenderer(this.extensionPath);
         this.renderers.set('native', nativeRenderer);
 
+        // HTML fallback renderer (always available)
+        const htmlRenderer = new HtmlXamlRenderer();
+        this.renderers.set('html', htmlRenderer);
+
         // TODO: Add Azure renderer
         // const azureRenderer = new AzureXamlRenderer();
         // this.renderers.set('azure', azureRenderer);
-
-        // TODO: Migrate HTML renderer from existing POC
-        // const htmlRenderer = new HtmlXamlRenderer();
-        // this.renderers.set('html', htmlRenderer);
     }
 
     /**

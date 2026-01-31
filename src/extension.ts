@@ -6,14 +6,21 @@ import * as vscode from 'vscode';
 import { DebugConfigurationProvider } from './debugConfigurationProvider';
 import { ServiceLocator } from './serviceLocator';
 import { COMMANDS, CONFIG, DEBUG_TYPES } from './constants';
+import { XamlPreviewController } from './xamlPreview';
+import { XamlDesignerPanel } from './xamlDesigner';
 
 let services: ServiceLocator;
+let previewController: XamlPreviewController;
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
     console.log('WinDev Helper extension is now active');
 
     // Initialize the service locator
     services = ServiceLocator.initialize(context);
+
+    // Initialize XAML preview controller
+    previewController = new XamlPreviewController(context.extensionPath);
+    context.subscriptions.push(previewController);
 
     // Register debug configuration provider
     const debugProvider = new DebugConfigurationProvider(
@@ -228,9 +235,26 @@ function registerCommands(context: vscode.ExtensionContext): void {
             await services.winAppCli.checkInstallation();
         })
     );
+
+    // XAML Preview command
+    context.subscriptions.push(
+        vscode.commands.registerCommand(COMMANDS.OPEN_XAML_PREVIEW, async () => {
+            const editor = vscode.window.activeTextEditor;
+            if (editor && (editor.document.languageId === 'xaml' || editor.document.fileName.endsWith('.xaml'))) {
+                XamlDesignerPanel.createOrShow(context.extensionUri, previewController, editor.document);
+            } else {
+                XamlDesignerPanel.createOrShow(context.extensionUri, previewController);
+            }
+        })
+    );
 }
 
 export function deactivate(): void {
+    // Dispose preview controller
+    if (previewController) {
+        previewController.dispose();
+    }
+    
     // Dispose all services through the service locator
     if (ServiceLocator.isInitialized) {
         services.dispose();
