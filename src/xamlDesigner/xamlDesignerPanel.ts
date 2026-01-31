@@ -239,12 +239,18 @@ export class XamlDesignerPanel {
      * Show image-based preview (from native renderer)
      */
     private showImagePreview(result: RenderResult & { success: true }): void {
+        // Log warnings to console instead of showing in preview
+        if (result.warnings && result.warnings.length > 0) {
+            for (const warning of result.warnings) {
+                console.log('[XAML Preview]', warning);
+            }
+        }
+
         this.panel.webview.postMessage({
             type: 'updateImagePreview',
             imageData: result.data,
             imageWidth: result.imageWidth,
             imageHeight: result.imageHeight,
-            warnings: result.warnings,
             renderTimeMs: result.renderTimeMs,
             mappings: result.elementMappings.map(m => ({
                 elementId: m.id,
@@ -674,22 +680,9 @@ export class XamlDesignerPanel {
                 case 'updateImagePreview':
                     elementMappings = message.mappings || [];
                     
+                    // For native preview, just show the image without overlays
+                    // Element click detection is not yet supported for native renderer
                     let html = '<img id="preview-image" src="data:image/png;base64,' + message.imageData + '" />';
-                    
-                    // Add element overlays for click detection
-                    for (const m of elementMappings) {
-                        if (m.bounds) {
-                            html += '<div class="element-overlay" id="' + m.elementId + '" ' +
-                                'style="left:' + m.bounds.x + 'px;top:' + m.bounds.y + 'px;' +
-                                'width:' + m.bounds.width + 'px;height:' + m.bounds.height + 'px;" ' +
-                                'data-line="' + m.line + '" data-column="' + (m.column || 1) + '" ' +
-                                'onclick="handleOverlayClick(event, this)"></div>';
-                        }
-                    }
-                    
-                    if (message.warnings && message.warnings.length > 0) {
-                        html = '<div class="warnings">' + message.warnings.join('<br>') + '</div>' + html;
-                    }
                     
                     previewContent.innerHTML = html;
                     previewContent.style.position = 'relative';

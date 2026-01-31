@@ -315,14 +315,20 @@ export class NativeXamlRenderer implements IXamlRenderer {
         this.initialized = false;
         this.pipeClient = null;
         this.process = null;
+        this.initPromise = null;
 
-        // Reject all pending requests
-        const error = new Error('Renderer process exited');
+        // Reject all pending requests with a retriable error
         for (const [, pending] of this.pendingRequests) {
             clearTimeout(pending.timeout);
-            pending.reject(error);
+            pending.resolve({
+                success: false,
+                code: 'PROCESS_EXITED',
+                message: 'Renderer process exited. The preview will restart automatically on next update.'
+            });
         }
         this.pendingRequests.clear();
+
+        console.log('[NativeRenderer] Process exited, will reinitialize on next render request');
     }
 
     /**
