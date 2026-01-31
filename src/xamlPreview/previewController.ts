@@ -6,7 +6,20 @@ import * as vscode from 'vscode';
 import { IXamlRenderer, RenderOptions, RenderResult, RendererType, RendererStatus } from './types';
 import { NativeXamlRenderer } from './nativeRenderer';
 import { HtmlXamlRenderer } from './htmlFallbackRenderer';
+import { ProjectContextProvider, ProjectContext } from './projectContext';
 // import { AzureXamlRenderer } from './azureRenderer';  // Future
+
+/**
+ * Extended render options that include project context
+ */
+export interface RenderWithContextOptions {
+    width: number;
+    height: number;
+    theme: 'light' | 'dark';
+    scale: number;
+    /** Path to the XAML file being rendered (for project context resolution) */
+    xamlFilePath?: string;
+}
 
 /**
  * Manages XAML preview renderers and routes requests to the appropriate one
@@ -14,6 +27,7 @@ import { HtmlXamlRenderer } from './htmlFallbackRenderer';
 export class XamlPreviewController implements vscode.Disposable {
     private renderers: Map<RendererType, IXamlRenderer> = new Map();
     private activeRenderer: IXamlRenderer | null = null;
+    private projectContextProvider: ProjectContextProvider;
     private disposables: vscode.Disposable[] = [];
     private renderCache = new Map<string, { result: RenderResult; timestamp: number }>();
     private readonly cacheMaxAge = 5000; // 5 seconds
@@ -23,6 +37,8 @@ export class XamlPreviewController implements vscode.Disposable {
     public readonly onRendererChanged = this._onRendererChanged.event;
 
     constructor(private readonly extensionPath: string) {
+        this.projectContextProvider = new ProjectContextProvider();
+        this.projectContextProvider.setupWatchers();
         this.initializeRenderers();
         this.setupConfigurationListener();
     }
@@ -128,10 +144,8 @@ export class XamlPreviewController implements vscode.Disposable {
         }
 
         if (selected !== this.activeRenderer) {
-            // Dispose old renderer
-            if (this.activeRenderer) {
-                this.activeRenderer.dispose();
-            }
+            // Dispose old renderer if switching away
+            // (but keep it in the map for potential future use)
 
             this.activeRenderer = selected;
 
@@ -141,9 +155,9 @@ export class XamlPreviewController implements vscode.Disposable {
     }
 
     /**
-     * Render XAML content
+     * Render XAML content with project context
      */
-    public async render(xaml: string, options: RenderOptions): Promise<RenderResult> {
+    public async render(xaml: string, options: RenderWithContextOptions): Promise<RenderResult> {
         // Ensure we have a renderer
         if (!this.activeRenderer) {
             await this.selectRenderer();
@@ -157,8 +171,11 @@ export class XamlPreviewController implements vscode.Disposable {
             };
         }
 
-        // Check cache
-        const cacheKey = this.getCacheKey(xaml, options);
+        // Build full render options with project context
+        const fullOptions = await this.buildRenderOptions(options);
+
+        // Check cache (include project path in cache key for context-aware caching)
+        const cacheKey = this.getCacheKey(xaml, fullOptions);
         const cached = this.renderCache.get(cacheKey);
         if (cached && Date.now() - cached.timestamp < this.cacheMaxAge) {
             return cached.result;
@@ -166,7 +183,7 @@ export class XamlPreviewController implements vscode.Disposable {
 
         // Render
         try {
-            const result = await this.activeRenderer.render(xaml, options);
+            const result = await this.activeRenderer.render(xaml, fullOptions);
 
             // Cache successful renders
             if (result.success) {
@@ -184,6 +201,51 @@ export class XamlPreviewController implements vscode.Disposable {
     }
 
     /**
+     * Build full render options including project context
+     */
+    private async buildRenderOptions(options: RenderWithContextOptions): Promise<RenderOptions> {
+        const fullOptions: RenderOptions = {
+            width: options.width,
+            height: options.height,
+            theme: options.theme,
+            scale: options.scale,
+            xamlFilePath: options.xamlFilePath
+        };
+
+        // Try to get project context if we have a file path
+        if (options.xamlFilePath) {
+            try {
+                const context = await this.projectContextProvider.getContext(options.xamlFilePath);
+                if (context) {
+                    fullOptions.projectPath = context.projectPath;
+                    fullOptions.appXamlContent = context.appXamlContent;
+                    fullOptions.resourceDictionaries = context.resourceDictionaries.map(rd => ({
+                        source: rd.source,
+                        content: rd.content
+                    }));
+
+                    // Use project's requested theme if available and we're in auto mode
+                    if (context.requestedTheme && context.requestedTheme !== 'Default') {
+                        // Only override if user hasn't explicitly set a theme
+                        const config = vscode.workspace.getConfiguration('windevHelper.preview');
+                        const userTheme = config.get<string>('theme');
+                        if (!userTheme || userTheme === 'auto') {
+                            fullOptions.theme = context.requestedTheme.toLowerCase() as 'light' | 'dark';
+                        }
+                    }
+
+                    console.log(`[PreviewController] Loaded project context: ${context.resourceDictionaries.length} resource dictionaries`);
+                }
+            } catch (err) {
+                console.error('[PreviewController] Failed to get project context:', err);
+                // Continue without project context
+            }
+        }
+
+        return fullOptions;
+    }
+
+    /**
      * Generate a cache key for a render request
      */
     private getCacheKey(xaml: string, options: RenderOptions): string {
@@ -192,7 +254,8 @@ export class XamlPreviewController implements vscode.Disposable {
             width: options.width,
             height: options.height,
             theme: options.theme,
-            scale: options.scale
+            scale: options.scale,
+            projectPath: options.projectPath
         });
     }
 
@@ -226,6 +289,7 @@ export class XamlPreviewController implements vscode.Disposable {
      */
     public clearCache(): void {
         this.renderCache.clear();
+        this.projectContextProvider.invalidateCache();
     }
 
     /**
@@ -254,6 +318,8 @@ export class XamlPreviewController implements vscode.Disposable {
         }
         this.renderers.clear();
         this.activeRenderer = null;
+
+        this.projectContextProvider.dispose();
 
         for (const disposable of this.disposables) {
             disposable.dispose();

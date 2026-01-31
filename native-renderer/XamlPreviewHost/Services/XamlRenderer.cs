@@ -11,6 +11,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Runtime.InteropServices.WindowsRuntime;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
@@ -27,6 +28,9 @@ public class XamlRenderer
     private Window? _renderWindow;
     private Grid? _renderHost;
     private int _elementCounter;
+    private ResourceDictionary? _appResources;
+    private string? _lastAppXamlContent;
+    private readonly Dictionary<string, ResourceDictionary> _loadedDictionaries = new();
 
     /// <summary>
     /// Initialize the renderer with a hidden window for rendering.
@@ -48,8 +52,6 @@ public class XamlRenderer
         _renderWindow.Content = _renderHost;
 
         // Activate but keep hidden
-        // Note: WinUI 3 doesn't have a true "hidden" mode, but we can minimize
-        // For now, we'll use a small off-screen position
         var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(_renderWindow);
         SetWindowPos(hwnd, IntPtr.Zero, -10000, -10000, 1, 1, 0x0080 /* SWP_HIDEWINDOW */);
         
@@ -79,6 +81,9 @@ public class XamlRenderer
                     ? ElementTheme.Light 
                     : ElementTheme.Dark;
             }
+
+            // Load project resources if provided
+            await LoadProjectResourcesAsync(options, warnings);
 
             // Preprocess XAML to remove compile-time attributes
             var processedXaml = PreprocessXaml(xaml, warnings);
@@ -117,7 +122,6 @@ public class XamlRenderer
             }
             catch (Exception ex)
             {
-                // Extract line/column from XamlParseException if possible
                 var (line, column) = ExtractLineColumn(ex.Message);
                 return new RenderResult
                 {
@@ -130,6 +134,26 @@ public class XamlRenderer
                         Column = column
                     }
                 };
+            }
+
+            // Apply loaded resources to the element
+            if (element is FrameworkElement frameElement && _appResources != null)
+            {
+                // Merge app resources into the element's resources
+                foreach (var key in _appResources.Keys)
+                {
+                    if (!frameElement.Resources.ContainsKey(key))
+                    {
+                        try
+                        {
+                            frameElement.Resources[key] = _appResources[key];
+                        }
+                        catch
+                        {
+                            // Skip resources that can't be added
+                        }
+                    }
+                }
             }
 
             // Set up the render host
@@ -199,9 +223,179 @@ public class XamlRenderer
     }
 
     /// <summary>
+    /// Load project resources (App.xaml and resource dictionaries).
+    /// </summary>
+    private async Task LoadProjectResourcesAsync(RenderOptions options, List<string> warnings)
+    {
+        // Check if we need to reload resources
+        var appXamlContent = options.AppXamlContent;
+        if (string.IsNullOrEmpty(appXamlContent))
+        {
+            return;
+        }
+
+        // Skip if already loaded and unchanged
+        if (_appResources != null && _lastAppXamlContent == appXamlContent)
+        {
+            return;
+        }
+
+        Console.Error.WriteLine("[XamlRenderer] Loading project resources...");
+        
+        _appResources = new ResourceDictionary();
+        _lastAppXamlContent = appXamlContent;
+        _loadedDictionaries.Clear();
+
+        // Load resource dictionaries first
+        if (options.ResourceDictionaries != null)
+        {
+            foreach (var dictInfo in options.ResourceDictionaries)
+            {
+                try
+                {
+                    Console.Error.WriteLine($"[XamlRenderer] Loading resource dictionary: {dictInfo.Source}");
+                    var dict = LoadResourceDictionary(dictInfo.Content, dictInfo.Source, warnings);
+                    if (dict != null)
+                    {
+                        _appResources.MergedDictionaries.Add(dict);
+                        _loadedDictionaries[dictInfo.Source] = dict;
+                        Console.Error.WriteLine($"[XamlRenderer] Loaded {dict.Count} resources from {dictInfo.Source}");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.Error.WriteLine($"[XamlRenderer] Failed to load resource dictionary {dictInfo.Source}: {ex.Message}");
+                    warnings.Add($"Could not load resource dictionary: {dictInfo.Source}");
+                }
+            }
+        }
+
+        // Extract resources directly from App.xaml content
+        try
+        {
+            // Parse App.xaml and extract Application.Resources section
+            var resourcesXaml = ExtractApplicationResources(appXamlContent);
+            if (!string.IsNullOrEmpty(resourcesXaml))
+            {
+                Console.Error.WriteLine("[XamlRenderer] Loading App.xaml resources...");
+                var appDict = LoadResourceDictionary(resourcesXaml, "App.xaml", warnings);
+                if (appDict != null)
+                {
+                    foreach (var key in appDict.Keys)
+                    {
+                        if (!_appResources.ContainsKey(key))
+                        {
+                            try
+                            {
+                                _appResources[key] = appDict[key];
+                            }
+                            catch
+                            {
+                                // Skip
+                            }
+                        }
+                    }
+                    Console.Error.WriteLine($"[XamlRenderer] Loaded {appDict.Count} resources from App.xaml");
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[XamlRenderer] Failed to parse App.xaml resources: {ex.Message}");
+            warnings.Add("Could not load App.xaml resources");
+        }
+
+        await Task.CompletedTask; // Keep async signature for future async operations
+    }
+
+    /// <summary>
+    /// Extract the Application.Resources section from App.xaml content.
+    /// </summary>
+    private static string? ExtractApplicationResources(string appXaml)
+    {
+        // Look for <Application.Resources>...</Application.Resources>
+        var match = Regex.Match(appXaml, @"<Application\.Resources>(.*?)</Application\.Resources>", RegexOptions.Singleline);
+        if (!match.Success)
+        {
+            return null;
+        }
+
+        var innerContent = match.Groups[1].Value.Trim();
+
+        // If it's wrapped in a ResourceDictionary, extract just the inner content
+        var dictMatch = Regex.Match(innerContent, @"<ResourceDictionary[^>]*>(.*?)</ResourceDictionary>", RegexOptions.Singleline);
+        if (dictMatch.Success)
+        {
+            // Check for MergedDictionaries - skip them, we load those separately
+            var mergedMatch = Regex.Match(dictMatch.Groups[1].Value, @"<ResourceDictionary\.MergedDictionaries>.*?</ResourceDictionary\.MergedDictionaries>", RegexOptions.Singleline);
+            var content = dictMatch.Groups[1].Value;
+            if (mergedMatch.Success)
+            {
+                content = content.Replace(mergedMatch.Value, "");
+            }
+            innerContent = content;
+        }
+
+        if (string.IsNullOrWhiteSpace(innerContent))
+        {
+            return null;
+        }
+
+        // Wrap in a ResourceDictionary with required namespaces
+        return $@"<ResourceDictionary 
+            xmlns=""http://schemas.microsoft.com/winfx/2006/xaml/presentation""
+            xmlns:x=""http://schemas.microsoft.com/winfx/2006/xaml"">
+            {innerContent}
+        </ResourceDictionary>";
+    }
+
+    /// <summary>
+    /// Load a resource dictionary from XAML content.
+    /// </summary>
+    private static ResourceDictionary? LoadResourceDictionary(string xaml, string source, List<string> warnings)
+    {
+        try
+        {
+            // Preprocess the XAML
+            var processed = PreprocessResourceDictionary(xaml);
+            
+            var dict = XamlReader.Load(processed) as ResourceDictionary;
+            return dict;
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[XamlRenderer] Error loading {source}: {ex.Message}");
+            warnings.Add($"Resource dictionary '{source}' could not be loaded: {ex.Message}");
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Preprocess a resource dictionary for dynamic loading.
+    /// </summary>
+    private static string PreprocessResourceDictionary(string xaml)
+    {
+        var result = xaml;
+
+        // Remove x:Class if present
+        result = Regex.Replace(result, @"\s+x:Class\s*=\s*""[^""]*""", "", RegexOptions.IgnoreCase);
+        
+        // Remove design-time namespaces and attributes
+        result = Regex.Replace(result, @"\s+mc:Ignorable\s*=\s*""[^""]*""", "", RegexOptions.IgnoreCase);
+        result = Regex.Replace(result, @"\s+xmlns:d\s*=\s*""[^""]*""", "", RegexOptions.IgnoreCase);
+        result = Regex.Replace(result, @"\s+xmlns:mc\s*=\s*""[^""]*""", "", RegexOptions.IgnoreCase);
+        result = Regex.Replace(result, @"\s+d:\w+\s*=\s*""[^""]*""", "", RegexOptions.IgnoreCase);
+
+        // Remove Source references in nested ResourceDictionary (we load those separately)
+        result = Regex.Replace(result, @"<ResourceDictionary\s+Source\s*=\s*""[^""]*""\s*/?>", "", RegexOptions.IgnoreCase);
+
+        return result;
+    }
+
+    /// <summary>
     /// Encode pixels to PNG format.
     /// </summary>
-    private async Task<byte[]> EncodeToPngAsync(IBuffer pixels, uint width, uint height)
+    private static async Task<byte[]> EncodeToPngAsync(IBuffer pixels, uint width, uint height)
     {
         using var stream = new InMemoryRandomAccessStream();
         var encoder = await BitmapEncoder.CreateAsync(BitmapEncoder.PngEncoderId, stream);
@@ -253,8 +447,6 @@ public class XamlRenderer
                 Width = bounds.Width,
                 Height = bounds.Height
             },
-            // Note: We don't have source location info from XamlReader.Load()
-            // This would require a custom XAML parser or source map
             XamlLine = 0,
             XamlColumn = 0
         });
@@ -271,22 +463,18 @@ public class XamlRenderer
     /// <summary>
     /// Try to extract line/column from XAML parse error message.
     /// </summary>
-    private (int? line, int? column) ExtractLineColumn(string message)
+    private static (int? line, int? column) ExtractLineColumn(string message)
     {
-        // Common patterns: "Line 15", "line 15, column 10", "[Line: 15 Position: 10]"
-        // This is a simplified extraction - real parsing would be more robust
         int? line = null;
         int? column = null;
 
-        var lineMatch = System.Text.RegularExpressions.Regex.Match(
-            message, @"[Ll]ine[:\s]+(\d+)", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        var lineMatch = Regex.Match(message, @"[Ll]ine[:\s]+(\d+)", RegexOptions.IgnoreCase);
         if (lineMatch.Success && int.TryParse(lineMatch.Groups[1].Value, out var l))
         {
             line = l;
         }
 
-        var colMatch = System.Text.RegularExpressions.Regex.Match(
-            message, @"[Cc]olumn[:\s]+(\d+)|[Pp]osition[:\s]+(\d+)", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        var colMatch = Regex.Match(message, @"[Cc]olumn[:\s]+(\d+)|[Pp]osition[:\s]+(\d+)", RegexOptions.IgnoreCase);
         if (colMatch.Success)
         {
             var colStr = colMatch.Groups[1].Success ? colMatch.Groups[1].Value : colMatch.Groups[2].Value;
@@ -300,13 +488,13 @@ public class XamlRenderer
     }
 
     /// <summary>
-    /// Preprocess XAML to remove compile-time only attributes that XamlReader.Load doesn't support.
+    /// Preprocess XAML to remove compile-time only attributes.
     /// </summary>
     private static string PreprocessXaml(string xaml, List<string> warnings)
     {
         var result = xaml;
 
-        // Remove x:Class attribute (only valid for compiled XAML with LoadComponent)
+        // Remove x:Class attribute
         var classMatch = Regex.Match(result, @"\s+x:Class\s*=\s*""[^""]*""", RegexOptions.IgnoreCase);
         if (classMatch.Success)
         {
@@ -319,69 +507,46 @@ public class XamlRenderer
         if (classModifierMatch.Success)
         {
             result = result.Remove(classModifierMatch.Index, classModifierMatch.Length);
-            warnings.Add("Removed x:ClassModifier attribute (not supported in dynamic XAML loading)");
         }
 
-        // Remove mc:Ignorable attribute and d: design-time namespace declarations
-        var mcIgnorableMatch = Regex.Match(result, @"\s+mc:Ignorable\s*=\s*""[^""]*""", RegexOptions.IgnoreCase);
-        if (mcIgnorableMatch.Success)
-        {
-            result = result.Remove(mcIgnorableMatch.Index, mcIgnorableMatch.Length);
-        }
-
-        // Remove d: namespace declaration
-        var dNamespaceMatch = Regex.Match(result, @"\s+xmlns:d\s*=\s*""[^""]*""", RegexOptions.IgnoreCase);
-        if (dNamespaceMatch.Success)
-        {
-            result = result.Remove(dNamespaceMatch.Index, dNamespaceMatch.Length);
-        }
-
-        // Remove mc: namespace declaration
-        var mcNamespaceMatch = Regex.Match(result, @"\s+xmlns:mc\s*=\s*""[^""]*""", RegexOptions.IgnoreCase);
-        if (mcNamespaceMatch.Success)
-        {
-            result = result.Remove(mcNamespaceMatch.Index, mcNamespaceMatch.Length);
-        }
-
-        // Remove d: prefixed attributes (design-time attributes like d:DesignHeight)
+        // Remove design-time namespaces and attributes
+        result = Regex.Replace(result, @"\s+mc:Ignorable\s*=\s*""[^""]*""", "", RegexOptions.IgnoreCase);
+        result = Regex.Replace(result, @"\s+xmlns:d\s*=\s*""[^""]*""", "", RegexOptions.IgnoreCase);
+        result = Regex.Replace(result, @"\s+xmlns:mc\s*=\s*""[^""]*""", "", RegexOptions.IgnoreCase);
         result = Regex.Replace(result, @"\s+d:\w+\s*=\s*""[^""]*""", "", RegexOptions.IgnoreCase);
 
         return result;
     }
 
     /// <summary>
-    /// Strip custom StaticResource and ThemeResource references that aren't available at runtime.
-    /// This is called when rendering fails due to missing resources.
+    /// Strip custom resource references that aren't available at runtime.
     /// </summary>
     private static string StripCustomResourceReferences(string xaml, List<string> warnings)
     {
         var result = xaml;
         var removedResources = new HashSet<string>();
 
-        // Remove Style attributes with StaticResource/ThemeResource references
-        // These are the most common source of "Cannot find a Resource" errors
+        // Remove Style attributes with custom StaticResource/ThemeResource references
         var styleMatches = Regex.Matches(result, @"\s+Style\s*=\s*""\{(?:StaticResource|ThemeResource)\s+([^}]+)\}""", RegexOptions.IgnoreCase);
-        foreach (Match match in styleMatches.Cast<Match>().Reverse()) // Reverse to preserve indices
+        foreach (Match match in styleMatches.Cast<Match>().Reverse())
         {
             var resourceName = match.Groups[1].Value.Trim();
             removedResources.Add(resourceName);
             result = result.Remove(match.Index, match.Length);
         }
 
-        // Also handle x:Bind and Binding that might reference unavailable data
-        // Remove Text="{x:Bind ...}" style bindings as they require compiled code-behind
+        // Remove x:Bind expressions (require compiled code-behind)
         var xBindMatches = Regex.Matches(result, @"(\w+)\s*=\s*""\{x:Bind\s+[^}]+\}""", RegexOptions.IgnoreCase);
         foreach (Match match in xBindMatches.Cast<Match>().Reverse())
         {
             var propertyName = match.Groups[1].Value;
-            // Replace with a placeholder value based on property type
             var replacement = propertyName.ToLowerInvariant() switch
             {
                 "text" => $" {propertyName}=\"[Binding]\"",
                 "content" => $" {propertyName}=\"[Binding]\"",
-                "itemssource" => "", // Remove entirely
-                "command" => "", // Remove entirely
-                _ => "" // Remove unknown bindings
+                "itemssource" => "",
+                "command" => "",
+                _ => ""
             };
             result = result.Remove(match.Index, match.Length);
             if (!string.IsNullOrEmpty(replacement))

@@ -48,6 +48,7 @@ public class PipeServer : IDisposable
                     PipeTransmissionMode.Byte,
                     PipeOptions.Asynchronous);
 
+                Console.Error.WriteLine($"[PipeServer] Waiting for connection on pipe: {_pipeName}");
                 await _pipeServer.WaitForConnectionAsync(_cts.Token);
                 Console.Error.WriteLine("[PipeServer] Client connected");
 
@@ -85,11 +86,26 @@ public class PipeServer : IDisposable
                 var line = await reader.ReadLineAsync(_cts.Token);
                 if (line == null)
                 {
-                    break; // Client disconnected
+                    Console.Error.WriteLine("[PipeServer] Client disconnected (null read)");
+                    break;
+                }
+
+                if (string.IsNullOrWhiteSpace(line))
+                {
+                    continue;
                 }
 
                 var response = await ProcessRequestAsync(line);
                 await writer.WriteLineAsync(response);
+            }
+            catch (OperationCanceledException)
+            {
+                break;
+            }
+            catch (IOException ex)
+            {
+                Console.Error.WriteLine($"[PipeServer] IO error (client likely disconnected): {ex.Message}");
+                break;
             }
             catch (Exception ex)
             {
@@ -118,10 +134,12 @@ public class PipeServer : IDisposable
                 }
             }
         }
+
+        Console.Error.WriteLine("[PipeServer] Connection handler exiting");
     }
 
     /// <summary>
-    /// Process a render request.
+    /// Process an incoming request.
     /// </summary>
     private async Task<string> ProcessRequestAsync(string json)
     {
@@ -145,7 +163,7 @@ public class PipeServer : IDisposable
             }, JsonOptions.Default);
         }
 
-        if (request?.Type != "render" || string.IsNullOrEmpty(request.RequestId))
+        if (request == null || string.IsNullOrEmpty(request.RequestId))
         {
             return JsonSerializer.Serialize(new RenderResponse
             {
@@ -155,7 +173,35 @@ public class PipeServer : IDisposable
                 Error = new RenderErrorInfo
                 {
                     Code = "INVALID_REQUEST",
-                    Message = "Invalid request type or missing request ID"
+                    Message = "Invalid request or missing request ID"
+                }
+            }, JsonOptions.Default);
+        }
+
+        // Handle ping request
+        if (request.Type == "ping")
+        {
+            Console.Error.WriteLine($"[PipeServer] Ping received: {request.RequestId}");
+            return JsonSerializer.Serialize(new PongResponse
+            {
+                Type = "pong",
+                RequestId = request.RequestId,
+                Success = true
+            }, JsonOptions.Default);
+        }
+
+        // Handle render request
+        if (request.Type != "render")
+        {
+            return JsonSerializer.Serialize(new RenderResponse
+            {
+                Type = "renderResult",
+                RequestId = request.RequestId,
+                Success = false,
+                Error = new RenderErrorInfo
+                {
+                    Code = "INVALID_REQUEST",
+                    Message = $"Unknown request type: {request.Type}"
                 }
             }, JsonOptions.Default);
         }
@@ -167,6 +213,8 @@ public class PipeServer : IDisposable
         {
             try
             {
+                Console.Error.WriteLine($"[PipeServer] Processing render request: {request.RequestId}");
+                
                 var result = await _renderer.RenderAsync(
                     request.Xaml ?? "",
                     request.Options ?? new RenderOptions());
@@ -187,6 +235,7 @@ public class PipeServer : IDisposable
             }
             catch (Exception ex)
             {
+                Console.Error.WriteLine($"[PipeServer] Render exception: {ex.Message}");
                 tcs.SetResult(new RenderResponse
                 {
                     Type = "renderResult",
@@ -202,6 +251,7 @@ public class PipeServer : IDisposable
         });
 
         var response = await tcs.Task;
+        Console.Error.WriteLine($"[PipeServer] Render complete: {request.RequestId}, success={response.Success}");
         return JsonSerializer.Serialize(response, JsonOptions.Default);
     }
 
@@ -233,6 +283,14 @@ public class RenderOptions
     public string Theme { get; set; } = "dark";
     public double Scale { get; set; } = 1.0;
     public string? ProjectPath { get; set; }
+    public string? AppXamlContent { get; set; }
+    public ResourceDictionaryInfo[]? ResourceDictionaries { get; set; }
+}
+
+public class ResourceDictionaryInfo
+{
+    public string Source { get; set; } = "";
+    public string Content { get; set; } = "";
 }
 
 public class RenderResponse
@@ -247,6 +305,13 @@ public class RenderResponse
     public string[]? Warnings { get; set; }
     public long? RenderTimeMs { get; set; }
     public RenderErrorInfo? Error { get; set; }
+}
+
+public class PongResponse
+{
+    public string Type { get; set; } = "pong";
+    public string RequestId { get; set; } = "";
+    public bool Success { get; set; } = true;
 }
 
 public class ElementInfo

@@ -213,12 +213,13 @@ export class XamlDesignerPanel {
         const width = config.get<number>('width', 800);
         const height = config.get<number>('height', 600);
 
-        // Render using the controller
+        // Render using the controller (with file path for project context)
         const result = await this.previewController.render(xamlText, {
             width,
             height,
             theme: this.getTheme(),
-            scale: 1.0 // TODO: Support high-DPI
+            scale: 1.0, // TODO: Support high-DPI
+            xamlFilePath: this.currentDocument.uri.fsPath
         });
 
         if (!result.success) {

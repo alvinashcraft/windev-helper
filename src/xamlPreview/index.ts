@@ -5,4 +5,5 @@
 export * from './types';
 export * from './nativeRenderer';
 export * from './htmlFallbackRenderer';
+export * from './projectContext';
 export * from './previewController';

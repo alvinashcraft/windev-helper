@@ -3,6 +3,16 @@
 // Licensed under the MIT License.
 
 /**
+ * Resource dictionary for rendering context
+ */
+export interface ResourceDictionaryInfo {
+    /** Source path as specified in XAML */
+    source: string;
+    /** XAML content of the dictionary */
+    content: string;
+}
+
+/**
  * Options for rendering XAML
  */
 export interface RenderOptions {
@@ -16,6 +26,12 @@ export interface RenderOptions {
     scale: number;
     /** Path to the project for custom control resolution (optional) */
     projectPath?: string;
+    /** Path to the XAML file being rendered (for relative resource resolution) */
+    xamlFilePath?: string;
+    /** App.xaml content (preprocessed) for resource resolution */
+    appXamlContent?: string;
+    /** Resource dictionaries to load before rendering */
+    resourceDictionaries?: ResourceDictionaryInfo[];
 }
 
 /**
