@@ -66,16 +66,15 @@ public class XamlRenderer
 
         _renderWindow.Content = _renderHost;
 
-        // Activate but keep hidden
-        var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(_renderWindow);
-        SetWindowPos(hwnd, IntPtr.Zero, -10000, -10000, 1, 1, 0x0080 /* SWP_HIDEWINDOW */);
-        
+        // Activate but keep the window hidden using managed APIs
         _renderWindow.Activate();
+
+        var appWindow = _renderWindow.AppWindow;
+        if (appWindow is not null)
+        {
+            appWindow.Hide();
+        }
     }
-
-    [System.Runtime.InteropServices.DllImport("user32.dll")]
-    private static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int X, int Y, int cx, int cy, uint uFlags);
-
     /// <summary>
     /// Render XAML content to a PNG image.
     /// </summary>
