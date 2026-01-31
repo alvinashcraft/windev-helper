@@ -2,8 +2,9 @@
   "name": "windev-helper",
   "displayName": "WinDev Helper",
   "description": "Build beautiful, performant WinUI apps with VS Code. Debug, build, package, and deploy Windows apps powered by the Windows App SDK.",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "publisher": "alvinashcraft",
+  "preview": true,
   "icon": "images/icon.png",
   "license": "MIT",
   "repository": {
@@ -172,6 +173,12 @@
         "command": "windev-helper.checkWinAppCli",
         "title": "Check WinApp CLI Installation",
         "category": "WinDev"
+      },
+      {
+        "command": "windev-helper.openXamlPreview",
+        "title": "Open XAML Preview",
+        "category": "WinDev",
+        "icon": "$(preview)"
       }
     ],
     "configuration": {
@@ -215,6 +222,41 @@
           "type": "string",
           "default": "",
           "description": "Default path to the certificate file for signing packages."
+        },
+        "windevHelper.preview.renderer": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "native",
+            "html"
+          ],
+          "default": "auto",
+          "description": "XAML preview renderer. 'auto' uses native WinUI on Windows, HTML elsewhere."
+        },
+        "windevHelper.preview.updateDelay": {
+          "type": "number",
+          "default": 300,
+          "description": "Delay in milliseconds before updating preview after XAML changes."
+        },
+        "windevHelper.preview.width": {
+          "type": "number",
+          "default": 800,
+          "description": "Default width for native XAML preview rendering."
+        },
+        "windevHelper.preview.height": {
+          "type": "number",
+          "default": 600,
+          "description": "Default height for native XAML preview rendering."
+        },
+        "windevHelper.preview.theme": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "light",
+            "dark"
+          ],
+          "default": "auto",
+          "description": "Theme for XAML preview. 'auto' follows VS Code theme or project's App.xaml RequestedTheme."
         }
       }
     },
@@ -287,6 +329,17 @@
         {
           "command": "windev-helper.createMsixPackage",
           "when": "windevHelper.isWinUIProject"
+        },
+        {
+          "command": "windev-helper.openXamlPreview",
+          "when": "resourceExtname == .xaml || editorLangId == xaml"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "windev-helper.openXamlPreview",
+          "when": "resourceExtname == .xaml || editorLangId == xaml",
+          "group": "navigation"
         }
       ]
     },
@@ -300,6 +353,11 @@
         "command": "windev-helper.debugProject",
         "key": "f5",
         "when": "windevHelper.isWinUIProject && !inDebugMode"
+      },
+      {
+        "command": "windev-helper.openXamlPreview",
+        "key": "ctrl+shift+v",
+        "when": "resourceExtname == .xaml || editorLangId == xaml"
       }
     ],
     "taskDefinitions": [
@@ -398,12 +456,18 @@
     ]
   },
   "scripts": {
-    "vscode:prepublish": "npm run package",
+    "vscode:prepublish": "npm run build",
     "compile": "npm run check-types && npm run lint && node esbuild.js",
     "watch": "npm-run-all -p watch:*",
     "watch:esbuild": "node esbuild.js --watch",
     "watch:tsc": "tsc --noEmit --watch --project tsconfig.json",
-    "package": "npm run check-types && npm run lint && node esbuild.js --production",
+    "build-native-renderer": "node -e \"if(process.platform==='win32'){require('child_process').execSync('dotnet publish native-renderer/XamlPreviewHost/XamlPreviewHost.csproj -c Release -r win-x64 --self-contained -o bin',{stdio:'inherit'})}else{console.log('Skipping native renderer build (Windows only)')}\"",
+    "build-native-renderer:windows": "dotnet publish native-renderer/XamlPreviewHost/XamlPreviewHost.csproj -c Release -r win-x64 --self-contained -o bin",
+    "build": "npm run build-native-renderer && npm run check-types && npm run lint && node esbuild.js --production",
+    "package": "npx vsce package --allow-star-activation",
+    "package:prerelease": "npx vsce package --pre-release --allow-star-activation",
+    "publish": "npx vsce publish --allow-star-activation",
+    "publish:prerelease": "npx vsce publish --pre-release --allow-star-activation",
     "compile-tests": "tsc -p . --outDir out",
     "watch-tests": "tsc -p . -w --outDir out",
     "pretest": "npm run compile-tests && npm run compile && npm run lint",
@@ -415,6 +479,7 @@
     "@types/vscode": "^1.108.1",
     "@types/mocha": "^10.0.10",
     "@types/node": "22.x",
+    "@vscode/vsce": "^3.2.2",
     "typescript-eslint": "^8.52.0",
     "eslint": "^9.39.2",
     "esbuild": "^0.27.2",

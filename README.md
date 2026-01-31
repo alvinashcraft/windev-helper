@@ -2,14 +2,37 @@
 
 [![Visual Studio Marketplace Version](https://img.shields.io/visual-studio-marketplace/v/alvinashcraft.windev-helper)](https://marketplace.visualstudio.com/items?itemName=alvinashcraft.windev-helper)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Preview](https://img.shields.io/badge/status-preview-orange)](https://marketplace.visualstudio.com/items?itemName=alvinashcraft.windev-helper)
 
 The **WinDev Helper** extension gives you the tools you need to build beautiful, performant, native Windows apps with WinUI 3 and the Windows App SDK. Built on top of the C# and C# Dev Kit extensions, it supercharges your .NET development with powerful IntelliSense, an intuitive Solution Explorer, package management, and more.
 
 This extension leverages **winapp**, the Windows App Development CLI, to provide a seamless development experience for WinUI apps in VS Code.
 
+> ⚠️ **Preview Release**: Version 2.x is currently in preview. It includes experimental features like native XAML preview. To get stable releases only, disable "Show Pre-Release Versions" in the VS Code extension settings.
+
 ![WinDev Helper Extension](images/icon.png)
 
 ## Features
+
+### 🎨 Native XAML Preview (Preview)
+
+- **Real-time XAML preview** - See your WinUI XAML rendered using the actual WinUI 3 rendering engine
+- **Click-to-navigate** - Click any element in the preview to jump to its definition in your XAML
+- **Cursor sync** - Move your cursor in XAML and the preview highlights the corresponding element
+- **Theme support** - Preview respects your VS Code light/dark theme
+- **Project resource support** - Uses your project's App.xaml and merged dictionaries
+- **Data binding indicators** - Shows where bindings are used with placeholder values
+
+#### HTML Fallback Preview (macOS/Linux)
+
+On non-Windows platforms, the extension provides an HTML-based preview renderer as a fallback:
+
+- **Cross-platform** - Works on macOS, Linux, and Windows
+- **Approximate rendering** - Uses HTML/CSS to approximate WinUI control appearance
+- **Same interaction model** - Click-to-navigate and cursor sync work the same way
+- **Automatic fallback** - No configuration needed; the extension detects your platform
+
+> **Note**: The HTML renderer provides a visual approximation of WinUI controls but may not match native rendering exactly. For pixel-perfect preview, use Windows with the native renderer.
 
 ### 🚀 Debugging & Running
 
@@ -126,6 +149,7 @@ dotnet new winuilib -n MyLib
 | `WinUI: Add New Page` | Add a new XAML page to your project |
 | `WinUI: Add New User Control` | Add a new user control |
 | `WinUI: Add New Window` | Add a new window |
+| `WinUI: Open XAML Preview` | Open native XAML preview panel (Preview) |
 | `WinUI: Build Project` | Build the current project |
 | `WinUI: Rebuild Project` | Clean and rebuild the project |
 | `WinUI: Clean Project` | Clean build outputs |
@@ -157,6 +181,11 @@ This extension contributes the following settings:
 | `windevHelper.autoRestoreOnOpen` | boolean | `true` | Auto-restore packages on project open |
 | `windevHelper.showStatusBarItems` | boolean | `true` | Show config/platform in status bar |
 | `windevHelper.certificatePath` | string | `""` | Default certificate path for signing |
+| `windevHelper.preview.renderer` | string | `auto` | XAML preview renderer: auto, native, html |
+| `windevHelper.preview.theme` | string | `auto` | Preview theme: auto, light, dark |
+| `windevHelper.preview.width` | number | `800` | Default preview width |
+| `windevHelper.preview.height` | number | `600` | Default preview height |
+| `windevHelper.preview.updateDelay` | number | `300` | Delay (ms) before updating preview after edits |
 
 ## Keyboard Shortcuts
 
@@ -219,8 +248,10 @@ MyApp/
 
 ## Known Issues
 
+- **XAML Preview (Preview)**: Some custom controls may not render correctly; complex styles and templates may have issues
 - XAML IntelliSense and Hot Reload are planned for future releases
 - Some advanced debugging scenarios may require Visual Studio
+- XAML Preview requires Windows (the native renderer uses WinUI 3)
 
 ## Contributing
 
@@ -228,7 +259,7 @@ Contributions are welcome! Please see our [Contributing Guide](docs/CONTRIBUTING
 
 ## Roadmap
 
-### v1.0 (Current)
+### v1.0 (Stable)
 
 - ✅ C#/.NET WinUI 3 project support
 - ✅ Debug and run support
@@ -236,6 +267,16 @@ Contributions are welcome! Please see our [Contributing Guide](docs/CONTRIBUTING
 - ✅ MSIX packaging and signing
 - ✅ Project and item templates
 - ✅ App manifest management
+
+### v2.x (Preview)
+
+- ✅ Native XAML preview using WinUI 3 rendering engine
+- ✅ Click-to-navigate from preview to XAML source
+- ✅ Bidirectional cursor/selection sync
+- ✅ Project resource support (App.xaml, merged dictionaries)
+- ✅ Data binding placeholder visualization
+- 🔄 Improved element matching for complex layouts
+- 🔄 DataTemplate and ItemsControl preview support
 
 ### Future Releases
 
@@ -253,6 +294,17 @@ Contributions are welcome! Please see our [Contributing Guide](docs/CONTRIBUTING
 - [.NET CLI Documentation](https://learn.microsoft.com/dotnet/core/tools/)
 
 ## Release Notes
+
+### 2.0.0 (Preview)
+
+New native XAML preview feature:
+
+- **Native XAML Preview** - Renders XAML using the actual WinUI 3 rendering engine
+- **Click-to-navigate** - Click elements in the preview to jump to XAML source
+- **Bidirectional sync** - Cursor position syncs between editor and preview
+- **Project resources** - Loads App.xaml and merged resource dictionaries
+- **Binding visualization** - Shows placeholder values for data bindings
+- **Theme support** - Respects VS Code light/dark theme settings
 
 ### 1.0.0
 

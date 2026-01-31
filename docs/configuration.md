@@ -143,6 +143,111 @@ Access these settings through:
 
 ---
 
+## XAML Preview Settings (Preview Feature)
+
+> ⚠️ These settings are for the preview XAML feature in WinDev Helper 2.x.
+
+### windevHelper.preview.renderer
+
+**Type:** `string`
+
+**Default:** `"auto"`
+
+**Options:** `"auto"`, `"native"`, `"html"`
+
+**Description:** The renderer to use for XAML preview.
+
+```json
+{
+  "windevHelper.preview.renderer": "auto"
+}
+```
+
+**Options:**
+
+- **auto**: Automatically selects the best renderer for your platform (native on Windows, HTML elsewhere)
+- **native**: Uses the WinUI 3 rendering engine for accurate preview (Windows only)
+- **html**: Uses an HTML-based approximation (cross-platform, less accurate)
+
+---
+
+### windevHelper.preview.width
+
+**Type:** `number`
+
+**Default:** `800`
+
+**Description:** Default width of the XAML preview in pixels.
+
+```json
+{
+  "windevHelper.preview.width": 1024
+}
+```
+
+---
+
+### windevHelper.preview.height
+
+**Type:** `number`
+
+**Default:** `600`
+
+**Description:** Default height of the XAML preview in pixels.
+
+```json
+{
+  "windevHelper.preview.height": 768
+}
+```
+
+---
+
+### windevHelper.preview.updateDelay
+
+**Type:** `number`
+
+**Default:** `300`
+
+**Description:** Delay in milliseconds before updating the preview after editing XAML.
+
+```json
+{
+  "windevHelper.preview.updateDelay": 500
+}
+```
+
+**When to adjust:**
+
+- Increase if preview updates cause performance issues
+- Decrease for more responsive previews on fast machines
+
+---
+
+### windevHelper.preview.theme
+
+**Type:** `string`
+
+**Default:** `"auto"`
+
+**Options:** `"auto"`, `"light"`, `"dark"`
+
+**Description:** Theme for the XAML preview.
+
+```json
+{
+  "windevHelper.preview.theme": "auto"
+}
+```
+
+**Options:**
+
+- **auto**: Follows VS Code theme, or uses project's App.xaml `RequestedTheme` if set
+- **light**: Always use light theme
+- **dark**: Always use dark theme
+
+---
+
 ## Workspace Configuration
 
 You can set project-specific configurations in your workspace settings (`.vscode/settings.json`):

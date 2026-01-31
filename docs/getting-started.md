@@ -121,6 +121,52 @@ Press `Ctrl+Shift+B` to build the project.
 dotnet build
 ```
 
+## Previewing XAML (Preview Feature)
+
+> ⚠️ This is a preview feature available in WinDev Helper 2.x.
+
+The native XAML preview lets you see your UI as you design it, rendered by the actual WinUI 3 engine.
+
+### Opening the Preview
+
+1. Open any `.xaml` file
+2. Press `Ctrl+Shift+P`
+3. Type "WinUI: Open XAML Preview" and select it
+4. The preview panel opens beside your XAML editor
+
+### Using the Preview
+
+- **Click-to-navigate**: Click any element in the preview to jump to its XAML definition
+- **Cursor sync**: As you move your cursor in the XAML editor, the preview highlights the corresponding element
+- **Theme sync**: The preview automatically matches your VS Code light/dark theme
+- **Live updates**: Changes to your XAML are reflected in the preview after a short delay
+
+### Preview Settings
+
+You can customize the preview behavior in Settings (`Ctrl+,`):
+
+- `windevHelper.preview.renderer`: Choose `native` (WinUI 3), `html` (fallback), or `auto` (default)
+- `windevHelper.preview.width`: Default preview width (default: 800)
+- `windevHelper.preview.height`: Default preview height (default: 600)
+- `windevHelper.preview.updateDelay`: Delay before updating preview after edits (default: 300ms)
+
+### Platform Support
+
+| Platform | Renderer | Notes |
+|----------|----------|-------|
+| Windows | Native (WinUI 3) | Full-fidelity rendering using actual WinUI engine |
+| macOS | HTML Fallback | Approximate rendering using HTML/CSS |
+| Linux | HTML Fallback | Approximate rendering using HTML/CSS |
+
+The extension automatically selects the best available renderer for your platform. You can override this with the `windevHelper.preview.renderer` setting.
+
+### Known Limitations
+
+- The native renderer requires Windows
+- HTML fallback provides approximate styling, not pixel-perfect rendering
+- Custom controls from external packages may not render without full project context
+- Some complex templates may have limited support
+
 ## Running and Debugging
 
 ### Start Debugging (F5)

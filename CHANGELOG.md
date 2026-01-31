@@ -5,6 +5,52 @@ All notable changes to the WinDev Helper extension will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0] - 2026-01-31 (Preview)
+
+> ⚠️ This is a preview release. To use stable releases only, disable pre-release versions in VS Code.
+
+### Added
+
+- **Native XAML Preview** (Preview Feature)
+  - Real-time XAML preview using the actual WinUI 3 rendering engine
+  - True-to-production rendering accuracy
+  - Click any element in the preview to navigate to its XAML definition
+  - Bidirectional sync between editor cursor and preview selection
+  - Light and dark theme support (respects VS Code theme)
+  - Project resource loading (App.xaml and merged resource dictionaries)
+  - Data binding visualization with placeholder values
+  - Custom resource fallback handling
+
+- **HTML Fallback Preview** (macOS/Linux)
+  - Cross-platform XAML preview using HTML/CSS approximation
+  - Same click-to-navigate and cursor sync features
+  - Automatic platform detection - no configuration required
+  - Approximate WinUI control styling
+
+- **New Extension Settings**
+  - `windevHelper.preview.renderer` - Choose between native, HTML, or auto
+  - `windevHelper.preview.width` - Default preview width
+  - `windevHelper.preview.height` - Default preview height
+  - `windevHelper.preview.updateDelay` - Debounce delay for preview updates
+
+- **New Commands**
+  - `WinUI: Open XAML Preview` - Open the native XAML preview panel
+
+### Technical
+
+- Bundled native renderer (XamlPreviewHost) for WinUI 3 rendering
+- Named pipe IPC between VS Code and native renderer process
+- DPI-aware overlay positioning for element selection
+- XAML preprocessing to handle design-time attributes
+
+### Known Limitations
+
+- Native renderer requires Windows (uses WinUI 3)
+- HTML fallback provides approximate styling, not pixel-perfect rendering
+- Some custom controls may not render without full project context
+- Complex DataTemplates may have limited preview support
+- Element matching may be imprecise for dynamically generated content
+
 ## [1.0.0] - 2026-01-23
 
 ### Added

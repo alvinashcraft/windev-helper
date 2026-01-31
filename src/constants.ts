@@ -51,6 +51,7 @@ export const COMMANDS = {
     SELECT_PLATFORM: 'windev-helper.selectPlatform',
     INSTALL_TEMPLATES: 'windev-helper.installTemplates',
     CHECK_WINAPP_CLI: 'windev-helper.checkWinAppCli',
+    OPEN_XAML_PREVIEW: 'windev-helper.openXamlPreview',
 } as const;
 
 /**

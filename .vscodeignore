@@ -9,6 +9,9 @@ src/**
 out/**
 node_modules/**
 
+# Native renderer source (only include published binaries in bin/)
+native-renderer/**
+
 # Build configuration
 esbuild.js
 **/tsconfig.json
