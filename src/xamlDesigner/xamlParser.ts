@@ -340,7 +340,6 @@ export class XamlParser {
             // Check for closing tag
             if (this.text.substring(this.pos, this.pos + 2) === '</') {
                 // Verify it's the right closing tag
-                const closingStart = this.pos;
                 this.pos += 2;
                 const closingTag = this.parseTagName();
                 this.skipWhitespace();
@@ -356,8 +355,7 @@ export class XamlParser {
                         line: this.line,
                         column: this.column
                     });
-                    // Reset position and continue
-                    this.pos = closingStart;
+                    // Break on mismatch - no recovery attempted
                     break;
                 }
             }

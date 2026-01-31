@@ -250,12 +250,8 @@ function registerCommands(context: vscode.ExtensionContext): void {
 }
 
 export function deactivate(): void {
-    // Dispose preview controller
-    if (previewController) {
-        previewController.dispose();
-    }
-    
-    // Dispose all services through the service locator
+    // previewController is disposed automatically via context.subscriptions
+    // Only dispose services that aren't in subscriptions
     if (ServiceLocator.isInitialized) {
         services.dispose();
     }
