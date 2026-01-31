@@ -2,7 +2,7 @@
   "name": "windev-helper",
   "displayName": "WinDev Helper",
   "description": "Build beautiful, performant WinUI apps with VS Code. Debug, build, package, and deploy Windows apps powered by the Windows App SDK.",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "publisher": "alvinashcraft",
   "icon": "images/icon.png",
   "license": "MIT",
