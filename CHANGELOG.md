@@ -21,8 +21,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Data binding visualization with placeholder values
   - Custom resource fallback handling
 
+- **HTML Fallback Preview** (macOS/Linux)
+  - Cross-platform XAML preview using HTML/CSS approximation
+  - Same click-to-navigate and cursor sync features
+  - Automatic platform detection - no configuration required
+  - Approximate WinUI control styling
+
 - **New Extension Settings**
-  - `windevHelper.preview.renderer` - Choose between native or HTML renderer
+  - `windevHelper.preview.renderer` - Choose between native, HTML, or auto
   - `windevHelper.preview.width` - Default preview width
   - `windevHelper.preview.height` - Default preview height
   - `windevHelper.preview.updateDelay` - Debounce delay for preview updates
@@ -39,7 +45,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Known Limitations
 
-- Requires Windows (native renderer uses WinUI 3)
+- Native renderer requires Windows (uses WinUI 3)
+- HTML fallback provides approximate styling, not pixel-perfect rendering
 - Some custom controls may not render without full project context
 - Complex DataTemplates may have limited preview support
 - Element matching may be imprecise for dynamically generated content

@@ -23,6 +23,17 @@ This extension leverages **winapp**, the Windows App Development CLI, to provide
 - **Project resource support** - Uses your project's App.xaml and merged dictionaries
 - **Data binding indicators** - Shows where bindings are used with placeholder values
 
+#### HTML Fallback Preview (macOS/Linux)
+
+On non-Windows platforms, the extension provides an HTML-based preview renderer as a fallback:
+
+- **Cross-platform** - Works on macOS, Linux, and Windows
+- **Approximate rendering** - Uses HTML/CSS to approximate WinUI control appearance
+- **Same interaction model** - Click-to-navigate and cursor sync work the same way
+- **Automatic fallback** - No configuration needed; the extension detects your platform
+
+> **Note**: The HTML renderer provides a visual approximation of WinUI controls but may not match native rendering exactly. For pixel-perfect preview, use Windows with the native renderer.
+
 ### 🚀 Debugging & Running
 
 - **Hit F5 to debug your app** on Windows

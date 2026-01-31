@@ -145,14 +145,25 @@ The native XAML preview lets you see your UI as you design it, rendered by the a
 
 You can customize the preview behavior in Settings (`Ctrl+,`):
 
-- `windevHelper.preview.renderer`: Choose `native` (WinUI 3) or `html` (fallback)
+- `windevHelper.preview.renderer`: Choose `native` (WinUI 3), `html` (fallback), or `auto` (default)
 - `windevHelper.preview.width`: Default preview width (default: 800)
 - `windevHelper.preview.height`: Default preview height (default: 600)
 - `windevHelper.preview.updateDelay`: Delay before updating preview after edits (default: 300ms)
 
+### Platform Support
+
+| Platform | Renderer | Notes |
+|----------|----------|-------|
+| Windows | Native (WinUI 3) | Full-fidelity rendering using actual WinUI engine |
+| macOS | HTML Fallback | Approximate rendering using HTML/CSS |
+| Linux | HTML Fallback | Approximate rendering using HTML/CSS |
+
+The extension automatically selects the best available renderer for your platform. You can override this with the `windevHelper.preview.renderer` setting.
+
 ### Known Limitations
 
 - The native renderer requires Windows
+- HTML fallback provides approximate styling, not pixel-perfect rendering
 - Custom controls from external packages may not render without full project context
 - Some complex templates may have limited support
 
