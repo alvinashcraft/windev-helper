@@ -8,9 +8,12 @@ import { ServiceLocator } from './serviceLocator';
 import { COMMANDS, CONFIG, DEBUG_TYPES } from './constants';
 import { XamlPreviewController } from './xamlPreview';
 import { XamlDesignerPanel } from './xamlDesigner';
+import { PropertyPaneController } from './propertyPane';
 
 let services: ServiceLocator;
 let previewController: XamlPreviewController;
+let propertyPaneController: PropertyPaneController;
+let designerSelectionSubscription: vscode.Disposable | undefined;
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
     console.log('WinDev Helper extension is now active');
@@ -21,6 +24,27 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     // Initialize XAML preview controller
     previewController = new XamlPreviewController(context.extensionPath);
     context.subscriptions.push(previewController);
+
+    // Initialize property pane controller
+    propertyPaneController = new PropertyPaneController(context);
+    context.subscriptions.push(propertyPaneController);
+
+    // Connect designer selection events to property pane
+    designerSelectionSubscription = XamlDesignerPanel.onElementSelected(event => {
+        propertyPaneController.updateDocument(event.document);
+        propertyPaneController.selectElement(event.element);
+    });
+    context.subscriptions.push(designerSelectionSubscription);
+
+    // Also update property pane when active editor changes to a XAML file
+    context.subscriptions.push(
+        vscode.window.onDidChangeActiveTextEditor(editor => {
+            if (editor && (editor.document.languageId === 'xaml' || editor.document.fileName.endsWith('.xaml'))) {
+                propertyPaneController.updateDocument(editor.document);
+                propertyPaneController.clearSelection();
+            }
+        })
+    );
 
     // Register debug configuration provider
     const debugProvider = new DebugConfigurationProvider(
