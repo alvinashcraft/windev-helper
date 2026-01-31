@@ -41,6 +41,7 @@ export class XamlPreviewController implements vscode.Disposable {
         this.projectContextProvider.setupWatchers();
         this.initializeRenderers();
         this.setupConfigurationListener();
+        this.setupContextInvalidationListener();
     }
 
     /**
@@ -69,6 +70,19 @@ export class XamlPreviewController implements vscode.Disposable {
                 if (e.affectsConfiguration('windevHelper.preview')) {
                     this.selectRenderer();
                 }
+            })
+        );
+    }
+
+    /**
+     * Listen for project context invalidation (App.xaml or resource changes)
+     */
+    private setupContextInvalidationListener(): void {
+        this.disposables.push(
+            this.projectContextProvider.onContextInvalidated(() => {
+                // Clear render cache when project resources change
+                this.renderCache.clear();
+                console.log('[PreviewController] Render cache cleared due to project context change');
             })
         );
     }
@@ -204,10 +218,20 @@ export class XamlPreviewController implements vscode.Disposable {
      * Build full render options including project context
      */
     private async buildRenderOptions(options: RenderWithContextOptions): Promise<RenderOptions> {
+        // Check if user has explicitly set a theme preference
+        const config = vscode.workspace.getConfiguration('windevHelper.preview');
+        const userTheme = config.get<string>('theme', 'auto');
+        
+        // If user explicitly chose light/dark, use that; otherwise use the passed-in theme (from VS Code)
+        let theme: 'light' | 'dark' = options.theme;
+        if (userTheme === 'light' || userTheme === 'dark') {
+            theme = userTheme;
+        }
+
         const fullOptions: RenderOptions = {
             width: options.width,
             height: options.height,
-            theme: options.theme,
+            theme,
             scale: options.scale
         };
 
@@ -231,13 +255,8 @@ export class XamlPreviewController implements vscode.Disposable {
                     }));
 
                     // Use project's requested theme if available and we're in auto mode
-                    if (context.requestedTheme && context.requestedTheme !== 'Default') {
-                        // Only override if user hasn't explicitly set a theme
-                        const config = vscode.workspace.getConfiguration('windevHelper.preview');
-                        const userTheme = config.get<string>('theme');
-                        if (!userTheme || userTheme === 'auto') {
-                            fullOptions.theme = context.requestedTheme.toLowerCase() as 'light' | 'dark';
-                        }
+                    if (userTheme === 'auto' && context.requestedTheme && context.requestedTheme !== 'Default') {
+                        fullOptions.theme = context.requestedTheme.toLowerCase() as 'light' | 'dark';
                     }
 
                     console.log(`[PreviewController] Loaded project context: ${context.resourceDictionaries.length} resource dictionaries`);

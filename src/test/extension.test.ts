@@ -20,6 +20,7 @@ suite('Extension Test Suite', () => {
             assert.strictEqual(COMMANDS.DEBUG_PROJECT, 'windev-helper.debugProject');
             assert.strictEqual(COMMANDS.ADD_PAGE, 'windev-helper.addPage');
             assert.strictEqual(COMMANDS.ADD_VIEW_MODEL, 'windev-helper.addViewModel');
+            assert.strictEqual(COMMANDS.OPEN_XAML_PREVIEW, 'windev-helper.openXamlPreview');
         });
 
         test('CONFIG should have expected configuration keys', () => {

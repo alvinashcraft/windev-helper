@@ -151,20 +151,21 @@ Access these settings through:
 
 **Type:** `string`
 
-**Default:** `"native"`
+**Default:** `"auto"`
 
-**Options:** `"native"`, `"html"`
+**Options:** `"auto"`, `"native"`, `"html"`
 
 **Description:** The renderer to use for XAML preview.
 
 ```json
 {
-  "windevHelper.preview.renderer": "native"
+  "windevHelper.preview.renderer": "auto"
 }
 ```
 
 **Options:**
 
+- **auto**: Automatically selects the best renderer for your platform (native on Windows, HTML elsewhere)
 - **native**: Uses the WinUI 3 rendering engine for accurate preview (Windows only)
 - **html**: Uses an HTML-based approximation (cross-platform, less accurate)
 
@@ -220,6 +221,30 @@ Access these settings through:
 
 - Increase if preview updates cause performance issues
 - Decrease for more responsive previews on fast machines
+
+---
+
+### windevHelper.preview.theme
+
+**Type:** `string`
+
+**Default:** `"auto"`
+
+**Options:** `"auto"`, `"light"`, `"dark"`
+
+**Description:** Theme for the XAML preview.
+
+```json
+{
+  "windevHelper.preview.theme": "auto"
+}
+```
+
+**Options:**
+
+- **auto**: Follows VS Code theme, or uses project's App.xaml `RequestedTheme` if set
+- **light**: Always use light theme
+- **dark**: Always use dark theme
 
 ---
 

@@ -119,7 +119,7 @@ dotnet new winui-window -n WindowName
 
 ### WinUI: Open XAML Preview
 
-**Command ID:** `windev-helper.openXamlDesigner`
+**Command ID:** `windev-helper.openXamlPreview`
 
 Opens the native XAML preview panel for the current XAML file.
 

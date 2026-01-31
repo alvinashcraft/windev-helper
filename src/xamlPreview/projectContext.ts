@@ -42,6 +42,10 @@ export class ProjectContextProvider {
     private readonly cacheMaxAge = 30000; // 30 seconds
     private fileWatchers: vscode.FileSystemWatcher[] = [];
 
+    private readonly _onContextInvalidated = new vscode.EventEmitter<string | undefined>();
+    /** Fired when project context is invalidated (App.xaml or resource dictionaries changed) */
+    public readonly onContextInvalidated = this._onContextInvalidated.event;
+
     /**
      * Get project context for a XAML file
      * @param xamlFilePath Path to the XAML file being previewed
@@ -279,6 +283,8 @@ export class ProjectContextProvider {
         } else {
             this.cache.clear();
         }
+        // Notify listeners that context has changed
+        this._onContextInvalidated.fire(projectPath);
     }
 
     /**
@@ -311,5 +317,6 @@ export class ProjectContextProvider {
         }
         this.fileWatchers = [];
         this.cache.clear();
+        this._onContextInvalidated.dispose();
     }
 }

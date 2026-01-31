@@ -181,7 +181,8 @@ This extension contributes the following settings:
 | `windevHelper.autoRestoreOnOpen` | boolean | `true` | Auto-restore packages on project open |
 | `windevHelper.showStatusBarItems` | boolean | `true` | Show config/platform in status bar |
 | `windevHelper.certificatePath` | string | `""` | Default certificate path for signing |
-| `windevHelper.preview.renderer` | string | `native` | XAML preview renderer: native, html |
+| `windevHelper.preview.renderer` | string | `auto` | XAML preview renderer: auto, native, html |
+| `windevHelper.preview.theme` | string | `auto` | Preview theme: auto, light, dark |
 | `windevHelper.preview.width` | number | `800` | Default preview width |
 | `windevHelper.preview.height` | number | `600` | Default preview height |
 | `windevHelper.preview.updateDelay` | number | `300` | Delay (ms) before updating preview after edits |

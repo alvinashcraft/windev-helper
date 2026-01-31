@@ -247,6 +247,16 @@
           "type": "number",
           "default": 600,
           "description": "Default height for native XAML preview rendering."
+        },
+        "windevHelper.preview.theme": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "light",
+            "dark"
+          ],
+          "default": "auto",
+          "description": "Theme for XAML preview. 'auto' follows VS Code theme or project's App.xaml RequestedTheme."
         }
       }
     },
@@ -451,12 +461,13 @@
     "watch": "npm-run-all -p watch:*",
     "watch:esbuild": "node esbuild.js --watch",
     "watch:tsc": "tsc --noEmit --watch --project tsconfig.json",
-    "build-native-renderer": "dotnet publish native-renderer/XamlPreviewHost/XamlPreviewHost.csproj -c Release -r win-x64 --self-contained -o bin",
+    "build-native-renderer": "node -e \"if(process.platform==='win32'){require('child_process').execSync('dotnet publish native-renderer/XamlPreviewHost/XamlPreviewHost.csproj -c Release -r win-x64 --self-contained -o bin',{stdio:'inherit'})}else{console.log('Skipping native renderer build (Windows only)')}\"",
+    "build-native-renderer:windows": "dotnet publish native-renderer/XamlPreviewHost/XamlPreviewHost.csproj -c Release -r win-x64 --self-contained -o bin",
     "build": "npm run build-native-renderer && npm run check-types && npm run lint && node esbuild.js --production",
-    "package": "vsce package --allow-star-activation",
-    "package:prerelease": "vsce package --pre-release --allow-star-activation",
-    "publish": "vsce publish --allow-star-activation",
-    "publish:prerelease": "vsce publish --pre-release --allow-star-activation",
+    "package": "npx vsce package --allow-star-activation",
+    "package:prerelease": "npx vsce package --pre-release --allow-star-activation",
+    "publish": "npx vsce publish --allow-star-activation",
+    "publish:prerelease": "npx vsce publish --pre-release --allow-star-activation",
     "compile-tests": "tsc -p . --outDir out",
     "watch-tests": "tsc -p . -w --outDir out",
     "pretest": "npm run compile-tests && npm run compile && npm run lint",
@@ -468,6 +479,7 @@
     "@types/vscode": "^1.108.1",
     "@types/mocha": "^10.0.10",
     "@types/node": "22.x",
+    "@vscode/vsce": "^3.2.2",
     "typescript-eslint": "^8.52.0",
     "eslint": "^9.39.2",
     "esbuild": "^0.27.2",

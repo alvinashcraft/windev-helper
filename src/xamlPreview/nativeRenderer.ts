@@ -57,10 +57,11 @@ interface NativeRenderResponse {
 }
 
 interface PendingRequest {
-    resolve: (result: RenderResult) => void;
-    reject: (error: Error) => void;
+    resolve: (result: RenderResult | void) => void;
     timeout: NodeJS.Timeout;
     startTime: number;
+    /** For ping requests that need rejection on dispose */
+    isPing?: boolean;
 }
 
 /**
@@ -98,6 +99,7 @@ export class NativeXamlRenderer implements IXamlRenderer {
     private readonly healthCheckIntervalMs = 30000;
     private readonly maxReconnectAttempts = 3;
     private readonly reconnectDelayMs = 1000;
+    private cachedAvailable: boolean | null = null;
 
     constructor(extensionPath: string) {
         this.extensionPath = extensionPath;
@@ -105,10 +107,56 @@ export class NativeXamlRenderer implements IXamlRenderer {
     }
 
     /**
-     * Check if native renderer is available (Windows only)
+     * Get the Windows RID (Runtime Identifier) for the current architecture
+     */
+    private static getWindowsRid(): string | null {
+        if (process.platform !== 'win32') {
+            return null;
+        }
+        switch (process.arch) {
+            case 'x64':
+                return 'win-x64';
+            case 'arm64':
+                return 'win-arm64';
+            case 'ia32':
+                return 'win-x86';
+            default:
+                return null;
+        }
+    }
+
+    /**
+     * Check if native renderer is available (Windows with matching architecture binary)
      */
     public get available(): boolean {
-        return process.platform === 'win32';
+        // Cache the result to avoid repeated file system checks
+        if (this.cachedAvailable !== null) {
+            return this.cachedAvailable;
+        }
+
+        // Must be Windows
+        if (process.platform !== 'win32') {
+            this.cachedAvailable = false;
+            return false;
+        }
+
+        // Must have a supported architecture
+        const rid = NativeXamlRenderer.getWindowsRid();
+        if (!rid) {
+            console.warn(`[NativeRenderer] Unsupported architecture: ${process.arch}`);
+            this.cachedAvailable = false;
+            return false;
+        }
+
+        // Check if the binary exists
+        const executablePath = this.findRendererExecutable();
+        this.cachedAvailable = executablePath !== null;
+        
+        if (!this.cachedAvailable) {
+            console.warn(`[NativeRenderer] No native renderer binary found for ${rid}`);
+        }
+        
+        return this.cachedAvailable;
     }
 
     /**
@@ -162,13 +210,21 @@ export class NativeXamlRenderer implements IXamlRenderer {
      * Find the native renderer executable
      */
     private findRendererExecutable(): string | null {
+        const rid = NativeXamlRenderer.getWindowsRid();
+        if (!rid) {
+            return null;
+        }
+
         const possiblePaths = [
-            // Development: built locally (.NET 10)
-            path.join(this.extensionPath, 'native-renderer', 'XamlPreviewHost', 'bin', 'Release', 'net10.0-windows10.0.19041.0', 'win-x64', 'publish', 'XamlPreviewHost.exe'),
-            path.join(this.extensionPath, 'native-renderer', 'XamlPreviewHost', 'bin', 'Debug', 'net10.0-windows10.0.19041.0', 'win-x64', 'XamlPreviewHost.exe'),
+            // Development: built locally (.NET 10) - architecture-specific
+            path.join(this.extensionPath, 'native-renderer', 'XamlPreviewHost', 'bin', 'Release', 'net10.0-windows10.0.19041.0', rid, 'publish', 'XamlPreviewHost.exe'),
+            path.join(this.extensionPath, 'native-renderer', 'XamlPreviewHost', 'bin', 'Debug', 'net10.0-windows10.0.19041.0', rid, 'XamlPreviewHost.exe'),
+            // Development: AnyCPU builds
             path.join(this.extensionPath, 'native-renderer', 'XamlPreviewHost', 'bin', 'Release', 'net10.0-windows10.0.19041.0', 'XamlPreviewHost.exe'),
             path.join(this.extensionPath, 'native-renderer', 'XamlPreviewHost', 'bin', 'Debug', 'net10.0-windows10.0.19041.0', 'XamlPreviewHost.exe'),
-            // Production: bundled with extension
+            // Production: bundled with extension - architecture-specific folder
+            path.join(this.extensionPath, 'bin', rid, 'XamlPreviewHost.exe'),
+            // Production: bundled with extension - flat folder (current build setup)
             path.join(this.extensionPath, 'bin', 'XamlPreviewHost.exe'),
         ];
 
@@ -184,7 +240,7 @@ export class NativeXamlRenderer implements IXamlRenderer {
             }
         }
 
-        console.error('[NativeRenderer] Renderer not found. Searched:', possiblePaths);
+        console.error(`[NativeRenderer] Renderer not found for ${rid}. Searched:`, possiblePaths);
         return null;
     }
 
@@ -517,9 +573,9 @@ export class NativeXamlRenderer implements IXamlRenderer {
                     this.pendingRequests.delete(requestId);
                     resolve();
                 },
-                reject,
                 timeout,
-                startTime: Date.now()
+                startTime: Date.now(),
+                isPing: true
             });
 
             const message = JSON.stringify(request) + '\n';
@@ -591,8 +647,7 @@ export class NativeXamlRenderer implements IXamlRenderer {
             }, this.renderTimeoutMs);
 
             this.pendingRequests.set(requestId, { 
-                resolve, 
-                reject: () => {}, 
+                resolve: resolve as (result: RenderResult | void) => void, 
                 timeout,
                 startTime: Date.now()
             });
@@ -627,11 +682,20 @@ export class NativeXamlRenderer implements IXamlRenderer {
         
         this.stopHealthCheck();
 
-        // Reject all pending requests
-        const error = new Error('Renderer disposed');
+        // Resolve all pending requests with appropriate responses
         for (const [, pending] of this.pendingRequests) {
             clearTimeout(pending.timeout);
-            pending.reject(error);
+            if (pending.isPing) {
+                // Ping requests just resolve with void - the caller handles errors
+                pending.resolve(undefined);
+            } else {
+                // Render requests get a failure result
+                pending.resolve({
+                    success: false,
+                    code: 'DISPOSED',
+                    message: 'Renderer was disposed while request was pending'
+                });
+            }
         }
         this.pendingRequests.clear();
 
