@@ -330,13 +330,27 @@ export class NativeXamlRenderer implements IXamlRenderer {
     private async doConnectToPipe(): Promise<void> {
         return new Promise((resolve, reject) => {
             const pipePath = `\\\\.\\pipe\\${this.pipeName}`;
+            let connectionResolved = false;
             
             console.log(`[NativeRenderer] Connecting to pipe: ${pipePath}`);
             
+            // Connection timeout
+            const connectionTimeout = setTimeout(() => {
+                if (!connectionResolved) {
+                    connectionResolved = true;
+                    this.pipeClient?.destroy();
+                    reject(new Error('Pipe connection timed out'));
+                }
+            }, 5000);
+
             this.pipeClient = net.createConnection(pipePath, () => {
-                console.log('[NativeRenderer] Connected to pipe');
-                this.lastActivityTime = Date.now();
-                resolve();
+                if (!connectionResolved) {
+                    connectionResolved = true;
+                    clearTimeout(connectionTimeout);
+                    console.log('[NativeRenderer] Connected to pipe');
+                    this.lastActivityTime = Date.now();
+                    resolve();
+                }
             });
 
             this.pipeClient.on('data', (data: Buffer) => {
@@ -346,9 +360,11 @@ export class NativeXamlRenderer implements IXamlRenderer {
 
             this.pipeClient.on('error', (err) => {
                 console.error('[NativeRenderer] Pipe error:', err);
-                if (!this.initialized) {
+                if (!connectionResolved) {
+                    connectionResolved = true;
+                    clearTimeout(connectionTimeout);
                     reject(new Error(`Failed to connect to pipe: ${err.message}`));
-                } else {
+                } else if (this.initialized) {
                     this.handlePipeError(err);
                 }
             });
@@ -359,14 +375,6 @@ export class NativeXamlRenderer implements IXamlRenderer {
                     this.scheduleReconnect();
                 }
             });
-
-            // Connection timeout
-            setTimeout(() => {
-                if (!this.pipeClient?.connecting === false) {
-                    this.pipeClient?.destroy();
-                    reject(new Error('Pipe connection timed out'));
-                }
-            }, 5000);
         });
     }
 

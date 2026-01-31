@@ -886,6 +886,7 @@ export class XamlDesignerPanel {
             const target = event.target.closest('[id^="xaml-el-"]');
             if (target) {
                 event.stopPropagation();
+                event.preventDefault(); // Prevent default action (e.g., anchor navigation)
                 const mapping = elementMappings.find(m => m.elementId === target.id);
                 if (mapping) {
                     selectElementById(target.id);
@@ -893,6 +894,9 @@ export class XamlDesignerPanel {
                 }
             }
         }
+
+        // Register HTML element click handler once (uses event delegation)
+        document.getElementById('preview-content').addEventListener('click', handleHtmlElementClick);
 
         window.addEventListener('message', event => {
             const message = event.data;
@@ -922,16 +926,6 @@ export class XamlDesignerPanel {
                         const displayedHeight = img.offsetHeight;
                         const scale = displayedWidth / layoutWidth;
                         
-                        console.log('[XAML Preview] Image scale:', {
-                            imageWidth: imageWidth,
-                            imageHeight: imageHeight,
-                            layoutWidth: layoutWidth,
-                            layoutHeight: layoutHeight,
-                            displayedWidth: displayedWidth,
-                            displayedHeight: displayedHeight,
-                            scale: scale
-                        });
-                        
                         // Add element overlays with scaled positions
                         const minSize = 5;
                         for (let i = 1; i < elementMappings.length; i++) {
@@ -952,11 +946,6 @@ export class XamlDesignerPanel {
                                 }
                                 overlay.onclick = function(event) { handleOverlayClick(event, overlay); };
                                 previewContent.appendChild(overlay);
-                                
-                                console.log('[XAML Preview] Overlay:', m.tagName, 
-                                    'original:', m.bounds, 
-                                    'scaled:', { x: m.bounds.x * scale, y: m.bounds.y * scale, w: m.bounds.width * scale, h: m.bounds.height * scale },
-                                    m.parentElementId ? 'parent:' + m.parentElementId : '');
                             }
                         }
                     };
@@ -969,7 +958,6 @@ export class XamlDesignerPanel {
                     // Clear info bar for HTML preview (it handles bindings inline)
                     updateInfoBar([]);
                     previewContent.innerHTML = '<div id="preview-html">' + message.html + '</div>';
-                    previewContent.addEventListener('click', handleHtmlElementClick);
                     renderTime.textContent = '';
                     break;
 
