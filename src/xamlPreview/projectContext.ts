@@ -109,7 +109,10 @@ export class ProjectContextProvider {
             context.appXamlPath = appXamlPath;
             const appXamlContent = await fs.promises.readFile(appXamlPath, 'utf-8');
             context.appXamlContent = this.preprocessAppXaml(appXamlContent);
-            context.requestedTheme = this.extractRequestedTheme(appXamlContent);
+            const requestedTheme = this.extractRequestedTheme(appXamlContent);
+            if (requestedTheme) {
+                context.requestedTheme = requestedTheme;
+            }
 
             // Extract and load resource dictionaries
             const resourceSources = this.extractResourceDictionarySources(appXamlContent);

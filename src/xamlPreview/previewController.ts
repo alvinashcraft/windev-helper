@@ -6,7 +6,7 @@ import * as vscode from 'vscode';
 import { IXamlRenderer, RenderOptions, RenderResult, RendererType, RendererStatus } from './types';
 import { NativeXamlRenderer } from './nativeRenderer';
 import { HtmlXamlRenderer } from './htmlFallbackRenderer';
-import { ProjectContextProvider, ProjectContext } from './projectContext';
+import { ProjectContextProvider } from './projectContext';
 // import { AzureXamlRenderer } from './azureRenderer';  // Future
 
 /**
@@ -208,9 +208,13 @@ export class XamlPreviewController implements vscode.Disposable {
             width: options.width,
             height: options.height,
             theme: options.theme,
-            scale: options.scale,
-            xamlFilePath: options.xamlFilePath
+            scale: options.scale
         };
+
+        // Add xamlFilePath if provided
+        if (options.xamlFilePath) {
+            fullOptions.xamlFilePath = options.xamlFilePath;
+        }
 
         // Try to get project context if we have a file path
         if (options.xamlFilePath) {
@@ -218,7 +222,9 @@ export class XamlPreviewController implements vscode.Disposable {
                 const context = await this.projectContextProvider.getContext(options.xamlFilePath);
                 if (context) {
                     fullOptions.projectPath = context.projectPath;
-                    fullOptions.appXamlContent = context.appXamlContent;
+                    if (context.appXamlContent) {
+                        fullOptions.appXamlContent = context.appXamlContent;
+                    }
                     fullOptions.resourceDictionaries = context.resourceDictionaries.map(rd => ({
                         source: rd.source,
                         content: rd.content

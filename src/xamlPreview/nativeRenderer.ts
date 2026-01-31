@@ -360,11 +360,11 @@ export class NativeXamlRenderer implements IXamlRenderer {
                 success: true,
                 type: 'image',
                 data: response.imageBase64 || '',
-                imageWidth: response.imageWidth,
-                imageHeight: response.imageHeight,
+                ...(response.imageWidth !== undefined && { imageWidth: response.imageWidth }),
+                ...(response.imageHeight !== undefined && { imageHeight: response.imageHeight }),
                 elementMappings: (response.elements || []).map(el => ({
                     id: el.id,
-                    name: el.name,
+                    ...(el.name !== undefined && { name: el.name }),
                     type: el.type,
                     bounds: el.bounds,
                     xamlLine: el.xamlLine,
@@ -378,8 +378,8 @@ export class NativeXamlRenderer implements IXamlRenderer {
                 success: false,
                 code: response.error?.code || 'UNKNOWN_ERROR',
                 message: response.error?.message || 'Unknown error',
-                line: response.error?.line,
-                column: response.error?.column
+                ...(response.error?.line !== undefined && { line: response.error.line }),
+                ...(response.error?.column !== undefined && { column: response.error.column })
             });
         }
     }
@@ -389,7 +389,7 @@ export class NativeXamlRenderer implements IXamlRenderer {
      */
     private handlePipeError(err: Error): void {
         // Reject all pending requests
-        for (const [id, pending] of this.pendingRequests) {
+        for (const [, pending] of this.pendingRequests) {
             clearTimeout(pending.timeout);
             pending.resolve({
                 success: false,
@@ -570,9 +570,9 @@ export class NativeXamlRenderer implements IXamlRenderer {
                 height: options.height,
                 theme: options.theme,
                 scale: options.scale,
-                projectPath: options.projectPath,
-                appXamlContent: options.appXamlContent,
-                resourceDictionaries: options.resourceDictionaries
+                ...(options.projectPath !== undefined && { projectPath: options.projectPath }),
+                ...(options.appXamlContent !== undefined && { appXamlContent: options.appXamlContent }),
+                ...(options.resourceDictionaries !== undefined && { resourceDictionaries: options.resourceDictionaries })
             }
         };
 

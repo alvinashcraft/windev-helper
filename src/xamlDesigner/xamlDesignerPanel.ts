@@ -240,13 +240,19 @@ export class XamlDesignerPanel {
      * Show image-based preview (from native renderer)
      */
     private showImagePreview(result: RenderResult & { success: true }): void {
+        // Log warnings to console instead of showing in preview
+        if (result.warnings && result.warnings.length > 0) {
+            for (const warning of result.warnings) {
+                console.log('[XAML Preview]', warning);
+            }
+        }
+
         this.panel.webview.postMessage({
             type: 'updateImagePreview',
             imageData: result.data,
             imageWidth: result.imageWidth,
             imageHeight: result.imageHeight,
             renderTimeMs: result.renderTimeMs,
-            warnings: result.warnings || [],
             mappings: result.elementMappings.map(m => ({
                 elementId: m.id,
                 line: m.xamlLine,
