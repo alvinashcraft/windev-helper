@@ -51,3 +51,16 @@ temp/
 
 # Debug
 .vscode-test-web/
+
+# Native renderer build outputs
+native-renderer/**/bin/
+native-renderer/**/obj/
+native-renderer/**/*.user
+native-renderer/**/*.suo
+native-renderer/**/.vs/
+native-renderer/**/packages/
+native-renderer/**/*.DotSettings.user
+native-renderer/**/project.lock.json
+native-renderer/**/*.nuget.props
+native-renderer/**/*.nuget.g.props
+native-renderer/**/*.nuget.g.targets
