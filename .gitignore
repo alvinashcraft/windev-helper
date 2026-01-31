@@ -1,6 +1,7 @@
 # Build outputs
 out/
 dist/
+bin/
 *.vsix
 
 # Dependencies

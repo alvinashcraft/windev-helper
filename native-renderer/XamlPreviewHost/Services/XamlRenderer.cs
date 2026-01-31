@@ -12,6 +12,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices.WindowsRuntime;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Windows.Graphics.Imaging;
 using Windows.Storage.Streams;
@@ -79,11 +80,14 @@ public class XamlRenderer
                     : ElementTheme.Dark;
             }
 
+            // Preprocess XAML to remove compile-time attributes
+            var processedXaml = PreprocessXaml(xaml, warnings);
+
             // Parse XAML
             UIElement element;
             try
             {
-                element = (UIElement)XamlReader.Load(xaml);
+                element = (UIElement)XamlReader.Load(processedXaml);
             }
             catch (Exception ex)
             {
@@ -267,6 +271,56 @@ public class XamlRenderer
         }
 
         return (line, column);
+    }
+
+    /// <summary>
+    /// Preprocess XAML to remove compile-time only attributes that XamlReader.Load doesn't support.
+    /// </summary>
+    private static string PreprocessXaml(string xaml, List<string> warnings)
+    {
+        var result = xaml;
+
+        // Remove x:Class attribute (only valid for compiled XAML with LoadComponent)
+        var classMatch = Regex.Match(result, @"\s+x:Class\s*=\s*""[^""]*""", RegexOptions.IgnoreCase);
+        if (classMatch.Success)
+        {
+            result = result.Remove(classMatch.Index, classMatch.Length);
+            warnings.Add("Removed x:Class attribute (not supported in dynamic XAML loading)");
+        }
+
+        // Remove x:ClassModifier attribute
+        var classModifierMatch = Regex.Match(result, @"\s+x:ClassModifier\s*=\s*""[^""]*""", RegexOptions.IgnoreCase);
+        if (classModifierMatch.Success)
+        {
+            result = result.Remove(classModifierMatch.Index, classModifierMatch.Length);
+            warnings.Add("Removed x:ClassModifier attribute (not supported in dynamic XAML loading)");
+        }
+
+        // Remove mc:Ignorable attribute and d: design-time namespace declarations
+        var mcIgnorableMatch = Regex.Match(result, @"\s+mc:Ignorable\s*=\s*""[^""]*""", RegexOptions.IgnoreCase);
+        if (mcIgnorableMatch.Success)
+        {
+            result = result.Remove(mcIgnorableMatch.Index, mcIgnorableMatch.Length);
+        }
+
+        // Remove d: namespace declaration
+        var dNamespaceMatch = Regex.Match(result, @"\s+xmlns:d\s*=\s*""[^""]*""", RegexOptions.IgnoreCase);
+        if (dNamespaceMatch.Success)
+        {
+            result = result.Remove(dNamespaceMatch.Index, dNamespaceMatch.Length);
+        }
+
+        // Remove mc: namespace declaration
+        var mcNamespaceMatch = Regex.Match(result, @"\s+xmlns:mc\s*=\s*""[^""]*""", RegexOptions.IgnoreCase);
+        if (mcNamespaceMatch.Success)
+        {
+            result = result.Remove(mcNamespaceMatch.Index, mcNamespaceMatch.Length);
+        }
+
+        // Remove d: prefixed attributes (design-time attributes like d:DesignHeight)
+        result = Regex.Replace(result, @"\s+d:\w+\s*=\s*""[^""]*""", "", RegexOptions.IgnoreCase);
+
+        return result;
     }
 }
 

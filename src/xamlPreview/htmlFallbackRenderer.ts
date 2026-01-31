@@ -75,9 +75,9 @@ export class HtmlXamlRenderer implements IXamlRenderer {
                 success: true,
                 type: 'html',
                 data: renderResult.html,
-                elementMappings: renderResult.elementMappings.map((m, index) => ({
+                elementMappings: renderResult.elementMappings.map((m) => ({
                     id: m.elementId,
-                    name: undefined, // HTML renderer doesn't track x:Name
+                    // name is omitted - HTML renderer doesn't track x:Name
                     type: m.xamlElement.tagName,
                     bounds: {
                         x: 0,
