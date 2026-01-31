@@ -268,11 +268,17 @@ public class XamlRenderer
 
         // Match Binding expressions: Property="{Binding Path, Mode=...}"
         // Property names can include dots for attached properties
-        var bindingPattern = @"([\w.]+)\s*=\s*""\{Binding\s+([^}]*)\}""";
+        // Allow `{Binding}` with no path (treated as `(self)`) and optional content after `Binding`.
+        var bindingPattern = @"([\w.]+)\s*=\s*""\{Binding(?:\s+([^}]*))?\}""";
         result = Regex.Replace(result, bindingPattern, match =>
         {
             var property = match.Groups[1].Value;
-            var bindingContent = match.Groups[2].Value;
+            var bindingContent = match.Groups[2].Success ? match.Groups[2].Value : string.Empty;
+            // Treat `{Binding}` (no content) as a self-binding.
+            if (string.IsNullOrWhiteSpace(bindingContent))
+            {
+                bindingContent = "(self)";
+            }
             var bindingInfo = ParseBindingExpression(property, bindingContent, isXBind: false, match.Value);
             bindings.Add(bindingInfo);
 
