@@ -83,11 +83,37 @@ public class XamlRenderer
             // Preprocess XAML to remove compile-time attributes
             var processedXaml = PreprocessXaml(xaml, warnings);
 
-            // Parse XAML
+            // Parse XAML with retry logic for missing resources
             UIElement element;
             try
             {
                 element = (UIElement)XamlReader.Load(processedXaml);
+            }
+            catch (Exception ex) when (ex.Message.Contains("Cannot find a Resource"))
+            {
+                // Resource not found - strip custom StaticResource references and retry
+                warnings.Add("Custom resources not available in preview. Some styles may differ from runtime appearance.");
+                var strippedXaml = StripCustomResourceReferences(processedXaml, warnings);
+                
+                try
+                {
+                    element = (UIElement)XamlReader.Load(strippedXaml);
+                }
+                catch (Exception retryEx)
+                {
+                    var (line, column) = ExtractLineColumn(retryEx.Message);
+                    return new RenderResult
+                    {
+                        Success = false,
+                        Error = new RenderErrorInfo
+                        {
+                            Code = "XAML_PARSE_ERROR",
+                            Message = retryEx.Message,
+                            Line = line,
+                            Column = column
+                        }
+                    };
+                }
             }
             catch (Exception ex)
             {
@@ -319,6 +345,55 @@ public class XamlRenderer
 
         // Remove d: prefixed attributes (design-time attributes like d:DesignHeight)
         result = Regex.Replace(result, @"\s+d:\w+\s*=\s*""[^""]*""", "", RegexOptions.IgnoreCase);
+
+        return result;
+    }
+
+    /// <summary>
+    /// Strip custom StaticResource and ThemeResource references that aren't available at runtime.
+    /// This is called when rendering fails due to missing resources.
+    /// </summary>
+    private static string StripCustomResourceReferences(string xaml, List<string> warnings)
+    {
+        var result = xaml;
+        var removedResources = new HashSet<string>();
+
+        // Remove Style attributes with StaticResource/ThemeResource references
+        // These are the most common source of "Cannot find a Resource" errors
+        var styleMatches = Regex.Matches(result, @"\s+Style\s*=\s*""\{(?:StaticResource|ThemeResource)\s+([^}]+)\}""", RegexOptions.IgnoreCase);
+        foreach (Match match in styleMatches.Cast<Match>().Reverse()) // Reverse to preserve indices
+        {
+            var resourceName = match.Groups[1].Value.Trim();
+            removedResources.Add(resourceName);
+            result = result.Remove(match.Index, match.Length);
+        }
+
+        // Also handle x:Bind and Binding that might reference unavailable data
+        // Remove Text="{x:Bind ...}" style bindings as they require compiled code-behind
+        var xBindMatches = Regex.Matches(result, @"(\w+)\s*=\s*""\{x:Bind\s+[^}]+\}""", RegexOptions.IgnoreCase);
+        foreach (Match match in xBindMatches.Cast<Match>().Reverse())
+        {
+            var propertyName = match.Groups[1].Value;
+            // Replace with a placeholder value based on property type
+            var replacement = propertyName.ToLowerInvariant() switch
+            {
+                "text" => $" {propertyName}=\"[Binding]\"",
+                "content" => $" {propertyName}=\"[Binding]\"",
+                "itemssource" => "", // Remove entirely
+                "command" => "", // Remove entirely
+                _ => "" // Remove unknown bindings
+            };
+            result = result.Remove(match.Index, match.Length);
+            if (!string.IsNullOrEmpty(replacement))
+            {
+                result = result.Insert(match.Index, replacement);
+            }
+        }
+
+        if (removedResources.Count > 0)
+        {
+            warnings.Add($"Removed custom resources not available in preview: {string.Join(", ", removedResources)}");
+        }
 
         return result;
     }
