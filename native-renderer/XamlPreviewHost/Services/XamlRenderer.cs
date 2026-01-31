@@ -525,18 +525,15 @@ public class XamlRenderer
                 var appDict = LoadResourceDictionary(resourcesXaml, "App.xaml", warnings);
                 if (appDict != null)
                 {
-                    foreach (var key in appDict.Keys)
+                    foreach (var key in appDict.Keys.Where(key => !_appResources.ContainsKey(key)))
                     {
-                        if (!_appResources.ContainsKey(key))
+                        try
                         {
-                            try
-                            {
-                                _appResources[key] = appDict[key];
-                            }
-                            catch
-                            {
-                                // Skip
-                            }
+                            _appResources[key] = appDict[key];
+                        }
+                        catch
+                        {
+                            // Skip
                         }
                     }
                     Console.Error.WriteLine($"[XamlRenderer] Loaded {appDict.Count} resources from App.xaml");
