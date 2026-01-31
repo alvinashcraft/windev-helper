@@ -258,7 +258,8 @@ public class XamlRenderer
         var result = xaml;
 
         // Match x:Bind expressions: Property="{x:Bind Path, Mode=...}"
-        var xBindPattern = @"(\w+)\s*=\s*""\{x:Bind\s+([^}]+)\}""";
+        // Property names can include dots for attached properties (e.g., Grid.Row, ToolTipService.ToolTip)
+        var xBindPattern = @"([\w.]+)\s*=\s*""\{x:Bind\s+([^}]+)\}""";
         result = Regex.Replace(result, xBindPattern, match =>
         {
             var property = match.Groups[1].Value;
@@ -270,7 +271,8 @@ public class XamlRenderer
         }, RegexOptions.IgnoreCase);
 
         // Match Binding expressions: Property="{Binding Path, Mode=...}"
-        var bindingPattern = @"(\w+)\s*=\s*""\{Binding\s+([^}]*)\}""";
+        // Property names can include dots for attached properties
+        var bindingPattern = @"([\w.]+)\s*=\s*""\{Binding\s+([^}]*)\}""";
         result = Regex.Replace(result, bindingPattern, match =>
         {
             var property = match.Groups[1].Value;
@@ -282,7 +284,8 @@ public class XamlRenderer
         }, RegexOptions.IgnoreCase);
 
         // Match TemplateBinding expressions
-        var templateBindingPattern = @"(\w+)\s*=\s*""\{TemplateBinding\s+([^}]+)\}""";
+        // Property names can include dots for attached properties
+        var templateBindingPattern = @"([\w.]+)\s*=\s*""\{TemplateBinding\s+([^}]+)\}""";
         result = Regex.Replace(result, templateBindingPattern, match =>
         {
             var property = match.Groups[1].Value;

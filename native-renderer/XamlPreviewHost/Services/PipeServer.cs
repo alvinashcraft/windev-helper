@@ -22,7 +22,6 @@ public class PipeServer : IDisposable
     private readonly XamlRenderer _renderer;
     private readonly CancellationTokenSource _cts = new();
     private readonly DispatcherQueue _dispatcherQueue;
-    private NamedPipeServerStream? _pipeServer;
     private bool _disposed;
 
     public PipeServer(string pipeName, XamlRenderer renderer)
@@ -41,7 +40,7 @@ public class PipeServer : IDisposable
         {
             try
             {
-                _pipeServer = new NamedPipeServerStream(
+                await using var pipeServer = new NamedPipeServerStream(
                     _pipeName,
                     PipeDirection.InOut,
                     1,
@@ -49,10 +48,10 @@ public class PipeServer : IDisposable
                     PipeOptions.Asynchronous);
 
                 Console.Error.WriteLine($"[PipeServer] Waiting for connection on pipe: {_pipeName}");
-                await _pipeServer.WaitForConnectionAsync(_cts.Token);
+                await pipeServer.WaitForConnectionAsync(_cts.Token);
                 Console.Error.WriteLine("[PipeServer] Client connected");
 
-                await HandleConnectionAsync(_pipeServer);
+                await HandleConnectionAsync(pipeServer);
             }
             catch (OperationCanceledException)
             {
@@ -62,11 +61,6 @@ public class PipeServer : IDisposable
             {
                 Console.Error.WriteLine($"[PipeServer] Error: {ex.Message}");
                 await Task.Delay(1000, _cts.Token);
-            }
-            finally
-            {
-                _pipeServer?.Dispose();
-                _pipeServer = null;
             }
         }
     }
@@ -263,7 +257,6 @@ public class PipeServer : IDisposable
         _disposed = true;
 
         _cts.Cancel();
-        _pipeServer?.Dispose();
         _cts.Dispose();
     }
 }
