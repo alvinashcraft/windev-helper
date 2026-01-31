@@ -240,19 +240,13 @@ export class XamlDesignerPanel {
      * Show image-based preview (from native renderer)
      */
     private showImagePreview(result: RenderResult & { success: true }): void {
-        // Log warnings to console instead of showing in preview
-        if (result.warnings && result.warnings.length > 0) {
-            for (const warning of result.warnings) {
-                console.log('[XAML Preview]', warning);
-            }
-        }
-
         this.panel.webview.postMessage({
             type: 'updateImagePreview',
             imageData: result.data,
             imageWidth: result.imageWidth,
             imageHeight: result.imageHeight,
             renderTimeMs: result.renderTimeMs,
+            warnings: result.warnings || [],
             mappings: result.elementMappings.map(m => ({
                 elementId: m.id,
                 line: m.xamlLine,
@@ -593,6 +587,65 @@ export class XamlDesignerPanel {
             font-size: 12px;
         }
 
+        .info-bar {
+            padding: 6px 12px;
+            background: var(--vscode-editorInfo-background, rgba(0, 120, 212, 0.1));
+            border-left: 3px solid var(--vscode-editorInfo-foreground, #0078d4);
+            margin: 0;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .info-bar.bindings {
+            background: rgba(147, 112, 219, 0.1);
+            border-left-color: #9370db;
+        }
+
+        .info-bar .icon {
+            font-size: 14px;
+        }
+
+        .info-bar .label {
+            font-weight: 500;
+            color: var(--vscode-editorInfo-foreground, #0078d4);
+        }
+
+        .info-bar.bindings .label {
+            color: #9370db;
+        }
+
+        .info-bar .content {
+            flex: 1;
+            opacity: 0.9;
+        }
+
+        .info-bar .binding-item {
+            display: inline-block;
+            background: rgba(147, 112, 219, 0.15);
+            padding: 2px 6px;
+            border-radius: 3px;
+            margin: 2px 4px 2px 0;
+            font-family: 'Cascadia Code', 'Consolas', monospace;
+            font-size: 11px;
+        }
+
+        .info-bar .dismiss {
+            background: none;
+            border: none;
+            color: var(--winui-text);
+            opacity: 0.6;
+            cursor: pointer;
+            padding: 2px 4px;
+            font-size: 14px;
+        }
+
+        .info-bar .dismiss:hover {
+            opacity: 1;
+        }
+
         /* Element overlay for image click detection */
         .element-overlay {
             position: absolute;
@@ -625,6 +678,7 @@ export class XamlDesignerPanel {
             <span class="label">HTML</span>
         </span>
     </div>
+    <div id="info-container"></div>
     <div id="preview-container">
         <div id="preview-content">
             <div class="placeholder">
@@ -681,6 +735,9 @@ export class XamlDesignerPanel {
                 case 'updateImagePreview':
                     elementMappings = message.mappings || [];
                     
+                    // Show info bar for bindings and warnings
+                    updateInfoBar(message.warnings || []);
+                    
                     // For native preview, just show the image without overlays
                     // Element click detection is not yet supported for native renderer
                     let html = '<img id="preview-image" src="data:image/png;base64,' + message.imageData + '" />';
@@ -693,21 +750,26 @@ export class XamlDesignerPanel {
 
                 case 'updateHtmlPreview':
                     elementMappings = message.mappings || [];
+                    // Clear info bar for HTML preview (it handles bindings inline)
+                    updateInfoBar([]);
                     previewContent.innerHTML = '<div id="preview-html">' + message.html + '</div>';
                     previewContent.addEventListener('click', handleHtmlElementClick);
                     renderTime.textContent = '';
                     break;
 
                 case 'showLoading':
+                    updateInfoBar([]);
                     previewContent.innerHTML = '<div class="loading"><div class="spinner"></div><div>Rendering...</div></div>';
                     break;
 
                 case 'showPlaceholder':
+                    updateInfoBar([]);
                     previewContent.innerHTML = '<div class="placeholder"><div class="placeholder-icon">📐</div><div>' + message.message + '</div></div>';
                     renderTime.textContent = '';
                     break;
 
                 case 'showError':
+                    updateInfoBar([]);
                     let errorHtml = '<div class="error-container"><div class="error-title">' + (message.code || 'Error') + '</div>';
                     errorHtml += '<div class="error-message">' + escapeHtml(message.message) + '</div>';
                     if (message.line) {
@@ -749,6 +811,51 @@ export class XamlDesignerPanel {
             const div = document.createElement('div');
             div.textContent = text;
             return div.innerHTML;
+        }
+
+        function updateInfoBar(warnings) {
+            const infoContainer = document.getElementById('info-container');
+            if (!warnings || warnings.length === 0) {
+                infoContainer.innerHTML = '';
+                return;
+            }
+
+            let infoHtml = '';
+            
+            // Separate binding info from other warnings
+            const bindingWarnings = warnings.filter(w => w.startsWith('Data bindings'));
+            const otherWarnings = warnings.filter(w => !w.startsWith('Data bindings'));
+
+            // Show binding info bar
+            if (bindingWarnings.length > 0) {
+                const bindingText = bindingWarnings[0];
+                // Parse binding info to show nicely
+                const match = bindingText.match(/Data bindings \\(([^)]+)\\): (.+)/);
+                if (match) {
+                    const bindType = match[1];
+                    const details = match[2];
+                    infoHtml += '<div class="info-bar bindings">';
+                    infoHtml += '<span class="icon">⟷</span>';
+                    infoHtml += '<span class="label">' + bindType + '</span>';
+                    infoHtml += '<span class="content">' + escapeHtml(details) + '</span>';
+                    infoHtml += '</div>';
+                } else {
+                    infoHtml += '<div class="info-bar bindings">';
+                    infoHtml += '<span class="icon">⟷</span>';
+                    infoHtml += '<span class="content">' + escapeHtml(bindingText) + '</span>';
+                    infoHtml += '</div>';
+                }
+            }
+
+            // Show other warnings
+            for (const warning of otherWarnings) {
+                infoHtml += '<div class="info-bar">';
+                infoHtml += '<span class="icon">⚠️</span>';
+                infoHtml += '<span class="content">' + escapeHtml(warning) + '</span>';
+                infoHtml += '</div>';
+            }
+
+            infoContainer.innerHTML = infoHtml;
         }
     </script>
 </body>

@@ -21,6 +21,18 @@ using Windows.Storage.Streams;
 namespace XamlPreviewHost.Services;
 
 /// <summary>
+/// Information about a data binding found in XAML
+/// </summary>
+public class BindingInfo
+{
+    public string Property { get; set; } = "";
+    public string Path { get; set; } = "";
+    public string Mode { get; set; } = "";
+    public string FullExpression { get; set; } = "";
+    public bool IsXBind { get; set; }
+}
+
+/// <summary>
 /// Renders XAML content to PNG images.
 /// </summary>
 public class XamlRenderer
@@ -31,6 +43,9 @@ public class XamlRenderer
     private ResourceDictionary? _appResources;
     private string? _lastAppXamlContent;
     private readonly Dictionary<string, ResourceDictionary> _loadedDictionaries = new();
+
+    // Binding indicator character (double-headed arrow)
+    private const string BindingIndicator = "⟷";
 
     /// <summary>
     /// Initialize the renderer with a hidden window for rendering.
@@ -68,6 +83,7 @@ public class XamlRenderer
     {
         var stopwatch = Stopwatch.StartNew();
         var warnings = new List<string>();
+        var bindings = new List<BindingInfo>();
         _elementCounter = 0;
 
         try
@@ -88,6 +104,9 @@ public class XamlRenderer
             // Preprocess XAML to remove compile-time attributes
             var processedXaml = PreprocessXaml(xaml, warnings);
 
+            // Replace bindings with visible placeholders and collect binding info
+            processedXaml = ReplaceBindingsWithPlaceholders(processedXaml, bindings, warnings);
+
             // Parse XAML with retry logic for missing resources
             UIElement element;
             try
@@ -97,7 +116,7 @@ public class XamlRenderer
             catch (Exception ex) when (ex.Message.Contains("Cannot find a Resource"))
             {
                 // Resource not found - strip custom StaticResource references and retry
-                warnings.Add("Custom resources not available in preview. Some styles may differ from runtime appearance.");
+                warnings.Add("Some custom resources not available in preview.");
                 var strippedXaml = StripCustomResourceReferences(processedXaml, warnings);
                 
                 try
@@ -139,7 +158,6 @@ public class XamlRenderer
             // Apply loaded resources to the element
             if (element is FrameworkElement frameElement && _appResources != null)
             {
-                // Merge app resources into the element's resources
                 foreach (var key in _appResources.Keys)
                 {
                     if (!frameElement.Resources.ContainsKey(key))
@@ -193,6 +211,13 @@ public class XamlRenderer
             var elements = new List<ElementInfo>();
             BuildElementMappings(element, elements, 0, 0);
 
+            // Add binding summary to warnings if any bindings found
+            if (bindings.Count > 0)
+            {
+                var bindingSummary = FormatBindingSummary(bindings);
+                warnings.Insert(0, bindingSummary);
+            }
+
             stopwatch.Stop();
 
             return new RenderResult
@@ -223,11 +248,228 @@ public class XamlRenderer
     }
 
     /// <summary>
+    /// Replace binding expressions with visible placeholder text showing the binding path.
+    /// </summary>
+    private string ReplaceBindingsWithPlaceholders(string xaml, List<BindingInfo> bindings, List<string> warnings)
+    {
+        var result = xaml;
+
+        // Match x:Bind expressions: Property="{x:Bind Path, Mode=...}"
+        var xBindPattern = @"(\w+)\s*=\s*""\{x:Bind\s+([^}]+)\}""";
+        result = Regex.Replace(result, xBindPattern, match =>
+        {
+            var property = match.Groups[1].Value;
+            var bindingContent = match.Groups[2].Value;
+            var bindingInfo = ParseBindingExpression(property, bindingContent, isXBind: true, match.Value);
+            bindings.Add(bindingInfo);
+
+            return GetBindingReplacement(property, bindingInfo);
+        }, RegexOptions.IgnoreCase);
+
+        // Match Binding expressions: Property="{Binding Path, Mode=...}"
+        var bindingPattern = @"(\w+)\s*=\s*""\{Binding\s+([^}]*)\}""";
+        result = Regex.Replace(result, bindingPattern, match =>
+        {
+            var property = match.Groups[1].Value;
+            var bindingContent = match.Groups[2].Value;
+            var bindingInfo = ParseBindingExpression(property, bindingContent, isXBind: false, match.Value);
+            bindings.Add(bindingInfo);
+
+            return GetBindingReplacement(property, bindingInfo);
+        }, RegexOptions.IgnoreCase);
+
+        // Match TemplateBinding expressions
+        var templateBindingPattern = @"(\w+)\s*=\s*""\{TemplateBinding\s+([^}]+)\}""";
+        result = Regex.Replace(result, templateBindingPattern, match =>
+        {
+            var property = match.Groups[1].Value;
+            var path = match.Groups[2].Value.Trim();
+            var bindingInfo = new BindingInfo
+            {
+                Property = property,
+                Path = path,
+                FullExpression = match.Value,
+                IsXBind = false
+            };
+            bindings.Add(bindingInfo);
+
+            return GetBindingReplacement(property, bindingInfo);
+        }, RegexOptions.IgnoreCase);
+
+        return result;
+    }
+
+    /// <summary>
+    /// Parse a binding expression to extract path and mode.
+    /// </summary>
+    private static BindingInfo ParseBindingExpression(string property, string content, bool isXBind, string fullExpression)
+    {
+        var info = new BindingInfo
+        {
+            Property = property,
+            IsXBind = isXBind,
+            FullExpression = fullExpression
+        };
+
+        // Split by comma to get parts
+        var parts = content.Split(',').Select(p => p.Trim()).ToArray();
+
+        foreach (var part in parts)
+        {
+            if (part.StartsWith("Path=", StringComparison.OrdinalIgnoreCase))
+            {
+                info.Path = part.Substring(5).Trim();
+            }
+            else if (part.StartsWith("Mode=", StringComparison.OrdinalIgnoreCase))
+            {
+                info.Mode = part.Substring(5).Trim();
+            }
+            else if (!part.Contains('=') && string.IsNullOrEmpty(info.Path))
+            {
+                // First unnamed parameter is the path
+                info.Path = part;
+            }
+        }
+
+        // Clean up path (remove any trailing Mode= etc that might be captured)
+        if (!string.IsNullOrEmpty(info.Path))
+        {
+            var modeIndex = info.Path.IndexOf(" Mode=", StringComparison.OrdinalIgnoreCase);
+            if (modeIndex > 0)
+            {
+                info.Path = info.Path.Substring(0, modeIndex).Trim();
+            }
+        }
+
+        return info;
+    }
+
+    /// <summary>
+    /// Get the replacement attribute for a binding based on the property type.
+    /// </summary>
+    private static string GetBindingReplacement(string property, BindingInfo bindingInfo)
+    {
+        var displayPath = FormatBindingPath(bindingInfo);
+        var indicator = bindingInfo.IsXBind ? $"{BindingIndicator} " : $"{BindingIndicator} ";
+
+        return property.ToLowerInvariant() switch
+        {
+            // Text properties - show binding path as content
+            "text" => $" {property}=\"{indicator}{displayPath}\"",
+            "content" => $" {property}=\"{indicator}{displayPath}\"",
+            "header" => $" {property}=\"{indicator}{displayPath}\"",
+            "title" => $" {property}=\"{indicator}{displayPath}\"",
+            "placeholder" or "placeholdertext" => $" {property}=\"{indicator}{displayPath}\"",
+            "description" => $" {property}=\"{indicator}{displayPath}\"",
+            "label" => $" {property}=\"{indicator}{displayPath}\"",
+            
+            // Tooltip - show binding info
+            "tooltip" or "tooltipservice.tooltip" => $" {property}=\"Bound: {displayPath}\"",
+            
+            // Collections - remove but add to warnings
+            "itemssource" => "", // Remove, will show in binding summary
+            "items" => "",
+            
+            // Commands - remove but add to warnings
+            "command" => "",
+            "click" => "",
+            
+            // Visibility - keep a reasonable default
+            "visibility" => $" {property}=\"Visible\"",
+            
+            // Boolean properties - keep reasonable defaults
+            "isenabled" => $" {property}=\"True\"",
+            "ischecked" => "",
+            "isselected" => "",
+            
+            // Numeric properties - show placeholder
+            "value" => $" {property}=\"0\"",
+            "selectedindex" => $" {property}=\"0\"",
+            "maximum" => $" {property}=\"100\"",
+            "minimum" => $" {property}=\"0\"",
+            
+            // Image sources - can't show, remove
+            "source" => "",
+            
+            // Default - try to show as text if possible, otherwise remove
+            _ when IsTextLikeProperty(property) => $" {property}=\"{indicator}{displayPath}\"",
+            _ => "" // Remove unknown binding types
+        };
+    }
+
+    /// <summary>
+    /// Check if a property is text-like and can display a string.
+    /// </summary>
+    private static bool IsTextLikeProperty(string property)
+    {
+        var textLike = new[] { "text", "content", "header", "title", "label", "caption", "name", "displayname" };
+        return textLike.Any(t => property.EndsWith(t, StringComparison.OrdinalIgnoreCase));
+    }
+
+    /// <summary>
+    /// Format a binding path for display (truncate if too long).
+    /// </summary>
+    private static string FormatBindingPath(BindingInfo info)
+    {
+        var path = info.Path;
+        if (string.IsNullOrEmpty(path))
+        {
+            path = "(self)";
+        }
+
+        // Add mode indicator if two-way
+        var suffix = "";
+        if (info.Mode?.Equals("TwoWay", StringComparison.OrdinalIgnoreCase) == true)
+        {
+            suffix = " ↔";
+        }
+        else if (info.Mode?.Equals("OneWayToSource", StringComparison.OrdinalIgnoreCase) == true)
+        {
+            suffix = " →";
+        }
+
+        // Truncate long paths
+        if (path.Length > 20)
+        {
+            path = path.Substring(0, 17) + "...";
+        }
+
+        return path + suffix;
+    }
+
+    /// <summary>
+    /// Format a summary of all bindings found for the warnings list.
+    /// </summary>
+    private static string FormatBindingSummary(List<BindingInfo> bindings)
+    {
+        var grouped = bindings.GroupBy(b => b.Property).ToList();
+        var parts = new List<string>();
+
+        foreach (var group in grouped.Take(5)) // Limit to 5 properties
+        {
+            var paths = group.Select(b => b.Path).Distinct().Take(3);
+            var pathList = string.Join(", ", paths);
+            if (group.Count() > 3)
+            {
+                pathList += $" (+{group.Count() - 3} more)";
+            }
+            parts.Add($"{group.Key}: {pathList}");
+        }
+
+        if (grouped.Count > 5)
+        {
+            parts.Add($"(+{grouped.Count - 5} more properties)");
+        }
+
+        var bindType = bindings.Any(b => b.IsXBind) ? "x:Bind" : "Binding";
+        return $"Data bindings ({bindType}): {string.Join("; ", parts)}";
+    }
+
+    /// <summary>
     /// Load project resources (App.xaml and resource dictionaries).
     /// </summary>
     private async Task LoadProjectResourcesAsync(RenderOptions options, List<string> warnings)
     {
-        // Check if we need to reload resources
         var appXamlContent = options.AppXamlContent;
         if (string.IsNullOrEmpty(appXamlContent))
         {
@@ -273,7 +515,6 @@ public class XamlRenderer
         // Extract resources directly from App.xaml content
         try
         {
-            // Parse App.xaml and extract Application.Resources section
             var resourcesXaml = ExtractApplicationResources(appXamlContent);
             if (!string.IsNullOrEmpty(resourcesXaml))
             {
@@ -305,7 +546,7 @@ public class XamlRenderer
             warnings.Add("Could not load App.xaml resources");
         }
 
-        await Task.CompletedTask; // Keep async signature for future async operations
+        await Task.CompletedTask;
     }
 
     /// <summary>
@@ -313,7 +554,6 @@ public class XamlRenderer
     /// </summary>
     private static string? ExtractApplicationResources(string appXaml)
     {
-        // Look for <Application.Resources>...</Application.Resources>
         var match = Regex.Match(appXaml, @"<Application\.Resources>(.*?)</Application\.Resources>", RegexOptions.Singleline);
         if (!match.Success)
         {
@@ -322,11 +562,9 @@ public class XamlRenderer
 
         var innerContent = match.Groups[1].Value.Trim();
 
-        // If it's wrapped in a ResourceDictionary, extract just the inner content
         var dictMatch = Regex.Match(innerContent, @"<ResourceDictionary[^>]*>(.*?)</ResourceDictionary>", RegexOptions.Singleline);
         if (dictMatch.Success)
         {
-            // Check for MergedDictionaries - skip them, we load those separately
             var mergedMatch = Regex.Match(dictMatch.Groups[1].Value, @"<ResourceDictionary\.MergedDictionaries>.*?</ResourceDictionary\.MergedDictionaries>", RegexOptions.Singleline);
             var content = dictMatch.Groups[1].Value;
             if (mergedMatch.Success)
@@ -341,7 +579,6 @@ public class XamlRenderer
             return null;
         }
 
-        // Wrap in a ResourceDictionary with required namespaces
         return $@"<ResourceDictionary 
             xmlns=""http://schemas.microsoft.com/winfx/2006/xaml/presentation""
             xmlns:x=""http://schemas.microsoft.com/winfx/2006/xaml"">
@@ -356,9 +593,7 @@ public class XamlRenderer
     {
         try
         {
-            // Preprocess the XAML
             var processed = PreprocessResourceDictionary(xaml);
-            
             var dict = XamlReader.Load(processed) as ResourceDictionary;
             return dict;
         }
@@ -377,16 +612,11 @@ public class XamlRenderer
     {
         var result = xaml;
 
-        // Remove x:Class if present
         result = Regex.Replace(result, @"\s+x:Class\s*=\s*""[^""]*""", "", RegexOptions.IgnoreCase);
-        
-        // Remove design-time namespaces and attributes
         result = Regex.Replace(result, @"\s+mc:Ignorable\s*=\s*""[^""]*""", "", RegexOptions.IgnoreCase);
         result = Regex.Replace(result, @"\s+xmlns:d\s*=\s*""[^""]*""", "", RegexOptions.IgnoreCase);
         result = Regex.Replace(result, @"\s+xmlns:mc\s*=\s*""[^""]*""", "", RegexOptions.IgnoreCase);
         result = Regex.Replace(result, @"\s+d:\w+\s*=\s*""[^""]*""", "", RegexOptions.IgnoreCase);
-
-        // Remove Source references in nested ResourceDictionary (we load those separately)
         result = Regex.Replace(result, @"<ResourceDictionary\s+Source\s*=\s*""[^""]*""\s*/?>", "", RegexOptions.IgnoreCase);
 
         return result;
@@ -405,8 +635,8 @@ public class XamlRenderer
             BitmapAlphaMode.Premultiplied,
             width,
             height,
-            96 * 1, // DPI X
-            96 * 1, // DPI Y
+            96 * 1,
+            96 * 1,
             pixels.ToArray());
 
         await encoder.FlushAsync();
@@ -424,7 +654,6 @@ public class XamlRenderer
     {
         if (obj is not UIElement uiElement) return;
 
-        // Get element bounds relative to root
         var transform = uiElement.TransformToVisual(null);
         var bounds = transform.TransformBounds(new Windows.Foundation.Rect(
             0, 0,
@@ -451,7 +680,6 @@ public class XamlRenderer
             XamlColumn = 0
         });
 
-        // Recurse into children
         int childCount = VisualTreeHelper.GetChildrenCount(obj);
         for (int i = 0; i < childCount; i++)
         {
@@ -494,22 +722,18 @@ public class XamlRenderer
     {
         var result = xaml;
 
-        // Remove x:Class attribute
         var classMatch = Regex.Match(result, @"\s+x:Class\s*=\s*""[^""]*""", RegexOptions.IgnoreCase);
         if (classMatch.Success)
         {
             result = result.Remove(classMatch.Index, classMatch.Length);
-            warnings.Add("Removed x:Class attribute (not supported in dynamic XAML loading)");
         }
 
-        // Remove x:ClassModifier attribute
         var classModifierMatch = Regex.Match(result, @"\s+x:ClassModifier\s*=\s*""[^""]*""", RegexOptions.IgnoreCase);
         if (classModifierMatch.Success)
         {
             result = result.Remove(classModifierMatch.Index, classModifierMatch.Length);
         }
 
-        // Remove design-time namespaces and attributes
         result = Regex.Replace(result, @"\s+mc:Ignorable\s*=\s*""[^""]*""", "", RegexOptions.IgnoreCase);
         result = Regex.Replace(result, @"\s+xmlns:d\s*=\s*""[^""]*""", "", RegexOptions.IgnoreCase);
         result = Regex.Replace(result, @"\s+xmlns:mc\s*=\s*""[^""]*""", "", RegexOptions.IgnoreCase);
@@ -526,7 +750,6 @@ public class XamlRenderer
         var result = xaml;
         var removedResources = new HashSet<string>();
 
-        // Remove Style attributes with custom StaticResource/ThemeResource references
         var styleMatches = Regex.Matches(result, @"\s+Style\s*=\s*""\{(?:StaticResource|ThemeResource)\s+([^}]+)\}""", RegexOptions.IgnoreCase);
         foreach (Match match in styleMatches.Cast<Match>().Reverse())
         {
@@ -535,29 +758,9 @@ public class XamlRenderer
             result = result.Remove(match.Index, match.Length);
         }
 
-        // Remove x:Bind expressions (require compiled code-behind)
-        var xBindMatches = Regex.Matches(result, @"(\w+)\s*=\s*""\{x:Bind\s+[^}]+\}""", RegexOptions.IgnoreCase);
-        foreach (Match match in xBindMatches.Cast<Match>().Reverse())
-        {
-            var propertyName = match.Groups[1].Value;
-            var replacement = propertyName.ToLowerInvariant() switch
-            {
-                "text" => $" {propertyName}=\"[Binding]\"",
-                "content" => $" {propertyName}=\"[Binding]\"",
-                "itemssource" => "",
-                "command" => "",
-                _ => ""
-            };
-            result = result.Remove(match.Index, match.Length);
-            if (!string.IsNullOrEmpty(replacement))
-            {
-                result = result.Insert(match.Index, replacement);
-            }
-        }
-
         if (removedResources.Count > 0)
         {
-            warnings.Add($"Removed custom resources not available in preview: {string.Join(", ", removedResources)}");
+            warnings.Add($"Removed unavailable resources: {string.Join(", ", removedResources.Take(5))}{(removedResources.Count > 5 ? $" (+{removedResources.Count - 5} more)" : "")}");
         }
 
         return result;
