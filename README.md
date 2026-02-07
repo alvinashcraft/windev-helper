@@ -34,11 +34,22 @@ On non-Windows platforms, the extension provides an HTML-based preview renderer 
 
 > **Note**: The HTML renderer provides a visual approximation of WinUI controls but may not match native rendering exactly. For pixel-perfect preview, use Windows with the native renderer.
 
-### 🚀 Debugging & Running
+### � XAML Properties Pane (Preview)
+
+- **Full property inspection** - View all properties for the selected XAML element
+- **Rich metadata** - Built-in metadata for ~65 WinUI 3 control types with full inheritance
+- **Attached properties** - ~35 attached property definitions (Grid.Row, Canvas.Left, ScrollViewer, etc.)
+- **Category grouping** - Properties organized by Layout, Appearance, Common, Content, Interaction, Text, Brushes, and Accessibility
+- **Set vs. default** - Toggle between showing only explicitly set properties and all available properties
+- **Data binding indicators** - Visual markers for properties using `{x:Bind}` or `{Binding}`
+- **Copy & navigate** - Copy property values or jump to their XAML definition
+
+### �🚀 Debugging & Running
 
 - **Hit F5 to debug your app** on Windows
 - Debug your WinUI app on any supported Windows device
 - Run your app without debugging
+- **MSIX packaged app support** - Automatic deployment and launch through package identity
 - Write your WinUI C# and XAML anywhere VS Code runs
 
 ### 🔨 Build & Configuration
@@ -150,6 +161,9 @@ dotnet new winuilib -n MyLib
 | `WinUI: Add New User Control` | Add a new user control |
 | `WinUI: Add New Window` | Add a new window |
 | `WinUI: Open XAML Preview` | Open native XAML preview panel (Preview) |
+| `WinDev: Refresh Properties` | Refresh the XAML Properties pane |
+| `WinDev: Toggle Property Grouping` | Switch between grouped and flat property view |
+| `WinDev: Toggle Default Properties` | Show/hide default (unset) properties |
 | `WinUI: Build Project` | Build the current project |
 | `WinUI: Rebuild Project` | Clean and rebuild the project |
 | `WinUI: Clean Project` | Clean build outputs |
@@ -248,7 +262,9 @@ MyApp/
 
 ## Known Issues
 
-- **XAML Preview (Preview)**: Some custom controls may not render correctly; complex styles and templates may have issues
+- **MSIX Packaged Apps**: Debugger attachment is not yet supported for packaged apps. They launch without a debugger; set `<WindowsPackageType>None</WindowsPackageType>` in your .csproj for full F5 debug support
+- **XAML Preview (Preview)**: Third-party controls (e.g., CommunityToolkit) are replaced with placeholder grids in the preview
+- **Properties Pane**: Metadata covers ~65 common WinUI controls; uncommon or third-party controls may have limited property defaults
 - XAML IntelliSense and Hot Reload are planned for future releases
 - Some advanced debugging scenarios may require Visual Studio
 - XAML Preview requires Windows (the native renderer uses WinUI 3)
@@ -275,6 +291,11 @@ Contributions are welcome! Please see our [Contributing Guide](docs/CONTRIBUTING
 - ✅ Bidirectional cursor/selection sync
 - ✅ Project resource support (App.xaml, merged dictionaries)
 - ✅ Data binding placeholder visualization
+- ✅ XAML Properties pane with full control metadata (~65 types)
+- ✅ XAML preprocessor for third-party control tolerance
+- ✅ MSIX packaged app deployment and launch
+- ✅ Improved debugging for packaged and unpackaged apps
+- 🔄 Debugger attachment for MSIX-packaged apps
 - 🔄 Improved element matching for complex layouts
 - 🔄 DataTemplate and ItemsControl preview support
 
@@ -294,6 +315,16 @@ Contributions are welcome! Please see our [Contributing Guide](docs/CONTRIBUTING
 - [.NET CLI Documentation](https://learn.microsoft.com/dotnet/core/tools/)
 
 ## Release Notes
+
+### 2.5.0 (Preview)
+
+XAML Properties Pane, packaged app support, and preview robustness:
+
+- **XAML Properties Pane** - Full property inspection with metadata for ~65 WinUI control types
+- **MSIX Packaged App Support** - Deploy and launch packaged apps through their package identity
+- **XAML Preprocessor** - Third-party controls handled gracefully with placeholder grids
+- **Preview Performance** - Eliminated first-render timeout with pre-initialization
+- **Debug Improvements** - Multi-path executable resolution for packaged/unpackaged apps
 
 ### 2.0.0 (Preview)
 

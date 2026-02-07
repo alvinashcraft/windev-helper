@@ -9,9 +9,11 @@ This guide covers debugging WinUI applications using the WinDev Helper extension
 3. Press `F5` to start debugging
 4. Your app launches with the debugger attached
 
+> **Note:** Full debugger attachment requires an **unpackaged** app (set `<WindowsPackageType>None</WindowsPackageType>` in your .csproj). For MSIX-packaged apps, the extension will build, deploy, and launch the app without a debugger. See [Packaged vs. Unpackaged Apps](#packaged-vs-unpackaged-apps) below.
+
 ## Debug Configuration
 
-### Default Configuration
+### Debug Flow
 
 The extension automatically creates a debug configuration when you press F5. It:
 
@@ -19,7 +21,34 @@ The extension automatically creates a debug configuration when you press F5. It:
 2. Uses the current build configuration (Debug/Release)
 3. Uses the current platform (x86/x64/ARM64)
 4. Builds the project if needed
-5. Launches the app with the debugger
+5. **For unpackaged apps:** Launches the app with the debugger attached
+6. **For packaged apps:** Deploys the MSIX package and launches through the package identity (without debugger)
+
+### Packaged vs. Unpackaged Apps
+
+WinUI apps can be either MSIX-packaged (the default) or unpackaged:
+
+| | Unpackaged | Packaged (MSIX) |
+|---|---|---|
+| **WindowsPackageType** | `None` | (default, not set) |
+| **F5 Debugging** | Full debugger support | Launches without debugger |
+| **Ctrl+F5 Run** | `dotnet run` | Deploy + launch via package identity |
+| **COM Registration** | Auto-initialized | Requires MSIX deployment |
+
+**To enable full F5 debugging**, add this to your .csproj:
+
+```xml
+<PropertyGroup>
+  <WindowsPackageType>None</WindowsPackageType>
+</PropertyGroup>
+```
+
+**Packaged app launch flow:**
+
+1. Project is built with `dotnet build`
+2. MSIX package is registered via `Add-AppxPackage -Register` (using AppxManifest.xml from build output)
+3. App is launched through `shell:AppsFolder` using the package family name
+4. An informational message suggests using unpackaged mode for full debug support
 
 ### Custom Launch Configuration
 
@@ -254,7 +283,7 @@ Application debug output:
 
 ## Debugging Without the Extension
 
-You can also use the standard .NET debugger:
+You can also use the standard .NET debugger for unpackaged apps:
 
 ```json
 {
@@ -272,6 +301,8 @@ You can also use the standard .NET debugger:
   ]
 }
 ```
+
+> **Note:** This approach only works for unpackaged apps. Packaged apps require MSIX deployment first.
 
 ---
 
@@ -313,6 +344,21 @@ You can also use the standard .NET debugger:
 2. Verify all required assets exist
 3. Check the Package.appxmanifest for errors
 4. Review Windows Event Viewer for crash details
+
+### COMException: Class not registered (0x80040154)
+
+**Symptoms:** App crashes immediately with `COMException` mentioning "Class not registered"
+
+**Cause:** This happens when a packaged WinUI app is launched directly without MSIX deployment. WinUI's COM classes are only registered after the MSIX package is deployed.
+
+**Solutions:**
+
+1. Use the extension's F5 or Ctrl+F5 commands, which handle deployment automatically
+2. If using a manual launch configuration, deploy the package first:
+   ```powershell
+   Add-AppxPackage -Register "path\to\bin\x64\Debug\net8.0-windows10.0.19041.0\AppxManifest.xml" -ForceUpdateFromAnyVersion
+   ```
+3. Switch to unpackaged mode by adding `<WindowsPackageType>None</WindowsPackageType>` to your .csproj
 
 ### Slow Debugging
 

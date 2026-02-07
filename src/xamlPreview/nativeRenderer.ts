@@ -7,6 +7,7 @@ import * as net from 'net';
 import { ChildProcess, spawn } from 'child_process';
 import { randomUUID } from 'crypto';
 import { IXamlRenderer, RenderOptions, RenderResult, RendererType, ResourceDictionaryInfo } from './types';
+import { preprocessXaml } from './xamlPreprocessor';
 
 /**
  * Request sent to the native renderer process
@@ -202,6 +203,15 @@ export class NativeXamlRenderer implements IXamlRenderer {
 
         // Connect to the named pipe
         await this.connectToPipe();
+
+        // Send a warm-up ping to ensure the host is fully ready
+        // (forces WinUI dispatcher initialization before real render requests)
+        try {
+            await this.ping();
+            console.log('[NativeRenderer] Warm-up ping succeeded');
+        } catch {
+            console.warn('[NativeRenderer] Warm-up ping failed (non-fatal)');
+        }
 
         console.log('[NativeRenderer] Initialized successfully');
     }
@@ -628,11 +638,14 @@ export class NativeXamlRenderer implements IXamlRenderer {
             };
         }
 
+        // Preprocess XAML to replace third-party controls with placeholders
+        const preprocessed = preprocessXaml(xaml);
+
         const requestId = randomUUID();
         const request: NativeRenderRequest = {
             type: 'render',
             requestId,
-            xaml,
+            xaml: preprocessed.xaml,
             options: {
                 width: options.width,
                 height: options.height,
@@ -644,7 +657,7 @@ export class NativeXamlRenderer implements IXamlRenderer {
             }
         };
 
-        return new Promise((resolve) => {
+        const result = await new Promise<RenderResult>((resolve) => {
             const timeout = setTimeout(() => {
                 this.pendingRequests.delete(requestId);
                 resolve({
@@ -673,6 +686,13 @@ export class NativeXamlRenderer implements IXamlRenderer {
                 }
             });
         });
+
+        // Merge preprocessing warnings into the result
+        if (preprocessed.warnings.length > 0 && result.success) {
+            result.warnings = [...preprocessed.warnings, ...(result.warnings || [])];
+        }
+
+        return result;
     }
 
     /**

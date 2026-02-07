@@ -4,19 +4,10 @@
 
 import * as vscode from 'vscode';
 import { XamlElement } from '../xamlDesigner/xamlParser';
+import { PropertyCategory, resolveAllProperties, isKnownControlType, getControlDescription, getInheritanceChain, ATTACHED_PROPERTIES, PropertyMetadata } from './controlMetadata';
 
-/**
- * Property categories for grouping in the tree view
- */
-export enum PropertyCategory {
-    Common = 'Common',
-    Layout = 'Layout',
-    Appearance = 'Appearance',
-    Text = 'Text',
-    Interaction = 'Interaction',
-    Accessibility = 'Accessibility',
-    Miscellaneous = 'Miscellaneous'
-}
+// Re-export PropertyCategory so existing consumers don't break
+export { PropertyCategory };
 
 /**
  * Represents a property item in the tree view
@@ -26,6 +17,8 @@ export class PropertyItem extends vscode.TreeItem {
         public readonly name: string,
         public readonly value: string,
         public readonly isBinding: boolean,
+        public readonly isDefault: boolean = false,
+        public readonly propertyType?: string,
         public readonly bindingPath?: string,
         public readonly fullExpression?: string,
         public readonly category?: PropertyCategory,
@@ -35,7 +28,7 @@ export class PropertyItem extends vscode.TreeItem {
         
         this.description = this.formatValue();
         this.tooltip = this.formatTooltip();
-        this.contextValue = isBinding ? 'boundProperty' : 'property';
+        this.contextValue = isBinding ? 'boundProperty' : (isDefault ? 'defaultProperty' : 'property');
         
         const icon = this.getIcon();
         if (icon) {
@@ -52,21 +45,37 @@ export class PropertyItem extends vscode.TreeItem {
             return `⟷ ${displayPath}`;
         }
         
-        // Truncate long values
-        if (this.value.length > 30) {
-            return this.value.substring(0, 27) + '...';
+        const displayValue = this.value.length > 30
+            ? this.value.substring(0, 27) + '...'
+            : this.value;
+
+        // Default properties show value dimmed with type hint
+        if (this.isDefault) {
+            if (displayValue) {
+                return `= ${displayValue}`;
+            }
+            return this.propertyType ? `(${this.propertyType})` : '';
         }
-        return this.value;
+        
+        return displayValue;
     }
 
     private formatTooltip(): vscode.MarkdownString {
         const md = new vscode.MarkdownString();
-        md.appendMarkdown(`**${this.name}**\n\n`);
+        md.appendMarkdown(`**${this.name}**`);
+        if (this.propertyType) {
+            md.appendMarkdown(` *(${this.propertyType})*`);
+        }
+        md.appendMarkdown('\n\n');
         
+        if (this.isDefault) {
+            md.appendMarkdown(`Default value\n\n`);
+        }
+
         if (this.isBinding && this.fullExpression) {
             md.appendMarkdown(`*Data Binding*\n\n`);
             md.appendCodeblock(this.fullExpression, 'xml');
-        } else {
+        } else if (this.value) {
             md.appendCodeblock(this.value, 'text');
         }
         
@@ -77,7 +86,10 @@ export class PropertyItem extends vscode.TreeItem {
         if (this.isBinding) {
             return new vscode.ThemeIcon('link', new vscode.ThemeColor('charts.purple'));
         }
-        return new vscode.ThemeIcon('symbol-property');
+        if (this.isDefault) {
+            return new vscode.ThemeIcon('circle-outline', new vscode.ThemeColor('disabledForeground'));
+        }
+        return new vscode.ThemeIcon('symbol-property', new vscode.ThemeColor('symbolIcon.propertyForeground'));
     }
 }
 
@@ -87,11 +99,16 @@ export class PropertyItem extends vscode.TreeItem {
 export class CategoryItem extends vscode.TreeItem {
     constructor(
         public readonly category: PropertyCategory,
-        public readonly properties: PropertyItem[]
+        public readonly properties: PropertyItem[],
+        public readonly setCount?: number
     ) {
         super(category, vscode.TreeItemCollapsibleState.Expanded);
         
-        this.description = `(${properties.length})`;
+        if (setCount !== undefined && setCount < properties.length) {
+            this.description = `(${setCount} set / ${properties.length} total)`;
+        } else {
+            this.description = `(${properties.length})`;
+        }
         this.contextValue = 'category';
         this.iconPath = this.getCategoryIcon();
     }
@@ -122,7 +139,8 @@ export class CategoryItem extends vscode.TreeItem {
 export class ElementHeader extends vscode.TreeItem {
     constructor(
         public readonly elementType: string,
-        public readonly elementName?: string
+        public readonly elementName?: string,
+        public readonly typeDescription?: string
     ) {
         const label = elementName ? `${elementType}: ${elementName}` : elementType;
         super(label, vscode.TreeItemCollapsibleState.Expanded);
@@ -130,6 +148,19 @@ export class ElementHeader extends vscode.TreeItem {
         this.description = elementName ? '' : '(no name)';
         this.contextValue = 'element';
         this.iconPath = new vscode.ThemeIcon('symbol-class', new vscode.ThemeColor('symbolIcon.classForeground'));
+
+        if (typeDescription) {
+            const md = new vscode.MarkdownString();
+            md.appendMarkdown(`**${elementType}**\n\n`);
+            md.appendMarkdown(typeDescription);
+            if (isKnownControlType(elementType)) {
+                const chain = getInheritanceChain(elementType);
+                if (chain.length > 1) {
+                    md.appendMarkdown(`\n\n*Inherits:* ${chain.join(' → ')}`);
+                }
+            }
+            this.tooltip = md;
+        }
     }
 }
 
@@ -142,84 +173,16 @@ export class PropertyPaneProvider implements vscode.TreeDataProvider<vscode.Tree
 
     private selectedElement: XamlElement | null = null;
     private groupByCategory = true;
+    private showDefaultProperties = true;
 
-    // Property categorization map
-    private static readonly PROPERTY_CATEGORIES: Record<string, PropertyCategory> = {
-        // Common
+    // Fallback categorization for properties not in the metadata
+    private static readonly FALLBACK_CATEGORIES: Record<string, PropertyCategory> = {
         'x:Name': PropertyCategory.Common,
-        'Name': PropertyCategory.Common,
-        'Content': PropertyCategory.Common,
-        'Text': PropertyCategory.Common,
-        'Header': PropertyCategory.Common,
-        'Title': PropertyCategory.Common,
-        'IsEnabled': PropertyCategory.Common,
-        'Visibility': PropertyCategory.Common,
-        'Tag': PropertyCategory.Common,
-        'DataContext': PropertyCategory.Common,
-
-        // Layout
-        'Width': PropertyCategory.Layout,
-        'Height': PropertyCategory.Layout,
-        'MinWidth': PropertyCategory.Layout,
-        'MinHeight': PropertyCategory.Layout,
-        'MaxWidth': PropertyCategory.Layout,
-        'MaxHeight': PropertyCategory.Layout,
-        'Margin': PropertyCategory.Layout,
-        'Padding': PropertyCategory.Layout,
-        'HorizontalAlignment': PropertyCategory.Layout,
-        'VerticalAlignment': PropertyCategory.Layout,
-        'HorizontalContentAlignment': PropertyCategory.Layout,
-        'VerticalContentAlignment': PropertyCategory.Layout,
-        'Grid.Row': PropertyCategory.Layout,
-        'Grid.Column': PropertyCategory.Layout,
-        'Grid.RowSpan': PropertyCategory.Layout,
-        'Grid.ColumnSpan': PropertyCategory.Layout,
-        'Canvas.Left': PropertyCategory.Layout,
-        'Canvas.Top': PropertyCategory.Layout,
-        'Canvas.ZIndex': PropertyCategory.Layout,
-        'RelativePanel.AlignLeftWithPanel': PropertyCategory.Layout,
-        'RelativePanel.AlignRightWithPanel': PropertyCategory.Layout,
-        'RelativePanel.AlignTopWithPanel': PropertyCategory.Layout,
-        'RelativePanel.AlignBottomWithPanel': PropertyCategory.Layout,
-
-        // Appearance
-        'Background': PropertyCategory.Appearance,
-        'Foreground': PropertyCategory.Appearance,
-        'BorderBrush': PropertyCategory.Appearance,
-        'BorderThickness': PropertyCategory.Appearance,
-        'CornerRadius': PropertyCategory.Appearance,
-        'Opacity': PropertyCategory.Appearance,
-        'Style': PropertyCategory.Appearance,
-        'RequestedTheme': PropertyCategory.Appearance,
-
-        // Text
-        'FontFamily': PropertyCategory.Text,
-        'FontSize': PropertyCategory.Text,
-        'FontWeight': PropertyCategory.Text,
-        'FontStyle': PropertyCategory.Text,
-        'TextWrapping': PropertyCategory.Text,
-        'TextAlignment': PropertyCategory.Text,
-        'TextTrimming': PropertyCategory.Text,
-        'PlaceholderText': PropertyCategory.Text,
-        'MaxLength': PropertyCategory.Text,
-        'AcceptsReturn': PropertyCategory.Text,
-
-        // Interaction
-        'Command': PropertyCategory.Interaction,
-        'CommandParameter': PropertyCategory.Interaction,
-        'Click': PropertyCategory.Interaction,
-        'IsHitTestVisible': PropertyCategory.Interaction,
-        'AllowDrop': PropertyCategory.Interaction,
-        'CanDrag': PropertyCategory.Interaction,
-        'IsTabStop': PropertyCategory.Interaction,
-        'TabIndex': PropertyCategory.Interaction,
-
-        // Accessibility
-        'AutomationProperties.Name': PropertyCategory.Accessibility,
-        'AutomationProperties.LabeledBy': PropertyCategory.Accessibility,
-        'AutomationProperties.HelpText': PropertyCategory.Accessibility,
-        'AutomationProperties.LiveSetting': PropertyCategory.Accessibility,
-        'ToolTipService.ToolTip': PropertyCategory.Accessibility,
+        'x:Bind': PropertyCategory.Common,
+        'x:Key': PropertyCategory.Common,
+        'x:Class': PropertyCategory.Miscellaneous,
+        'x:Uid': PropertyCategory.Miscellaneous,
+        'xmlns': PropertyCategory.Miscellaneous,
     };
 
     constructor() {}
@@ -241,6 +204,21 @@ export class PropertyPaneProvider implements vscode.TreeDataProvider<vscode.Tree
     }
 
     /**
+     * Toggle display of default (unset) properties
+     */
+    public toggleDefaultProperties(): void {
+        this.showDefaultProperties = !this.showDefaultProperties;
+        this._onDidChangeTreeData.fire();
+    }
+
+    /**
+     * Whether default properties are currently shown
+     */
+    public get isShowingDefaultProperties(): boolean {
+        return this.showDefaultProperties;
+    }
+
+    /**
      * Get tree item for display
      */
     getTreeItem(element: vscode.TreeItem): vscode.TreeItem {
@@ -257,19 +235,22 @@ export class PropertyPaneProvider implements vscode.TreeDataProvider<vscode.Tree
 
         // Root level - show element header
         if (!element) {
+            const desc = getControlDescription(this.selectedElement.tagName);
             const header = new ElementHeader(
                 this.selectedElement.tagName,
-                this.getElementName()
+                this.getElementName(),
+                desc
             );
             return Promise.resolve([header]);
         }
 
         // Element header - show categories or flat list
         if (element instanceof ElementHeader) {
+            const items = this.getAllPropertyItems();
             if (this.groupByCategory) {
-                return Promise.resolve(this.getCategoryItems());
+                return Promise.resolve(this.getCategoryItems(items));
             } else {
-                return Promise.resolve(this.getAllPropertyItems());
+                return Promise.resolve(items);
             }
         }
 
@@ -305,9 +286,7 @@ export class PropertyPaneProvider implements vscode.TreeDataProvider<vscode.Tree
     /**
      * Get all properties as category groups
      */
-    private getCategoryItems(): CategoryItem[] {
-        const propertyItems = this.getAllPropertyItems();
-        
+    private getCategoryItems(propertyItems: PropertyItem[]): CategoryItem[] {
         // Group by category
         const categoryMap = new Map<PropertyCategory, PropertyItem[]>();
         
@@ -334,7 +313,9 @@ export class PropertyPaneProvider implements vscode.TreeDataProvider<vscode.Tree
         for (const category of orderedCategories) {
             const properties = categoryMap.get(category);
             if (properties && properties.length > 0) {
-                categoryItems.push(new CategoryItem(category, properties));
+                // Count set vs default
+                const setCount = properties.filter(p => !p.isDefault).length;
+                categoryItems.push(new CategoryItem(category, properties, setCount));
             }
         }
 
@@ -342,7 +323,8 @@ export class PropertyPaneProvider implements vscode.TreeDataProvider<vscode.Tree
     }
 
     /**
-     * Get all properties as a flat list
+     * Get all properties as a flat list, merging explicit XAML attributes
+     * with the full set of available properties from the control metadata.
      */
     private getAllPropertyItems(): PropertyItem[] {
         if (!this.selectedElement) {
@@ -350,23 +332,97 @@ export class PropertyPaneProvider implements vscode.TreeDataProvider<vscode.Tree
         }
 
         const items: PropertyItem[] = [];
+        const tagName = this.selectedElement.tagName;
+        const explicitAttributes = this.selectedElement.attributes;
+        const addedNames = new Set<string>();
 
-        for (const [name, value] of this.selectedElement.attributes) {
+        // Build a lookup from metadata properties for the element's type
+        const metadataProps = resolveAllProperties(tagName);
+        const metadataByName = new Map<string, PropertyMetadata>();
+        for (const prop of metadataProps) {
+            metadataByName.set(prop.name, prop);
+        }
+
+        // Also index attached properties by their XAML name
+        const attachedByName = new Map<string, typeof ATTACHED_PROPERTIES[number]>();
+        for (const ap of ATTACHED_PROPERTIES) {
+            attachedByName.set(ap.xamlName, ap);
+        }
+
+        // 1) Add explicitly set attributes (from XAML markup)
+        for (const [name, value] of explicitAttributes) {
             const bindingInfo = this.parseBindingExpression(value);
-            const category = PropertyPaneProvider.PROPERTY_CATEGORIES[name] || PropertyCategory.Miscellaneous;
+            const meta = metadataByName.get(name);
+            const attached = attachedByName.get(name);
+            const category = meta?.category
+                ?? attached?.category
+                ?? PropertyPaneProvider.FALLBACK_CATEGORIES[name]
+                ?? PropertyCategory.Miscellaneous;
+            const propType = meta?.type ?? attached?.type;
 
             items.push(new PropertyItem(
                 name,
                 value,
                 bindingInfo.isBinding,
+                /* isDefault */ false,
+                propType,
                 bindingInfo.path,
                 bindingInfo.isBinding ? value : undefined,
                 category
             ));
+            addedNames.add(name);
         }
 
-        // Sort alphabetically within categories
-        items.sort((a, b) => a.name.localeCompare(b.name));
+        // 2) Add remaining metadata properties with default values
+        if (this.showDefaultProperties) {
+            for (const prop of metadataProps) {
+                if (addedNames.has(prop.name)) {
+                    continue;
+                }
+                items.push(new PropertyItem(
+                    prop.name,
+                    prop.defaultValue,
+                    /* isBinding */ false,
+                    /* isDefault */ true,
+                    prop.type,
+                    undefined,
+                    undefined,
+                    prop.category
+                ));
+                addedNames.add(prop.name);
+            }
+
+            // 3) Add applicable attached properties that are explicitly set
+            //    (already handled above), and common ones as defaults
+            for (const ap of ATTACHED_PROPERTIES) {
+                if (addedNames.has(ap.xamlName)) {
+                    continue;
+                }
+                // Only show attached properties as defaults if they're from
+                // common layout providers (Grid, Canvas) — not all of them
+                if (ap.ownerType === 'AutomationProperties' || ap.ownerType === 'ToolTipService') {
+                    items.push(new PropertyItem(
+                        ap.xamlName,
+                        ap.defaultValue,
+                        /* isBinding */ false,
+                        /* isDefault */ true,
+                        ap.type,
+                        undefined,
+                        undefined,
+                        ap.category
+                    ));
+                    addedNames.add(ap.xamlName);
+                }
+            }
+        }
+
+        // Sort: explicitly set properties first, then defaults; alphabetical within each group
+        items.sort((a, b) => {
+            if (a.isDefault !== b.isDefault) {
+                return a.isDefault ? 1 : -1;
+            }
+            return a.name.localeCompare(b.name);
+        });
 
         return items;
     }

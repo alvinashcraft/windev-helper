@@ -166,6 +166,14 @@ export class XamlPreviewController implements vscode.Disposable {
             // Notify listeners
             this._onRendererChanged.fire(this.getStatus());
         }
+
+        // Pre-initialize the selected renderer so first render doesn't have to wait
+        // for process startup. Fire-and-forget — if it fails, render() will retry.
+        if (this.activeRenderer) {
+            this.activeRenderer.initialize().catch(err => {
+                console.warn('[PreviewController] Pre-initialization failed (will retry on render):', err);
+            });
+        }
     }
 
     /**

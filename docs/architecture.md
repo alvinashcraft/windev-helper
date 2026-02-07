@@ -24,6 +24,16 @@ This document provides an overview of the WinDev Helper extension architecture f
 │  │   Manager   │  │   Manager   │  │   Provider  │             │
 │  └─────────────┘  └─────────────┘  └─────────────┘             │
 ├─────────────────────────────────────────────────────────────────┤
+│                       XAML Features                               │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐             │
+│  │   Preview   │  │  Property   │  │    XAML     │             │
+│  │ Controller  │  │    Pane     │  │Preprocessor │             │
+│  └─────────────┘  └─────────────┘  └─────────────┘             │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐             │
+│  │   Native    │  │    HTML     │  │  Control    │             │
+│  │  Renderer   │  │  Fallback   │  │  Metadata   │             │
+│  └─────────────┘  └─────────────┘  └─────────────┘             │
+├─────────────────────────────────────────────────────────────────┤
 │                       Utilities                                  │
 │  ┌─────────────┐  ┌─────────────┐                               │
 │  │  Constants  │  │ Cancellation│                               │
@@ -173,7 +183,7 @@ class WinUIProjectManager {
 
 ### Build Manager (`buildManager.ts`)
 
-Manages build operations and configuration with cancellation support:
+Manages build operations, MSIX deployment, and configuration with cancellation support:
 
 ```typescript
 class BuildManager {
@@ -190,12 +200,26 @@ class BuildManager {
     rebuild(project: vscode.Uri, token?: CancellationToken): Promise<boolean>
     clean(project: vscode.Uri, token?: CancellationToken): Promise<boolean>
     publish(project: vscode.Uri, rid?: string, token?: CancellationToken): Promise<boolean>
-    runWithoutDebugging(project: vscode.Uri): Promise<void>
+    runWithoutDebugging(project: vscode.Uri, tfm?: string, isPackaged?: boolean): Promise<void>
+    
+    // MSIX deployment
+    deploy(project: vscode.Uri, tfm?: string, token?: CancellationToken): Promise<boolean>
+    launchPackagedApp(project: vscode.Uri, tfm?: string): Promise<boolean>
+    findAppxManifest(projectPath: string, tfm?: string): string | undefined
     
     // Build control
     cancelBuild(): void
 }
 ```
+
+**MSIX Deployment:**
+
+For packaged apps, the build manager:
+1. Locates AppxManifest.xml in the build output
+2. Runs `Add-AppxPackage -Register` via PowerShell to register the package
+3. Parses the manifest for package identity (Name + Application Id)
+4. Resolves the PackageFamilyName via `Get-AppxPackage`
+5. Launches via `shell:AppsFolder\<PackageFamilyName>!<AppId>`
 
 **Cancellation Support:**
 
@@ -321,7 +345,7 @@ services.statusBarManager.subscribeToEvents(services.buildManager);
 
 ### Debug Configuration Provider (`debugConfigurationProvider.ts`)
 
-Provides debug configuration for WinUI apps:
+Provides debug configuration for WinUI apps, with special handling for packaged vs. unpackaged apps:
 
 ```typescript
 class DebugConfigurationProvider implements vscode.DebugConfigurationProvider {
@@ -329,6 +353,11 @@ class DebugConfigurationProvider implements vscode.DebugConfigurationProvider {
         folder: vscode.WorkspaceFolder,
         config: vscode.DebugConfiguration
     ): Promise<vscode.DebugConfiguration>
+    
+    resolveDebugConfigurationWithSubstitutedVariables(
+        folder: vscode.WorkspaceFolder,
+        config: vscode.DebugConfiguration
+    ): Promise<vscode.DebugConfiguration | undefined>
     
     provideDebugConfigurations(
         folder: vscode.WorkspaceFolder
@@ -340,9 +369,9 @@ class DebugConfigurationProvider implements vscode.DebugConfigurationProvider {
 
 1. User presses F5
 2. Provider creates/resolves configuration
-3. Runs `preLaunchTask: "winui: build"` (builds the project)
-4. Converts `winui` type to `coreclr`
-5. VS Code launches the debugger
+3. Builds the project via BuildManager
+4. For packaged apps: deploys MSIX and launches via package identity, returns undefined (no debug session)
+5. For unpackaged apps: converts `winui` type to `coreclr`, VS Code launches the debugger
 
 ---
 
@@ -399,13 +428,20 @@ Resolve Debug Configuration
 Build Project (if needed)
       │
       ▼
-Get Executable Path
-      │
-      ▼
-Convert to coreclr Config
-      │
-      ▼
-VS Code Debugger Launch
+┌────────────────────────────────────────┐
+│  Check WindowsPackageType        │
+└───────────────────┬────────────────────┘
+           │                    │
+      Unpackaged              Packaged
+           │                    │
+           ▼                    ▼
+    Get Executable Path    Deploy MSIX Package
+           │                    │
+           ▼                    ▼
+    Convert to coreclr     Launch via Package Identity
+           │                    │
+           ▼                    ▼
+    VS Code Debugger       Show Info Message
 ```
 
 ---
@@ -586,14 +622,47 @@ suite('Extension Integration', () => {
 
 ---
 
+## XAML Features Architecture
+
+### XAML Preprocessor (`xamlPreview/xamlPreprocessor.ts`)
+
+Sanitizes XAML before sending it to the native renderer, handling third-party controls and unsupported elements:
+
+- **Namespace classification**: Identifies known WinUI namespaces vs. unknown third-party namespaces
+- **Element replacement**: Replaces elements from unknown namespaces with `<Grid>` placeholders
+- **Window root conversion**: Converts `<Window>` roots to `<Grid>` (since `XamlReader.Load()` can't handle `<Window>`)
+- **Attribute whitelist**: Only keeps FrameworkElement-compatible attributes on placeholder elements
+- **Resource cleanup**: Strips unknown namespace entries from resource dictionaries
+- **Warning collection**: Reports all replaced/removed elements so the preview can display warnings
+
+### Property Pane (`propertyPane/`)
+
+Provides a tree view showing properties for the selected XAML element:
+
+- **`controlMetadata.ts`**: Database of ~65 WinUI 3 control types with full inheritance chains, ~35 attached properties, category classification, and default values
+- **`propertyPaneProvider.ts`**: TreeDataProvider that merges explicit XAML attributes with metadata defaults; supports grouped and flat views
+- **`propertyPaneController.ts`**: Manages lifecycle, listens for cursor position changes, and registers view commands
+
+### Native Renderer (`xamlPreview/nativeRenderer.ts`)
+
+Manages the WinUI 3 host process for rendering XAML:
+
+- Pre-initializes during renderer selection (eliminates first-render timeout)
+- Sends warm-up ping after pipe connection
+- Integrates XAML preprocessor before sending XAML to host
+- Merges preprocessing warnings into render results
+
+---
+
 ## Future Considerations
 
 ### Planned Features
 
-1. XAML IntelliSense integration
-2. Hot Reload support
-3. C++ WinUI project support
-4. Additional project templates
+1. Debugger attachment for MSIX-packaged apps
+2. XAML IntelliSense integration
+3. Hot Reload support
+4. C++ WinUI project support
+5. Additional project templates
 
 ### Extension Points for Future
 

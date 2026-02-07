@@ -4,3 +4,4 @@
 
 export * from './propertyPaneProvider';
 export * from './propertyPaneController';
+export * from './controlMetadata';

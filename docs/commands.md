@@ -204,8 +204,9 @@ Builds the project (if necessary) and starts debugging.
 **Features:**
 
 - Builds with current configuration and platform
-- Attaches the debugger
-- Supports breakpoints and step debugging
+- For unpackaged apps: attaches the debugger with full breakpoint support
+- For MSIX-packaged apps: deploys the package and launches through the package identity (without debugger attachment)
+- Supports breakpoints and step debugging (unpackaged apps only)
 
 ---
 
@@ -216,6 +217,57 @@ Builds the project (if necessary) and starts debugging.
 **Keyboard Shortcut:** `Ctrl+F5`
 
 Builds and runs the application without the debugger attached.
+
+**Behavior by app type:**
+
+- **Unpackaged apps** (`WindowsPackageType=None`): Uses `dotnet run` to launch
+- **Packaged apps** (default MSIX): Builds, deploys the MSIX package via `Add-AppxPackage -Register`, and launches through the package identity using `shell:AppsFolder`
+
+---
+
+## XAML Properties Pane Commands (Preview Feature)
+
+> ⚠️ These commands are for the preview feature in WinDev Helper 2.5.
+
+The Properties pane appears in the XAML panel when editing `.xaml` files. It displays properties for the currently selected XAML element.
+
+### WinDev: Refresh Properties
+
+**Command ID:** `windevHelper.propertyPane.refresh`
+
+Refreshes the Properties pane to reflect the latest XAML content.
+
+---
+
+### WinDev: Toggle Property Grouping
+
+**Command ID:** `windevHelper.propertyPane.toggleGrouping`
+
+Switches between grouped view (properties organized by category like Layout, Appearance, Common, etc.) and a flat alphabetical list.
+
+---
+
+### WinDev: Toggle Default Properties
+
+**Command ID:** `windevHelper.propertyPane.toggleDefaults`
+
+Toggles display of default (unset) properties. When enabled, shows all available properties for the selected control type from the built-in metadata database (~65 WinUI control types). Default values appear dimmed to distinguish them from explicitly set values.
+
+---
+
+### WinDev: Copy Value
+
+**Command ID:** `windevHelper.propertyPane.copyValue`
+
+Copies the value of the selected property to the clipboard. Available from the context menu on property items.
+
+---
+
+### WinDev: Go to Definition
+
+**Command ID:** `windevHelper.propertyPane.goToDefinition`
+
+Navigates to the property's definition in the XAML source. Available from the context menu on property items.
 
 ---
 

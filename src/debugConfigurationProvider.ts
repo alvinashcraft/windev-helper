@@ -4,6 +4,7 @@
 
 import * as vscode from 'vscode';
 import * as path from 'path';
+import * as fs from 'fs';
 import { WinUIProjectManager } from './projectManager';
 import { BuildManager } from './buildManager';
 import { DEBUG_TYPES } from './constants';
@@ -81,6 +82,35 @@ export class DebugConfigurationProvider implements vscode.DebugConfigurationProv
                 return undefined;
             }
 
+            // For MSIX-packaged apps, deploy to register COM classes before launch.
+            // Without deployment, WinUI apps fail with COMException 0x80040154 (Class not registered).
+            // Packaged apps must also be launched through their package identity, so we deploy,
+            // launch via shell:AppsFolder, and skip direct exe debugging.
+            const projectInfo = await this.projectManager.getProjectInfo();
+            const isUnpackaged = projectInfo?.windowsPackageType?.toLowerCase() === 'none';
+            if (!isUnpackaged) {
+                const deploySuccess = await this.buildManager.deploy(
+                    vscode.Uri.file(projectPath), projectInfo?.targetFramework);
+                if (!deploySuccess) {
+                    vscode.window.showErrorMessage('MSIX deployment failed. Cannot start debugging.');
+                    return undefined;
+                }
+
+                // Launch the packaged app through its MSIX identity
+                const launched = await this.buildManager.launchPackagedApp(
+                    vscode.Uri.file(projectPath), projectInfo?.targetFramework);
+                if (!launched) {
+                    vscode.window.showErrorMessage('Failed to launch packaged application.');
+                    return undefined;
+                }
+
+                vscode.window.showInformationMessage(
+                    'Packaged WinUI app launched. Debugger attachment is not yet supported for MSIX-packaged apps — ' +
+                    'the app is running without a debugger. Set WindowsPackageType to None in your .csproj for full debug support.'
+                );
+                return undefined;
+            }
+
             // Convert to coreclr configuration
             const executablePath = await this.getExecutablePath(vscode.Uri.file(projectPath));
             
@@ -123,17 +153,44 @@ export class DebugConfigurationProvider implements vscode.DebugConfigurationProv
     }
 
     /**
-     * Gets the executable path for the project
+     * Gets the executable path for the project.
+     * Tries multiple candidate locations to handle both MSIX-packaged and unpackaged apps:
+     * - Unpackaged (WindowsPackageType=None): exe is in bin/{platform}/{config}/{tfm}/{rid}/
+     * - Packaged (default MSIX): exe is in bin/{platform}/{config}/{tfm}/ (no RID subfolder)
+     * - Packaged AppX layout: exe may be in bin/{platform}/{config}/{tfm}/{rid}/AppX/
      * @param projectUri - URI to the project file
      * @returns The full path to the executable
      */
     private async getExecutablePath(projectUri: vscode.Uri): Promise<string> {
         const projectInfo = await this.projectManager.getProjectInfo();
         const projectName = path.basename(projectUri.fsPath, '.csproj');
-        
         const targetFramework = projectInfo?.targetFramework;
-        const outputPath = this.buildManager.getOutputPath(projectUri.fsPath, targetFramework);
+        const exeName = `${projectName}.exe`;
+        const isUnpackaged = projectInfo?.windowsPackageType?.toLowerCase() === 'none';
 
-        return path.join(outputPath, `${projectName}.exe`);
+        // Build candidate paths in priority order
+        const candidates: string[] = [];
+
+        if (isUnpackaged) {
+            // Unpackaged apps: RID subfolder is the primary location
+            candidates.push(path.join(this.buildManager.getOutputPath(projectUri.fsPath, targetFramework, true), exeName));
+            candidates.push(path.join(this.buildManager.getOutputPath(projectUri.fsPath, targetFramework, false), exeName));
+        } else {
+            // Packaged apps: no RID subfolder is the primary location
+            candidates.push(path.join(this.buildManager.getOutputPath(projectUri.fsPath, targetFramework, false), exeName));
+            candidates.push(path.join(this.buildManager.getOutputPath(projectUri.fsPath, targetFramework, true), exeName));
+            // Also check AppX layout for packaged apps
+            candidates.push(path.join(this.buildManager.getOutputPath(projectUri.fsPath, targetFramework, true), 'AppX', exeName));
+        }
+
+        // Return the first path that exists, or fall back to the primary candidate
+        for (const candidate of candidates) {
+            if (fs.existsSync(candidate)) {
+                return candidate;
+            }
+        }
+
+        // Pre-build: return the best guess (first candidate)
+        return candidates[0];
     }
 }

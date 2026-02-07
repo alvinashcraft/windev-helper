@@ -165,7 +165,13 @@ function registerCommands(context: vscode.ExtensionContext): void {
 
     context.subscriptions.push(
         vscode.commands.registerCommand(COMMANDS.RUN_WITHOUT_DEBUGGING, async () => {
-            await services.buildManager.runWithoutDebugging(services.projectManager.currentProject);
+            const projectInfo = await services.projectManager.getProjectInfo();
+            const isPackaged = projectInfo?.windowsPackageType?.toLowerCase() !== 'none';
+            await services.buildManager.runWithoutDebugging(
+                services.projectManager.currentProject,
+                projectInfo?.targetFramework,
+                isPackaged
+            );
         })
     );
 

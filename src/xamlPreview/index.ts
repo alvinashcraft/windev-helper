@@ -7,3 +7,4 @@ export * from './nativeRenderer';
 export * from './htmlFallbackRenderer';
 export * from './projectContext';
 export * from './previewController';
+export * from './xamlPreprocessor';

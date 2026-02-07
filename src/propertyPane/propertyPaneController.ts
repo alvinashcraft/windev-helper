@@ -36,6 +36,9 @@ export class PropertyPaneController implements vscode.Disposable {
             vscode.commands.registerCommand('windevHelper.propertyPane.toggleGrouping', () => {
                 this.provider.toggleGrouping();
             }),
+            vscode.commands.registerCommand('windevHelper.propertyPane.toggleDefaults', () => {
+                this.provider.toggleDefaultProperties();
+            }),
             vscode.commands.registerCommand('windevHelper.propertyPane.copyValue', (item: { name: string; value: string }) => {
                 if (item && item.value) {
                     vscode.env.clipboard.writeText(item.value);
