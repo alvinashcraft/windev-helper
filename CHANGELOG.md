@@ -5,6 +5,59 @@ All notable changes to the WinDev Helper extension will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.5.0] - 2026-02-07 (Preview)
+
+> ⚠️ This is a preview release. To use stable releases only, disable pre-release versions in VS Code.
+
+### Added
+
+- **XAML Properties Pane** (Preview Feature)
+  - New "Properties" panel in the XAML view container
+  - Displays all properties for the selected XAML element
+  - Full metadata database for ~65 WinUI 3 control types with inheritance
+  - ~35 attached property definitions (Grid, Canvas, ScrollViewer, etc.)
+  - Properties grouped by category (Layout, Appearance, Common, Content, Interaction, Text, Brushes, Accessibility)
+  - Toggle between set properties only and all available properties (including defaults)
+  - Toggle between grouped and flat property views
+  - Copy property values and navigate to XAML definitions
+  - Visual indicators for data-bound properties
+
+- **MSIX Packaged App Support**
+  - Deploy MSIX packages for development using `Add-AppxPackage -Register`
+  - Launch packaged apps through their package identity (`shell:AppsFolder`)
+  - Automatic AppxManifest.xml discovery in build output
+  - Packaged app detection via `WindowsPackageType` in .csproj
+  - Run Without Debugging support for both packaged and unpackaged apps
+
+### Improved
+
+- **XAML Preview Robustness**
+  - New XAML preprocessor that sanitizes third-party/unknown namespace elements
+  - Graceful handling of CommunityToolkit and other NuGet control libraries
+  - `<Window>` root elements automatically converted for preview rendering
+  - Unknown namespace elements replaced with `<Grid>` placeholders
+  - Attribute whitelist ensures only FrameworkElement-compatible attributes are kept
+  - Resource entries from unknown namespaces are stripped to prevent parse errors
+  - Preview warnings displayed for replaced or removed elements
+
+- **XAML Preview Performance**
+  - Native renderer pre-initialized during renderer selection (no first-render timeout)
+  - Warm-up ping sent after pipe connection to verify renderer readiness
+
+- **Debugging**
+  - Improved executable path resolution for both packaged and unpackaged apps
+  - Multi-path fallback: checks RID subfolder, TFM folder, and AppX layout
+  - Informational message when debugging packaged apps (suggests unpackaged for full debug support)
+
+- **Project Creation**
+  - Fixed project folder detection when `dotnet new` creates a subfolder
+
+### Known Limitations
+
+- Debugger attachment is not yet supported for MSIX-packaged apps; they launch without a debugger. Set `WindowsPackageType` to `None` in your .csproj for full debugging support.
+- XAML preview may not render third-party controls; they appear as placeholder grids
+- Property pane metadata covers ~65 common WinUI controls; uncommon controls may have limited property defaults
+
 ## [2.0.0] - 2026-01-31 (Preview)
 
 > ⚠️ This is a preview release. To use stable releases only, disable pre-release versions in VS Code.

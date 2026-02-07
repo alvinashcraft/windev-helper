@@ -4,6 +4,7 @@
 
 import * as vscode from 'vscode';
 import * as path from 'path';
+import * as fs from 'fs';
 import * as cp from 'child_process';
 import { WinAppCli } from './winAppCli';
 import { CONFIG, OUTPUT_CHANNELS, DEFAULTS } from './constants';
@@ -142,17 +143,279 @@ export class BuildManager {
     }
 
     /**
-     * Runs the project without debugging
+     * Runs the project without debugging.
+     * For unpackaged apps, uses `dotnet run`.
+     * For MSIX-packaged apps, builds, deploys, and launches through the package identity.
      * @param projectUri - Optional URI to the project file
+     * @param targetFramework - Optional target framework moniker
+     * @param isPackaged - Whether the app is MSIX-packaged (default: false)
      */
-    public async runWithoutDebugging(projectUri?: vscode.Uri): Promise<void> {
+    public async runWithoutDebugging(
+        projectUri?: vscode.Uri,
+        targetFramework?: string,
+        isPackaged: boolean = false
+    ): Promise<void> {
         const buildSuccess = await this.build(projectUri);
         if (!buildSuccess) {
             vscode.window.showErrorMessage('Build failed. Cannot run the application.');
             return;
         }
 
-        await this.runDotnetCommand('run', projectUri, false);
+        if (isPackaged && projectUri) {
+            const deploySuccess = await this.deploy(projectUri, targetFramework);
+            if (!deploySuccess) {
+                vscode.window.showErrorMessage('MSIX deployment failed. Cannot run the application.');
+                return;
+            }
+
+            const launched = await this.launchPackagedApp(projectUri, targetFramework);
+            if (!launched) {
+                vscode.window.showErrorMessage('Failed to launch packaged application.');
+            }
+        } else {
+            await this.runDotnetCommand('run', projectUri, false);
+        }
+    }
+
+    /**
+     * Deploys the MSIX-packaged WinUI project for development.
+     * This registers the app package so that COM classes (used by WinUI/Windows App SDK)
+     * are available at runtime. Required before launching packaged apps for debugging.
+     * Locates AppxManifest.xml in the build output and runs Add-AppxPackage -Register.
+     * @param projectUri - Optional URI to the project file
+     * @param targetFramework - Optional target framework moniker
+     * @param token - Optional cancellation token
+     * @returns Promise<boolean> - True if the deployment succeeded
+     */
+    public async deploy(
+        projectUri?: vscode.Uri,
+        targetFramework?: string,
+        token?: vscode.CancellationToken
+    ): Promise<boolean> {
+        const projectPath = projectUri?.fsPath || '';
+        if (!projectPath) {
+            vscode.window.showErrorMessage('No project specified for deployment.');
+            return false;
+        }
+
+        if (token?.isCancellationRequested) {
+            return false;
+        }
+
+        const manifestPath = this.findAppxManifest(projectPath, targetFramework);
+        if (!manifestPath) {
+            vscode.window.showErrorMessage(
+                'Could not find AppxManifest.xml in build output. ' +
+                'Ensure the project is configured for MSIX packaging.'
+            );
+            return false;
+        }
+
+        // Register the MSIX package for development using Add-AppxPackage
+        return this.runPowerShellDeploy(manifestPath, token);
+    }
+
+    /**
+     * Launches a packaged WinUI app through its MSIX package identity.
+     * Packaged apps must be launched this way so COM class registrations are available.
+     * Parses the AppxManifest.xml for the package name and app ID, resolves the
+     * PackageFamilyName via Get-AppxPackage, and uses shell:AppsFolder activation.
+     * @param projectUri - URI to the project file
+     * @param targetFramework - Optional target framework moniker
+     * @returns Promise<boolean> - True if the app was launched
+     */
+    public async launchPackagedApp(
+        projectUri: vscode.Uri,
+        targetFramework?: string
+    ): Promise<boolean> {
+        const manifestPath = this.findAppxManifest(projectUri.fsPath, targetFramework);
+        if (!manifestPath) {
+            vscode.window.showErrorMessage(
+                'Could not find AppxManifest.xml in build output. ' +
+                'Ensure the project is configured for MSIX packaging.'
+            );
+            return false;
+        }
+
+        const manifestInfo = this.parseAppxManifest(manifestPath);
+        if (!manifestInfo) {
+            vscode.window.showErrorMessage('Could not parse package identity from AppxManifest.xml.');
+            return false;
+        }
+
+        return this.runPowerShellLaunch(manifestInfo.packageName, manifestInfo.appId);
+    }
+
+    /**
+     * Finds AppxManifest.xml in the build output.
+     * Checks multiple candidate paths: with/without RID subfolder, with/without AppX subfolder.
+     * @param projectPath - Full path to the .csproj file
+     * @param targetFramework - Optional target framework moniker
+     * @returns The path to AppxManifest.xml, or undefined if not found
+     */
+    public findAppxManifest(projectPath: string, targetFramework?: string): string | undefined {
+        const candidates = [
+            path.join(this.getOutputPath(projectPath, targetFramework, false), 'AppxManifest.xml'),
+            path.join(this.getOutputPath(projectPath, targetFramework, true), 'AppxManifest.xml'),
+            path.join(this.getOutputPath(projectPath, targetFramework, false), 'AppX', 'AppxManifest.xml'),
+            path.join(this.getOutputPath(projectPath, targetFramework, true), 'AppX', 'AppxManifest.xml'),
+        ];
+
+        for (const candidate of candidates) {
+            if (fs.existsSync(candidate)) {
+                return candidate;
+            }
+        }
+        return undefined;
+    }
+
+    /**
+     * Parses AppxManifest.xml to extract the package Identity Name and Application Id.
+     * @param manifestPath - Path to AppxManifest.xml
+     * @returns Object with packageName and appId, or undefined on parse failure
+     */
+    private parseAppxManifest(manifestPath: string): { packageName: string; appId: string } | undefined {
+        try {
+            const content = fs.readFileSync(manifestPath, 'utf-8');
+            // Extract Identity Name attribute
+            const identityMatch = content.match(/<Identity\s[^>]*Name="([^"]+)"/);
+            if (!identityMatch) {
+                return undefined;
+            }
+
+            // Extract Application Id attribute (defaults to "App")
+            const appIdMatch = content.match(/<Application\s[^>]*Id="([^"]+)"/);
+            const appId = appIdMatch ? appIdMatch[1] : 'App';
+
+            return { packageName: identityMatch[1], appId };
+        } catch {
+            return undefined;
+        }
+    }
+
+    /**
+     * Uses PowerShell to resolve the PackageFamilyName and launch the app via shell:AppsFolder.
+     * @param packageName - The package Identity Name from AppxManifest.xml
+     * @param appId - The Application Id from AppxManifest.xml
+     * @returns Promise<boolean> - True if the launch succeeded
+     */
+    private runPowerShellLaunch(packageName: string, appId: string): Promise<boolean> {
+        return new Promise((resolve) => {
+            // PowerShell script: resolve the PackageFamilyName then activate via shell:AppsFolder
+            const script = [
+                `$pkg = Get-AppxPackage -Name '${packageName}' | Select-Object -First 1`,
+                `if (-not $pkg) { Write-Error 'Package not found: ${packageName}'; exit 1 }`,
+                `$aumid = $pkg.PackageFamilyName + '!${appId}'`,
+                `Write-Host "Launching $aumid"`,
+                `Start-Process "shell:AppsFolder\\$aumid"`
+            ].join('; ');
+
+            this.outputChannel.appendLine('');
+            this.outputChannel.appendLine(`> Launching packaged app: ${packageName}!${appId}`);
+            this.outputChannel.appendLine('');
+            this.outputChannel.show();
+
+            const proc = cp.spawn('powershell', [
+                '-NoProfile',
+                '-NonInteractive',
+                '-Command',
+                script
+            ], {
+                shell: false,
+                windowsHide: true
+            });
+
+            proc.stdout?.on('data', (data) => {
+                this.outputChannel.append(data.toString());
+            });
+
+            proc.stderr?.on('data', (data) => {
+                this.outputChannel.append(data.toString());
+            });
+
+            proc.on('close', (code) => {
+                if (code === 0) {
+                    this.outputChannel.appendLine('Application launched successfully.');
+                } else {
+                    this.outputChannel.appendLine(`Failed to launch application (exit code ${code}).`);
+                }
+                resolve(code === 0);
+            });
+
+            proc.on('error', (error) => {
+                this.outputChannel.appendLine(`Launch error: ${error.message}`);
+                resolve(false);
+            });
+        });
+    }
+
+    /**
+     * Runs Add-AppxPackage -Register to deploy the MSIX package for development.
+     * @param manifestPath - Path to AppxManifest.xml
+     * @param token - Optional cancellation token
+     * @returns Promise<boolean> - True if deployment succeeded
+     */
+    private runPowerShellDeploy(manifestPath: string, token?: vscode.CancellationToken): Promise<boolean> {
+        return new Promise((resolve) => {
+            if (token?.isCancellationRequested) {
+                resolve(false);
+                return;
+            }
+
+            const command = `Add-AppxPackage -Register "${manifestPath}" -ForceUpdateFromAnyVersion`;
+
+            this.outputChannel.appendLine('');
+            this.outputChannel.appendLine(`> ${command}`);
+            this.outputChannel.appendLine('');
+            this.outputChannel.show();
+
+            const proc = cp.spawn('powershell', [
+                '-NoProfile',
+                '-NonInteractive',
+                '-Command',
+                command
+            ], {
+                shell: false,
+                windowsHide: true
+            });
+
+            let cancellationListener: vscode.Disposable | undefined;
+            if (token) {
+                cancellationListener = token.onCancellationRequested(() => {
+                    proc.kill('SIGTERM');
+                    this.outputChannel.appendLine('Deployment cancelled by user.');
+                });
+            }
+
+            proc.stdout?.on('data', (data) => {
+                this.outputChannel.append(data.toString());
+            });
+
+            proc.stderr?.on('data', (data) => {
+                this.outputChannel.append(data.toString());
+            });
+
+            proc.on('close', (code, signal) => {
+                cancellationListener?.dispose();
+                const wasCancelled = signal === 'SIGTERM' || token?.isCancellationRequested;
+
+                if (wasCancelled) {
+                    this.outputChannel.appendLine('Deployment was cancelled.');
+                } else if (code === 0) {
+                    this.outputChannel.appendLine('MSIX deployment succeeded.');
+                } else {
+                    this.outputChannel.appendLine(`MSIX deployment failed with exit code ${code}.`);
+                }
+
+                resolve(!wasCancelled && code === 0);
+            });
+
+            proc.on('error', (error) => {
+                cancellationListener?.dispose();
+                this.outputChannel.appendLine(`Deployment error: ${error.message}`);
+                resolve(false);
+            });
+        });
     }
 
     /**
@@ -346,19 +609,17 @@ export class BuildManager {
      * Gets the output path for the current build
      * @param projectPath - Path to the project file
      * @param targetFramework - Optional target framework (defaults to net8.0-windows10.0.19041.0)
+     * @param includeRid - Whether to include the RuntimeIdentifier subfolder (default: true)
      * @returns The full path to the build output directory
      */
-    public getOutputPath(projectPath: string, targetFramework?: string): string {
+    public getOutputPath(projectPath: string, targetFramework?: string, includeRid: boolean = true): string {
         const projectDir = path.dirname(projectPath);
         const tfm = targetFramework || DEFAULTS.TARGET_FRAMEWORK;
-        return path.join(
-            projectDir, 
-            'bin', 
-            this._currentPlatform, 
-            this._currentConfiguration, 
-            tfm,
-            this.getRuntimeIdentifier()
-        );
+        const segments = [projectDir, 'bin', this._currentPlatform, this._currentConfiguration, tfm];
+        if (includeRid) {
+            segments.push(this.getRuntimeIdentifier());
+        }
+        return path.join(...segments);
     }
 
     /**

@@ -8,11 +8,25 @@ import { XamlParser, XamlElement } from './xamlParser';
 import { XamlPreviewController, RenderResult, RendererStatus, ElementMapping } from '../xamlPreview';
 
 /**
+ * Event data for element selection
+ */
+export interface ElementSelectionEvent {
+    element: XamlElement | null;
+    line: number;
+    column?: number | undefined;
+    document: vscode.TextDocument;
+}
+
+/**
  * Manages the XAML designer preview webview panel
  */
 export class XamlDesignerPanel {
     public static currentPanel: XamlDesignerPanel | undefined;
     public static readonly viewType = 'xamlDesigner';
+
+    // Event emitter for element selection
+    private static readonly _onElementSelected = new vscode.EventEmitter<ElementSelectionEvent>();
+    public static readonly onElementSelected = XamlDesignerPanel._onElementSelected.event;
 
     private readonly panel: vscode.WebviewPanel;
     private readonly parser: XamlParser;
@@ -520,6 +534,7 @@ export class XamlDesignerPanel {
             case 'elementClicked':
                 if (message.line !== undefined && this.currentDocument) {
                     this.navigateToLine(message.line, message.column);
+                    this.emitElementSelection(message.line, message.column);
                 }
                 break;
 
@@ -540,6 +555,24 @@ export class XamlDesignerPanel {
                 vscode.commands.executeCommand('workbench.action.openSettings', 'windevHelper.preview.renderer');
                 break;
         }
+    }
+
+    /**
+     * Emit an element selection event for the property pane
+     */
+    private emitElementSelection(line: number, column?: number): void {
+        if (!this.currentDocument || !this.lastParsedRoot) {
+            return;
+        }
+
+        const element = this.parser.findElementAtPosition(this.lastParsedRoot, line, column || 1);
+        
+        XamlDesignerPanel._onElementSelected.fire({
+            element: element ?? null,
+            line,
+            column,
+            document: this.currentDocument
+        });
     }
 
     /**

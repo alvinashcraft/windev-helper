@@ -191,6 +191,7 @@ export class WinUIProjectManager {
             const targetFramework = this.extractXmlValue(content, 'TargetFramework');
             const windowsAppSdkVersion = this.extractPackageVersion(content, 'Microsoft.WindowsAppSDK');
             const windowsSdkVersion = this.extractPackageVersion(content, 'Microsoft.Windows.SDK.BuildTools');
+            const windowsPackageType = this.extractXmlValue(content, 'WindowsPackageType');
             
             const info: ProjectInfo = {
                 path: this._currentProject.fsPath,
@@ -199,7 +200,8 @@ export class WinUIProjectManager {
                 runtimeIdentifiers: this.extractXmlValue(content, 'RuntimeIdentifiers')?.split(';') || [],
                 ...(targetFramework && { targetFramework }),
                 ...(windowsAppSdkVersion && { windowsAppSdkVersion }),
-                ...(windowsSdkVersion && { windowsSdkVersion })
+                ...(windowsSdkVersion && { windowsSdkVersion }),
+                ...(windowsPackageType && { windowsPackageType }),
             };
 
             return info;
@@ -284,4 +286,6 @@ export interface ProjectInfo {
     runtimeIdentifiers: string[];
     windowsAppSdkVersion?: string;
     windowsSdkVersion?: string;
+    /** Value of WindowsPackageType property. 'None' = unpackaged, undefined = MSIX packaged (default) */
+    windowsPackageType?: string;
 }

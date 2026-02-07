@@ -2,7 +2,7 @@
   "name": "windev-helper",
   "displayName": "WinDev Helper",
   "description": "Build beautiful, performant WinUI apps with VS Code. Debug, build, package, and deploy Windows apps powered by the Windows App SDK.",
-  "version": "2.0.0",
+  "version": "2.5.0",
   "publisher": "alvinashcraft",
   "preview": true,
   "icon": "images/icon.png",
@@ -179,8 +179,88 @@
         "title": "Open XAML Preview",
         "category": "WinDev",
         "icon": "$(preview)"
+      },
+      {
+        "command": "windevHelper.propertyPane.refresh",
+        "title": "Refresh Properties",
+        "category": "WinDev",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "windevHelper.propertyPane.toggleGrouping",
+        "title": "Toggle Property Grouping",
+        "category": "WinDev",
+        "icon": "$(list-tree)"
+      },
+      {
+        "command": "windevHelper.propertyPane.toggleDefaults",
+        "title": "Toggle Default Properties",
+        "category": "WinDev",
+        "icon": "$(eye)"
+      },
+      {
+        "command": "windevHelper.propertyPane.copyValue",
+        "title": "Copy Value",
+        "category": "WinDev",
+        "icon": "$(copy)"
+      },
+      {
+        "command": "windevHelper.propertyPane.goToDefinition",
+        "title": "Go to Definition",
+        "category": "WinDev",
+        "icon": "$(go-to-file)"
       }
     ],
+    "viewsContainers": {
+      "panel": [
+        {
+          "id": "windevHelperPanel",
+          "title": "XAML",
+          "icon": "$(symbol-misc)"
+        }
+      ]
+    },
+    "views": {
+      "windevHelperPanel": [
+        {
+          "id": "windevHelper.propertyPane",
+          "name": "Properties",
+          "when": "resourceExtname == .xaml || editorLangId == xaml",
+          "contextualTitle": "XAML Properties"
+        }
+      ]
+    },
+    "menus": {
+      "view/title": [
+        {
+          "command": "windevHelper.propertyPane.refresh",
+          "when": "view == windevHelper.propertyPane",
+          "group": "navigation"
+        },
+        {
+          "command": "windevHelper.propertyPane.toggleGrouping",
+          "when": "view == windevHelper.propertyPane",
+          "group": "navigation"
+        },
+        {
+          "command": "windevHelper.propertyPane.toggleDefaults",
+          "when": "view == windevHelper.propertyPane",
+          "group": "navigation"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "windevHelper.propertyPane.copyValue",
+          "when": "view == windevHelper.propertyPane && viewItem == property || viewItem == boundProperty",
+          "group": "inline"
+        },
+        {
+          "command": "windevHelper.propertyPane.goToDefinition",
+          "when": "view == windevHelper.propertyPane && viewItem == property || viewItem == boundProperty",
+          "group": "navigation"
+        }
+      ]
+    },
     "configuration": {
       "title": "WinDev Helper",
       "properties": {

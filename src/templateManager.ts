@@ -113,7 +113,9 @@ export class TemplateManager {
 
                 await this.executeCommand(command, targetDir);
 
-                const projectPath = path.join(targetDir, projectName);
+                // Some templates create a subfolder named after the project, others don't
+                const subfolderPath = path.join(targetDir, projectName);
+                const projectPath = fs.existsSync(subfolderPath) ? subfolderPath : targetDir;
                 
                 const action = await vscode.window.showInformationMessage(
                     `WinUI project '${projectName}' created successfully.`,
