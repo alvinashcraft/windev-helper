@@ -499,19 +499,26 @@ export class PackageManager {
      * Create external catalog for asset management
      */
     public async createExternalCatalog(): Promise<void> {
-        const outputUri = await vscode.window.showSaveDialog({
-            title: 'Select location for external catalog',
-            filters: {
-                'All Files': ['*']
-            }
+        const outputUris = await vscode.window.showOpenDialog({
+            canSelectFolders: true,
+            canSelectFiles: false,
+            canSelectMany: false,
+            openLabel: 'Select output folder for external catalog',
+            title: 'Select output folder for external catalog'
         });
+
+        if (!outputUris || outputUris.length === 0) {
+            return;
+        }
+
+        const outputPath = outputUris[0].fsPath;
 
         await vscode.window.withProgress({
             location: vscode.ProgressLocation.Notification,
             title: 'Creating external catalog...',
             cancellable: false
         }, async () => {
-            await this.winAppCli.createExternalCatalog(outputUri?.fsPath);
+            await this.winAppCli.createExternalCatalog(outputPath);
         });
     }
 
