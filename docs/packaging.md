@@ -281,12 +281,85 @@ Create an `.appinstaller` file for auto-updates:
 
 ### Microsoft Store
 
-For Store distribution:
+The WinDev Helper extension provides integrated Microsoft Store publishing via the `winapp store` subcommand (v0.2.0+).
 
-1. Create a partner account
-2. Reserve your app name
-3. Associate your project with the Store app
-4. Submit your package for certification
+#### Prerequisites
+
+1. Create a [Partner Center](https://partner.microsoft.com/dashboard) account
+2. Reserve your app name in Partner Center
+3. Create an Azure AD application for API access
+4. Note your Tenant ID, Seller ID, Client ID, and Client Secret
+
+#### Configure Credentials
+
+**Using VS Code:**
+
+Run **WinDev: Configure Microsoft Store Credentials** and enter your credentials.
+
+**Using CLI:**
+
+```bash
+winapp store reconfigure --tenantId <tenant-id> --sellerId <seller-id> --clientId <client-id> --clientSecret <secret>
+```
+
+#### Initialize Project for Store
+
+```bash
+winapp store init ./my-app
+```
+
+This associates your project with a Store app and sets up the required identity.
+
+#### Package for Store
+
+```bash
+winapp store package ./my-app --arch x64,arm64
+```
+
+#### Publish to Store
+
+**Using VS Code:**
+
+1. Run **WinDev: Publish to Microsoft Store**
+2. Optionally enter an App ID (if not previously initialized)
+3. Choose release type:
+   - **Full release** - 100% rollout
+   - **Gradual rollout** - Specify percentage
+   - **Draft only** - Don't commit submission
+
+**Using CLI:**
+
+```bash
+# Full release
+winapp store publish ./my-app
+
+# Gradual rollout (10% of users)
+winapp store publish ./my-app --packageRolloutPercentage 10
+
+# Draft only
+winapp store publish ./my-app --noCommit
+
+# Publish to a flight
+winapp store publish ./my-app --flightId <flight-id>
+```
+
+#### Check Submission Status
+
+**Using VS Code:**
+
+Run **WinDev: Check Store Submission Status** and enter the Product ID.
+
+**Using CLI:**
+
+```bash
+winapp store submission status <product-id>
+```
+
+#### List Your Store Apps
+
+```bash
+winapp store apps list
+```
 
 ---
 
@@ -375,3 +448,4 @@ Provide all required logo sizes:
 - [App Installer Documentation](https://learn.microsoft.com/windows/msix/app-installer/)
 - [Package Signing](https://learn.microsoft.com/windows/msix/package/sign-app-package-using-signtool)
 - [Microsoft Store Submission](https://learn.microsoft.com/windows/apps/publish/)
+- [Microsoft Store Developer CLI](https://learn.microsoft.com/windows/apps/publish/msstore-dev-cli/commands)

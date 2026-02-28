@@ -2,6 +2,8 @@
 
 This document provides a comprehensive guide to using the Windows App Development CLI (winapp) with the WinDev Helper extension.
 
+> **Note:** This guide covers winapp CLI v0.2.0 and later. See the [Breaking Changes](#breaking-changes-v020) section for migration notes.
+
 ## Overview
 
 The Windows App Development CLI (winapp) is a command-line tool that simplifies Windows app development tasks. It provides commands for:
@@ -12,6 +14,8 @@ The Windows App Development CLI (winapp) is a command-line tool that simplifies 
 - Certificate generation and management
 - App manifest handling
 - Debug identity creation
+- **Microsoft Store publishing** (v0.2.0+)
+- **External catalog management** (v0.2.0+)
 
 ## Installation
 
@@ -47,6 +51,10 @@ winapp init [project-path]
 
 **VS Code command:** WinUI: Initialize Project with Windows SDK
 
+> **v0.2.0 Breaking Change:** `init` no longer generates a certificate automatically. Run `winapp cert generate` explicitly when you need a dev signing certificate.
+>
+> **v0.2.0 .NET Projects:** When `winapp init` detects a `.csproj`, it configures NuGet packages in the project file directly instead of creating a `winapp.yaml`.
+
 ---
 
 #### winapp restore
@@ -58,6 +66,8 @@ winapp restore [project-path]
 ```
 
 **VS Code command:** WinUI: Restore Packages
+
+> **v0.2.0 Note:** winapp now uses the NuGet global cache for packages instead of `%userprofile%/.winapp/packages`. This avoids duplicate downloads if you already have packages cached.
 
 ---
 
@@ -244,6 +254,95 @@ winapp get-winapp-path
 
 ---
 
+### Microsoft Store Commands (v0.2.0+)
+
+The `winapp store` subcommand provides integrated Microsoft Store Developer CLI functionality.
+
+#### winapp store reconfigure
+
+Configure Microsoft Store credentials.
+
+```bash
+winapp store reconfigure --tenantId <id> --sellerId <id> --clientId <id> --clientSecret <secret>
+```
+
+**VS Code command:** WinDev: Configure Microsoft Store Credentials
+
+---
+
+#### winapp store apps list
+
+List all applications in your Store account.
+
+```bash
+winapp store apps list
+```
+
+**VS Code command:** WinDev: List Microsoft Store Apps
+
+---
+
+#### winapp store publish
+
+Publish an application to the Microsoft Store.
+
+```bash
+winapp store publish <project-path> [options]
+```
+
+**Options:**
+
+| Option | Description |
+|--------|-------------|
+| `--inputFile` | Path to `.msix` or `.msixupload` file |
+| `--appId` | Application ID (if not initialized) |
+| `--noCommit` | Keep submission in draft state |
+| `--flightId` | Publish to a specific flight |
+| `--packageRolloutPercentage` | Gradual rollout percentage (1-100) |
+
+**VS Code command:** WinDev: Publish to Microsoft Store
+
+**Example:**
+
+```bash
+# Full release
+winapp store publish ./my-app
+
+# Gradual rollout
+winapp store publish ./my-app --packageRolloutPercentage 10
+
+# Draft only
+winapp store publish ./my-app --noCommit
+```
+
+---
+
+#### winapp store submission status
+
+Check submission status.
+
+```bash
+winapp store submission status <product-id>
+```
+
+**VS Code command:** WinDev: Check Store Submission Status
+
+---
+
+### External Catalog Command (v0.2.0+)
+
+#### winapp create-external-catalog
+
+Create an external catalog for asset management.
+
+```bash
+winapp create-external-catalog [output-directory]
+```
+
+**VS Code command:** WinDev: Create External Catalog
+
+---
+
 ## Extension Integration
 
 The WinDev Helper extension integrates with the winapp CLI in several ways:
@@ -366,9 +465,32 @@ Error: Failed to create MSIX package
 
 ---
 
+## Breaking Changes (v0.2.0)
+
+### Certificate Generation Removed from init
+
+`winapp init` no longer generates a certificate automatically. Run `winapp cert generate` explicitly when you need a dev signing certificate. The `--no-cert` flag has been removed since there's nothing to skip.
+
+**Migration:** If your scripts relied on `init` producing a cert, add a `winapp cert generate` step.
+
+### NuGet Global Cache
+
+winapp now uses the NuGet global cache for packages instead of `%userprofile%/.winapp/packages`. This avoids duplicate downloads if you already have packages cached.
+
+**Migration:** If your code depends on packages being in the `.winapp` folder, update it to use the NuGet global cache path.
+
+### .NET Projects Skip winapp.yaml
+
+When `winapp init` detects a `.csproj`, it configures NuGet packages in the project file directly instead of creating a `winapp.yaml`. This is the correct behavior for .NET projects.
+
+**Migration:** For .NET projects, check the `.csproj` for Windows App SDK package references instead of looking for `winapp.yaml`.
+
+---
+
 ## Resources
 
 - [Windows App Development CLI Repository](https://github.com/microsoft/WinAppCli)
 - [Announcement Blog Post](https://blogs.windows.com/windowsdeveloper/2026/01/22/announcing-winapp-the-windows-app-development-cli/)
 - [MSIX Packaging Documentation](https://learn.microsoft.com/windows/msix/)
 - [Code Signing Best Practices](https://learn.microsoft.com/windows/win32/seccrypto/cryptography-tools)
+- [Microsoft Store Developer CLI](https://learn.microsoft.com/windows/apps/publish/msstore-dev-cli/commands)

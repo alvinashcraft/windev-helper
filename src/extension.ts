@@ -266,6 +266,38 @@ function registerCommands(context: vscode.ExtensionContext): void {
         })
     );
 
+    // Microsoft Store commands (v0.2.0+)
+    context.subscriptions.push(
+        vscode.commands.registerCommand(COMMANDS.STORE_CONFIGURE, async () => {
+            await services.packageManager.configureStore();
+        })
+    );
+
+    context.subscriptions.push(
+        vscode.commands.registerCommand(COMMANDS.STORE_LIST_APPS, async () => {
+            await services.packageManager.listStoreApps();
+        })
+    );
+
+    context.subscriptions.push(
+        vscode.commands.registerCommand(COMMANDS.STORE_SUBMISSION_STATUS, async () => {
+            await services.packageManager.getStoreSubmissionStatus();
+        })
+    );
+
+    context.subscriptions.push(
+        vscode.commands.registerCommand(COMMANDS.STORE_PUBLISH, async () => {
+            await services.packageManager.publishToStore(services.projectManager.currentProject);
+        })
+    );
+
+    // External catalog command (v0.2.0+)
+    context.subscriptions.push(
+        vscode.commands.registerCommand(COMMANDS.CREATE_EXTERNAL_CATALOG, async () => {
+            await services.packageManager.createExternalCatalog();
+        })
+    );
+
     // XAML Preview command
     context.subscriptions.push(
         vscode.commands.registerCommand(COMMANDS.OPEN_XAML_PREVIEW, async () => {

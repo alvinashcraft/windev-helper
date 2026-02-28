@@ -336,6 +336,185 @@ export class PackageManager {
         }
     }
 
+    // ============================================
+    // Microsoft Store Operations (v0.2.0+)
+    // ============================================
+
+    /**
+     * Configure Microsoft Store credentials
+     */
+    public async configureStore(): Promise<void> {
+        const tenantId = await vscode.window.showInputBox({
+            prompt: 'Enter your Azure AD Tenant ID',
+            placeHolder: 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx',
+            ignoreFocusOut: true
+        });
+        if (!tenantId) { return; }
+
+        const sellerId = await vscode.window.showInputBox({
+            prompt: 'Enter your Partner Center Seller ID',
+            placeHolder: 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx',
+            ignoreFocusOut: true
+        });
+        if (!sellerId) { return; }
+
+        const clientId = await vscode.window.showInputBox({
+            prompt: 'Enter your Azure AD Application (Client) ID',
+            placeHolder: 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx',
+            ignoreFocusOut: true
+        });
+        if (!clientId) { return; }
+
+        const clientSecret = await vscode.window.showInputBox({
+            prompt: 'Enter your Client Secret',
+            password: true,
+            ignoreFocusOut: true
+        });
+        if (!clientSecret) { return; }
+
+        await vscode.window.withProgress({
+            location: vscode.ProgressLocation.Notification,
+            title: 'Configuring Microsoft Store credentials...',
+            cancellable: false
+        }, async () => {
+            await this.winAppCli.storeConfigure({
+                tenantId,
+                sellerId,
+                clientId,
+                clientSecret
+            });
+        });
+    }
+
+    /**
+     * List all apps in the Microsoft Store account
+     */
+    public async listStoreApps(): Promise<void> {
+        await vscode.window.withProgress({
+            location: vscode.ProgressLocation.Notification,
+            title: 'Fetching Microsoft Store apps...',
+            cancellable: false
+        }, async () => {
+            const result = await this.winAppCli.storeListApps();
+            if (result) {
+                this.outputChannel.appendLine('--- Microsoft Store Apps ---');
+                this.outputChannel.appendLine(result);
+                this.outputChannel.show();
+            }
+        });
+    }
+
+    /**
+     * Get submission status for a Store app
+     */
+    public async getStoreSubmissionStatus(): Promise<void> {
+        const productId = await vscode.window.showInputBox({
+            prompt: 'Enter the Store Product ID',
+            placeHolder: '9NXXXXXXXX',
+            ignoreFocusOut: true
+        });
+        if (!productId) { return; }
+
+        await vscode.window.withProgress({
+            location: vscode.ProgressLocation.Notification,
+            title: 'Checking submission status...',
+            cancellable: false
+        }, async () => {
+            const result = await this.winAppCli.storeGetSubmissionStatus(productId);
+            if (result) {
+                this.outputChannel.appendLine(`--- Submission Status for ${productId} ---`);
+                this.outputChannel.appendLine(result);
+                this.outputChannel.show();
+            }
+        });
+    }
+
+    /**
+     * Publish to Microsoft Store
+     */
+    public async publishToStore(projectUri?: vscode.Uri): Promise<void> {
+        const projectPath = projectUri ? path.dirname(projectUri.fsPath) : 
+            vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+
+        if (!projectPath) {
+            vscode.window.showErrorMessage('No project selected.');
+            return;
+        }
+
+        // Ask for optional app ID
+        const appId = await vscode.window.showInputBox({
+            prompt: 'Enter the Store App ID (leave empty if previously initialized with msstore init)',
+            placeHolder: '9NXXXXXXXX (optional)',
+            ignoreFocusOut: true
+        });
+
+        // Ask about rollout
+        const rolloutChoice = await vscode.window.showQuickPick(
+            ['Full release (100%)', 'Gradual rollout (specify percentage)', 'Draft only (don\'t commit)'],
+            { placeHolder: 'Select release type' }
+        );
+        if (!rolloutChoice) { return; }
+
+        let rolloutPercentage: number | undefined;
+        let noCommit = false;
+
+        if (rolloutChoice.includes('Gradual')) {
+            const percentStr = await vscode.window.showInputBox({
+                prompt: 'Enter rollout percentage (1-100)',
+                placeHolder: '10',
+                ignoreFocusOut: true,
+                validateInput: (value) => {
+                    const num = parseInt(value);
+                    if (isNaN(num) || num < 1 || num > 100) {
+                        return 'Please enter a number between 1 and 100';
+                    }
+                    return null;
+                }
+            });
+            if (!percentStr) { return; }
+            rolloutPercentage = parseInt(percentStr);
+        } else if (rolloutChoice.includes('Draft')) {
+            noCommit = true;
+        }
+
+        await vscode.window.withProgress({
+            location: vscode.ProgressLocation.Notification,
+            title: 'Publishing to Microsoft Store...',
+            cancellable: false
+        }, async () => {
+            try {
+                await this.winAppCli.storePublish({
+                    projectPath,
+                    ...(appId && { appId }),
+                    noCommit,
+                    ...(rolloutPercentage !== undefined && { rolloutPercentage })
+                });
+            } catch (error) {
+                vscode.window.showErrorMessage(`Failed to publish to Store: ${error}`);
+            }
+        });
+    }
+
+    /**
+     * Create external catalog for asset management
+     */
+    public async createExternalCatalog(): Promise<void> {
+        const outputUri = await vscode.window.showSaveDialog({
+            title: 'Select location for external catalog',
+            filters: {
+                'All Files': ['*']
+            }
+        });
+
+        await vscode.window.withProgress({
+            location: vscode.ProgressLocation.Notification,
+            title: 'Creating external catalog...',
+            cancellable: false
+        }, async () => {
+            await this.winAppCli.createExternalCatalog(outputUri?.fsPath);
+        });
+    }
+
     /**
      * Dispose of resources
      */

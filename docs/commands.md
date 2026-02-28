@@ -349,6 +349,71 @@ Adds a temporary app identity for debugging packaged apps.
 
 ---
 
+## Microsoft Store Commands
+
+These commands enable publishing and managing apps in the Microsoft Store directly from VS Code. They use the `winapp store` subcommand which wraps the Microsoft Store Developer CLI.
+
+> **Prerequisite:** Configure your Store credentials first using **WinDev: Configure Microsoft Store Credentials**.
+
+### WinDev: Configure Microsoft Store Credentials
+
+**Command ID:** `windev-helper.storeConfigure`
+
+Configures authentication for Microsoft Store operations. Prompts for:
+
+- Azure AD Tenant ID
+- Partner Center Seller ID
+- Azure AD Application (Client) ID
+- Client Secret
+
+**Uses:** `winapp store reconfigure` CLI command
+
+---
+
+### WinDev: List Microsoft Store Apps
+
+**Command ID:** `windev-helper.storeListApps`
+
+Lists all applications registered in your Microsoft Store account. Results appear in the WinUI Packaging output channel.
+
+**Uses:** `winapp store apps list` CLI command
+
+---
+
+### WinDev: Publish to Microsoft Store
+
+**Command ID:** `windev-helper.storePublish`
+
+Publishes an application to the Microsoft Store. Supports:
+
+- **Full release** - 100% rollout to all users
+- **Gradual rollout** - Specify a percentage (1-100%) of users
+- **Draft only** - Create submission without committing
+
+**Uses:** `winapp store publish` CLI command
+
+---
+
+### WinDev: Check Store Submission Status
+
+**Command ID:** `windev-helper.storeSubmissionStatus`
+
+Checks the current status of a Store submission. Prompts for the Store Product ID.
+
+**Uses:** `winapp store submission status` CLI command
+
+---
+
+### WinDev: Create External Catalog
+
+**Command ID:** `windev-helper.createExternalCatalog`
+
+Creates an external catalog for streamlined asset management across applications.
+
+**Uses:** `winapp create-external-catalog` CLI command
+
+---
+
 ### WinUI: Generate App Manifest
 
 **Command ID:** `windev-helper.generateManifest`
