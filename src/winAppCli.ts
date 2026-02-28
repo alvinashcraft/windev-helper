@@ -177,8 +177,7 @@ export class WinAppCli {
             );
             
             if (action === 'Generate Certificate') {
-                await this.execute('cert', ['generate']);
-                vscode.window.showInformationMessage('Development certificate generated successfully.');
+                await this.generateCertificate();
             }
             
             return true;
