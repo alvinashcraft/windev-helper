@@ -31,6 +31,28 @@ export class WinAppCli {
         return customPath || 'winapp';
     }
 
+    /** Arg keys whose values should be redacted in logs */
+    private static readonly SENSITIVE_ARG_KEYS = new Set([
+        '--clientSecret', '--cert-password', '-p', '--password',
+        '--certificatePassword'
+    ]);
+
+    /**
+     * Build a display-safe version of the command by redacting values
+     * that follow known sensitive flags.
+     */
+    private redactArgs(args: string[]): string[] {
+        const redacted: string[] = [];
+        for (let i = 0; i < args.length; i++) {
+            redacted.push(args[i]);
+            if (WinAppCli.SENSITIVE_ARG_KEYS.has(args[i]) && i + 1 < args.length) {
+                redacted.push('********');
+                i++; // skip the actual value
+            }
+        }
+        return redacted;
+    }
+
     /**
      * Executes a winapp CLI command
      * @param command - The CLI command to execute
@@ -49,7 +71,8 @@ export class WinAppCli {
             }
 
             const fullArgs = [command, ...args];
-            const displayCommand = `${this.winAppPath} ${fullArgs.join(' ')}`;
+            const safeArgs = this.redactArgs(fullArgs);
+            const displayCommand = `${this.winAppPath} ${safeArgs.join(' ')}`;
             this.outputChannel.appendLine(`> ${displayCommand}`);
             this.outputChannel.show();
 
@@ -123,23 +146,18 @@ export class WinAppCli {
             return false;
         }
         
-        // Check for winapp.yaml (non-.NET projects)
+        // Check for winapp.yaml (non-.NET projects) - search immediate dir and one level up
         const winappYamlPath = path.join(workingDir, 'winapp.yaml');
         if (fs.existsSync(winappYamlPath)) {
             return true;
         }
         
-        // For .NET projects (v0.2.0+), check for .csproj with Windows App SDK packages
-        let csprojFiles: string[] = [];
-        try {
-            csprojFiles = fs.readdirSync(workingDir).filter(f => f.endsWith('.csproj'));
-        } catch {
-            // If we can't read the directory, treat as not initialized
-            return false;
-        }
-        for (const csproj of csprojFiles) {
+        // For .NET projects (v0.2.0+), check for .csproj with Windows App SDK packages.
+        // Search recursively so projects in subfolders (e.g. src/*.csproj) are detected.
+        const csprojFiles = this.findCsprojFiles(workingDir);
+        for (const csprojPath of csprojFiles) {
             try {
-                const content = fs.readFileSync(path.join(workingDir, csproj), 'utf-8');
+                const content = fs.readFileSync(csprojPath, 'utf-8');
                 if (content.includes('Microsoft.WindowsAppSDK') || content.includes('Microsoft.Windows.SDK.BuildTools')) {
                     return true;
                 }
@@ -149,6 +167,37 @@ export class WinAppCli {
         }
         
         return false;
+    }
+
+    /**
+     * Recursively find .csproj files under a directory, skipping common
+     * non-source folders (node_modules, bin, obj, .git, .vs) to keep the
+     * search fast.
+     */
+    private findCsprojFiles(dir: string, depth: number = 0, maxDepth: number = 5): string[] {
+        const results: string[] = [];
+        if (depth > maxDepth) {
+            return results;
+        }
+
+        const skipDirs = new Set(['node_modules', 'bin', 'obj', '.git', '.vs', '.winapp', 'packages']);
+
+        let entries: fs.Dirent[];
+        try {
+            entries = fs.readdirSync(dir, { withFileTypes: true });
+        } catch {
+            return results;
+        }
+
+        for (const entry of entries) {
+            if (entry.isFile() && entry.name.endsWith('.csproj')) {
+                results.push(path.join(dir, entry.name));
+            } else if (entry.isDirectory() && !skipDirs.has(entry.name)) {
+                results.push(...this.findCsprojFiles(path.join(dir, entry.name), depth + 1, maxDepth));
+            }
+        }
+
+        return results;
     }
 
     /**
@@ -308,16 +357,16 @@ export class WinAppCli {
     /**
      * Generate development certificates
      */
-    public async generateCertificate(options: CertificateOptions): Promise<void> {
+    public async generateCertificate(options?: CertificateOptions): Promise<void> {
         try {
             const args: string[] = ['generate'];
-            if (options.subjectName) {
+            if (options?.subjectName) {
                 args.push('-n', options.subjectName);
             }
-            if (options.outputPath) {
+            if (options?.outputPath) {
                 args.push('-o', options.outputPath);
             }
-            if (options.password) {
+            if (options?.password) {
                 args.push('-p', options.password);
             }
             await this.execute('cert', args);
@@ -406,6 +455,15 @@ export class WinAppCli {
             }
             if (options.clientSecret) {
                 args.push('--clientSecret', options.clientSecret);
+            }
+            if (options.certificateThumbprint) {
+                args.push('--certificateThumbprint', options.certificateThumbprint);
+            }
+            if (options.certificateFilePath) {
+                args.push('--certificateFilePath', options.certificateFilePath);
+            }
+            if (options.certificatePassword) {
+                args.push('--certificatePassword', options.certificatePassword);
             }
             await this.execute('store', args);
             vscode.window.showInformationMessage('Microsoft Store credentials configured successfully.');
