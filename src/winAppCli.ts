@@ -130,7 +130,13 @@ export class WinAppCli {
         }
         
         // For .NET projects (v0.2.0+), check for .csproj with Windows App SDK packages
-        const csprojFiles = fs.readdirSync(workingDir).filter(f => f.endsWith('.csproj'));
+        let csprojFiles: string[] = [];
+        try {
+            csprojFiles = fs.readdirSync(workingDir).filter(f => f.endsWith('.csproj'));
+        } catch {
+            // If we can't read the directory, treat as not initialized
+            return false;
+        }
         for (const csproj of csprojFiles) {
             try {
                 const content = fs.readFileSync(path.join(workingDir, csproj), 'utf-8');
