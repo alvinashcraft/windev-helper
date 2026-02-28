@@ -2,7 +2,7 @@
   "name": "windev-helper",
   "displayName": "WinDev Helper",
   "description": "Build beautiful, performant WinUI apps with VS Code. Debug, build, package, and deploy Windows apps powered by the Windows App SDK.",
-  "version": "2.5.0",
+  "version": "2.6.0",
   "publisher": "alvinashcraft",
   "preview": true,
   "icon": "images/icon.png",
@@ -172,6 +172,31 @@
       {
         "command": "windev-helper.checkWinAppCli",
         "title": "Check WinApp CLI Installation",
+        "category": "WinDev"
+      },
+      {
+        "command": "windev-helper.storeListApps",
+        "title": "List Microsoft Store Apps",
+        "category": "WinDev"
+      },
+      {
+        "command": "windev-helper.storePublish",
+        "title": "Publish to Microsoft Store",
+        "category": "WinDev"
+      },
+      {
+        "command": "windev-helper.storeSubmissionStatus",
+        "title": "Check Store Submission Status",
+        "category": "WinDev"
+      },
+      {
+        "command": "windev-helper.storeConfigure",
+        "title": "Configure Microsoft Store Credentials",
+        "category": "WinDev"
+      },
+      {
+        "command": "windev-helper.createExternalCatalog",
+        "title": "Create External Catalog",
         "category": "WinDev"
       },
       {

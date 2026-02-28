@@ -31,6 +31,28 @@ export class WinAppCli {
         return customPath || 'winapp';
     }
 
+    /** Arg keys whose values should be redacted in logs */
+    private static readonly SENSITIVE_ARG_KEYS = new Set([
+        '--clientSecret', '--cert-password', '-p', '--password',
+        '--certificatePassword'
+    ]);
+
+    /**
+     * Build a display-safe version of the command by redacting values
+     * that follow known sensitive flags.
+     */
+    private redactArgs(args: string[]): string[] {
+        const redacted: string[] = [];
+        for (let i = 0; i < args.length; i++) {
+            redacted.push(args[i]);
+            if (WinAppCli.SENSITIVE_ARG_KEYS.has(args[i]) && i + 1 < args.length) {
+                redacted.push('********');
+                i++; // skip the actual value
+            }
+        }
+        return redacted;
+    }
+
     /**
      * Executes a winapp CLI command
      * @param command - The CLI command to execute
@@ -49,7 +71,8 @@ export class WinAppCli {
             }
 
             const fullArgs = [command, ...args];
-            const displayCommand = `${this.winAppPath} ${fullArgs.join(' ')}`;
+            const safeArgs = this.redactArgs(fullArgs);
+            const displayCommand = `${this.winAppPath} ${safeArgs.join(' ')}`;
             this.outputChannel.appendLine(`> ${displayCommand}`);
             this.outputChannel.show();
 
@@ -113,19 +136,74 @@ export class WinAppCli {
     }
 
     /**
-     * Check if winapp.yaml exists in the workspace
+     * Check if project is initialized with winapp
+     * For winapp v0.2.0+: .NET projects configure packages in .csproj directly,
+     * non-.NET projects use winapp.yaml
      */
     public isInitialized(workspacePath?: string): boolean {
         const workingDir = workspacePath || vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
         if (!workingDir) {
             return false;
         }
+        
+        // Check for winapp.yaml (non-.NET projects) - search immediate dir and one level up
         const winappYamlPath = path.join(workingDir, 'winapp.yaml');
-        return fs.existsSync(winappYamlPath);
+        if (fs.existsSync(winappYamlPath)) {
+            return true;
+        }
+        
+        // For .NET projects (v0.2.0+), check for .csproj with Windows App SDK packages.
+        // Search recursively so projects in subfolders (e.g. src/*.csproj) are detected.
+        const csprojFiles = this.findCsprojFiles(workingDir);
+        for (const csprojPath of csprojFiles) {
+            try {
+                const content = fs.readFileSync(csprojPath, 'utf-8');
+                if (content.includes('Microsoft.WindowsAppSDK') || content.includes('Microsoft.Windows.SDK.BuildTools')) {
+                    return true;
+                }
+            } catch {
+                // Ignore read errors
+            }
+        }
+        
+        return false;
+    }
+
+    /**
+     * Recursively find .csproj files under a directory, skipping common
+     * non-source folders (node_modules, bin, obj, .git, .vs) to keep the
+     * search fast.
+     */
+    private findCsprojFiles(dir: string, depth: number = 0, maxDepth: number = 5): string[] {
+        const results: string[] = [];
+        if (depth > maxDepth) {
+            return results;
+        }
+
+        const skipDirs = new Set(['node_modules', 'bin', 'obj', '.git', '.vs', '.winapp', 'packages']);
+
+        let entries: fs.Dirent[];
+        try {
+            entries = fs.readdirSync(dir, { withFileTypes: true });
+        } catch {
+            return results;
+        }
+
+        for (const entry of entries) {
+            if (entry.isFile() && entry.name.endsWith('.csproj')) {
+                results.push(path.join(dir, entry.name));
+            } else if (entry.isDirectory() && !skipDirs.has(entry.name)) {
+                results.push(...this.findCsprojFiles(path.join(dir, entry.name), depth + 1, maxDepth));
+            }
+        }
+
+        return results;
     }
 
     /**
      * Initialize project with Windows SDK and App SDK
+     * Note: As of winapp v0.2.0, init no longer generates a certificate automatically.
+     * Use generateCertificate() separately if you need a dev signing certificate.
      * @param projectPath Optional path to the project directory
      * @param skipPrompts If true, uses --no-prompt flag to skip interactive prompts (default: true for non-interactive execution)
      */
@@ -139,7 +217,18 @@ export class WinAppCli {
                 args.push(projectPath);
             }
             await this.execute('init', args);
-            vscode.window.showInformationMessage('Project initialized with Windows SDK successfully.');
+            
+            // Offer to generate a certificate since init no longer does this automatically (v0.2.0+)
+            const action = await vscode.window.showInformationMessage(
+                'Project initialized with Windows SDK successfully. Would you like to generate a development certificate for signing?',
+                'Generate Certificate',
+                'Skip'
+            );
+            
+            if (action === 'Generate Certificate') {
+                await this.generateCertificate();
+            }
+            
             return true;
         } catch (error) {
             vscode.window.showErrorMessage(`Failed to initialize project: ${error}`);
@@ -150,14 +239,15 @@ export class WinAppCli {
     /**
      * Restore packages and dependencies
      * Returns true if restore was successful or skipped, false if failed
+     * Note: For .NET projects (v0.2.0+), packages are configured in .csproj directly
      */
     public async restore(projectPath?: string): Promise<boolean> {
         const workingDir = projectPath || vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
 
-        // Check if winapp.yaml exists before attempting restore
+        // Check if winapp workspace is initialized
         if (!this.isInitialized(workingDir)) {
             const action = await vscode.window.showWarningMessage(
-                'WinApp workspace not initialized. winapp.yaml not found. Would you like to initialize it now?',
+                'WinApp workspace not initialized. No winapp.yaml or configured .NET project found. Would you like to initialize it now?',
                 'Initialize',
                 'Skip'
             );
@@ -267,16 +357,16 @@ export class WinAppCli {
     /**
      * Generate development certificates
      */
-    public async generateCertificate(options: CertificateOptions): Promise<void> {
+    public async generateCertificate(options?: CertificateOptions): Promise<void> {
         try {
             const args: string[] = ['generate'];
-            if (options.subjectName) {
+            if (options?.subjectName) {
                 args.push('-n', options.subjectName);
             }
-            if (options.outputPath) {
+            if (options?.outputPath) {
                 args.push('-o', options.outputPath);
             }
-            if (options.password) {
+            if (options?.password) {
                 args.push('-p', options.password);
             }
             await this.execute('cert', args);
@@ -342,6 +432,148 @@ export class WinAppCli {
         }
     }
 
+    // ============================================
+    // Microsoft Store Commands (v0.2.0+)
+    // Uses 'winapp store' subcommand which wraps msstore CLI
+    // ============================================
+
+    /**
+     * Configure Microsoft Store credentials
+     * Sets up authentication for Store operations
+     */
+    public async storeConfigure(options: StoreConfigureOptions): Promise<void> {
+        try {
+            const args: string[] = ['reconfigure'];
+            if (options.tenantId) {
+                args.push('--tenantId', options.tenantId);
+            }
+            if (options.sellerId) {
+                args.push('--sellerId', options.sellerId);
+            }
+            if (options.clientId) {
+                args.push('--clientId', options.clientId);
+            }
+            if (options.clientSecret) {
+                args.push('--clientSecret', options.clientSecret);
+            }
+            if (options.certificateThumbprint) {
+                args.push('--certificateThumbprint', options.certificateThumbprint);
+            }
+            if (options.certificateFilePath) {
+                args.push('--certificateFilePath', options.certificateFilePath);
+            }
+            if (options.certificatePassword) {
+                args.push('--certificatePassword', options.certificatePassword);
+            }
+            await this.execute('store', args);
+            vscode.window.showInformationMessage('Microsoft Store credentials configured successfully.');
+        } catch (error) {
+            vscode.window.showErrorMessage(`Failed to configure Store credentials: ${error}`);
+        }
+    }
+
+    /**
+     * List all applications in the Microsoft Store account
+     */
+    public async storeListApps(): Promise<string> {
+        try {
+            return await this.execute('store', ['apps', 'list']);
+        } catch (error) {
+            vscode.window.showErrorMessage(`Failed to list Store apps: ${error}`);
+            return '';
+        }
+    }
+
+    /**
+     * Get submission status for a Store app
+     * @param productId The Store product ID
+     */
+    public async storeGetSubmissionStatus(productId: string): Promise<string> {
+        try {
+            return await this.execute('store', ['submission', 'status', productId]);
+        } catch (error) {
+            vscode.window.showErrorMessage(`Failed to get submission status: ${error}`);
+            return '';
+        }
+    }
+
+    /**
+     * Publish application to Microsoft Store
+     * @param options Publishing options
+     */
+    public async storePublish(options: StorePublishOptions): Promise<void> {
+        try {
+            const args: string[] = ['publish'];
+            if (options.projectPath) {
+                args.push(options.projectPath);
+            }
+            if (options.inputFile) {
+                args.push('--inputFile', options.inputFile);
+            }
+            if (options.appId) {
+                args.push('--appId', options.appId);
+            }
+            if (options.flightId) {
+                args.push('--flightId', options.flightId);
+            }
+            if (options.noCommit) {
+                args.push('--noCommit');
+            }
+            if (options.rolloutPercentage !== undefined) {
+                args.push('--packageRolloutPercentage', options.rolloutPercentage.toString());
+            }
+            await this.execute('store', args);
+            vscode.window.showInformationMessage('Application published to Microsoft Store successfully.');
+        } catch (error) {
+            vscode.window.showErrorMessage(`Failed to publish to Store: ${error}`);
+        }
+    }
+
+    /**
+     * Package application for Microsoft Store submission
+     * @param projectPath Path to the project
+     * @param options Packaging options
+     */
+    public async storePackage(projectPath: string, options?: StorePackageOptions): Promise<void> {
+        try {
+            const args: string[] = ['package', projectPath];
+            if (options?.output) {
+                args.push('--output', options.output);
+            }
+            if (options?.arch) {
+                args.push('--arch', options.arch.join(','));
+            }
+            if (options?.version) {
+                args.push('--version', options.version);
+            }
+            await this.execute('store', args);
+            vscode.window.showInformationMessage('Application packaged for Store submission.');
+        } catch (error) {
+            vscode.window.showErrorMessage(`Failed to package for Store: ${error}`);
+        }
+    }
+
+    // ============================================
+    // External Catalog Command (v0.2.0+)
+    // ============================================
+
+    /**
+     * Create an external catalog for asset management
+     * @param outputPath Optional output directory for the catalog
+     */
+    public async createExternalCatalog(outputPath?: string): Promise<void> {
+        try {
+            const args: string[] = [];
+            if (outputPath) {
+                args.push(outputPath);
+            }
+            await this.execute('create-external-catalog', args);
+            vscode.window.showInformationMessage('External catalog created successfully.');
+        } catch (error) {
+            vscode.window.showErrorMessage(`Failed to create external catalog: ${error}`);
+        }
+    }
+
     /**
      * Dispose of resources
      */
@@ -372,4 +604,31 @@ export interface SignOptions {
     certPath?: string;
     password?: string;
     timestampUrl?: string;
+}
+
+// Microsoft Store options (v0.2.0+)
+
+export interface StoreConfigureOptions {
+    tenantId?: string;
+    sellerId?: string;
+    clientId?: string;
+    clientSecret?: string;
+    certificateThumbprint?: string;
+    certificateFilePath?: string;
+    certificatePassword?: string;
+}
+
+export interface StorePublishOptions {
+    projectPath?: string;
+    inputFile?: string;
+    appId?: string;
+    flightId?: string;
+    noCommit?: boolean;
+    rolloutPercentage?: number;
+}
+
+export interface StorePackageOptions {
+    output?: string;
+    arch?: ('x86' | 'x64' | 'arm64')[];
+    version?: string;
 }

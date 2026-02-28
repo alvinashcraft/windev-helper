@@ -2,7 +2,7 @@
 
 Welcome to the WinDev Helper extension documentation. This folder contains detailed guides and reference materials for using the extension.
 
-> ⚠️ **Preview Release**: Documentation for version 2.5 includes experimental features like native XAML preview and XAML properties pane.
+> ⚠️ **Preview Release**: Documentation for version 2.6 includes experimental features like native XAML preview and XAML properties pane.
 
 ## Contents
 
@@ -27,5 +27,7 @@ Welcome to the WinDev Helper extension documentation. This folder contains detai
 
 - [Windows App SDK Documentation](https://learn.microsoft.com/windows/apps/windows-app-sdk/)
 - [WinUI 3 Documentation](https://learn.microsoft.com/windows/apps/winui/winui3/)
+- [Windows App Development CLI](https://learn.microsoft.com/windows/apps/package-and-deploy/desktop-app-sdk-cli/overview)
+- [Microsoft Store Developer CLI](https://learn.microsoft.com/windows/apps/publish/store-cli)
 - [VS Code Extension API](https://code.visualstudio.com/api)
 - [C# Dev Kit](https://marketplace.visualstudio.com/items?itemName=ms-dotnettools.csdevkit)

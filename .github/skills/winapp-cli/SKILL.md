@@ -1,7 +1,8 @@
 ---
 name: winapp-cli
-description: 'Windows App Development CLI (winapp) for building, packaging, and deploying Windows applications. Use when asked to initialize Windows app projects, create MSIX packages, generate AppxManifest.xml, manage development certificates, add package identity for debugging, sign packages, or access Windows SDK build tools. Supports .NET, C++, Electron, Rust, Tauri, and cross-platform frameworks targeting Windows.'
+description: 'Windows App Development CLI (winapp) for building, packaging, and deploying Windows applications. Use when asked to initialize Windows app projects, create MSIX packages, generate AppxManifest.xml, manage development certificates, add package identity for debugging, sign packages, publish to Microsoft Store, or access Windows SDK build tools. Supports .NET, C++, Electron, Rust, Tauri, and cross-platform frameworks targeting Windows.'
 license: MIT
+version: '0.2.0'
 ---
 
 # Windows App Development CLI (winapp)
@@ -22,6 +23,8 @@ Use this skill when you need to:
 - Build Windows apps using cross-platform frameworks (Electron, Rust, Tauri, Qt)
 - Set up CI/CD pipelines for Windows app deployment
 - Access Windows APIs that require package identity (notifications, Windows AI, shell integration)
+- Publish applications to the Microsoft Store (via `winapp store` subcommand)
+- Create external catalogs for asset management
 
 ## Prerequisites
 
@@ -48,10 +51,13 @@ winapp init [<base-directory>] [options]
 | ------ | ----------- |
 | `--setup-sdks <mode>` | SDK installation: `stable` (default), `preview`, `experimental`, `none` |
 | `--config-dir <dir>` | Directory to read/store configuration |
-| `--no-cert` | Skip development certificate generation |
 | `--no-prompt` | Use defaults without prompting |
 | `--config-only` | Only create/validate configuration file |
 | `--no-gitignore` | Don't update .gitignore file |
+
+> **v0.2.0 Breaking Change:** `init` no longer generates a certificate automatically. Run `winapp cert generate` explicitly when you need a dev signing certificate. The `--no-cert` flag has been removed.
+>
+> **v0.2.0 .NET Projects:** When `winapp init` detects a `.csproj`, it configures NuGet packages in the project file directly instead of creating a `winapp.yaml`. This is the expected behavior for .NET projects.
 
 **Example:**
 
@@ -68,7 +74,7 @@ winapp init --no-prompt
 
 ### restore - Restore Workspace Packages
 
-Restore packages from `winapp.yaml` and ensure workspace is ready.
+Restore packages from `winapp.yaml` (or `.csproj` for .NET projects) and ensure workspace is ready.
 
 ```bash
 winapp restore [<base-directory>] [options]
@@ -81,6 +87,8 @@ winapp restore [<base-directory>] [options]
 | `--config-dir <dir>` | Directory to read configuration from |
 | `-v, --verbose` | Enable verbose output |
 | `-q, --quiet` | Suppress progress messages |
+
+> **v0.2.0 Note:** winapp now uses the NuGet global cache for packages instead of `%userprofile%/.winapp/packages`. This avoids duplicate downloads if you already have packages cached.
 
 **Example:**
 
@@ -304,6 +312,71 @@ winapp get-winapp-path
 winapp get-winapp-path --global
 ```
 
+### store - Microsoft Store Integration (v0.2.0+)
+
+Run Microsoft Store Developer CLI commands directly from winapp. This wraps the `msstore` CLI, enabling integrated Store development workflows.
+
+```bash
+winapp store <subcommand> [options]
+```
+
+**Available Subcommands:**
+
+| Subcommand | Description |
+| ---------- | ----------- |
+| `reconfigure` | Configure Store credentials (tenantId, sellerId, clientId, clientSecret) |
+| `apps list` | List all applications in your Store account |
+| `apps get <productId>` | Get details of a specific application |
+| `submission status <productId>` | Get submission status |
+| `submission publish <productId>` | Publish a submission |
+| `publish <path>` | Package and publish application to Store |
+| `package <path>` | Package application for Store submission |
+| `init <path>` | Initialize project for Store publishing |
+
+**Examples:**
+
+```bash
+# Configure Store credentials
+winapp store reconfigure --tenantId xxx --sellerId xxx --clientId xxx --clientSecret xxx
+
+# List Store apps
+winapp store apps list
+
+# Publish to Store
+winapp store publish ./my-app
+
+# Package for Store
+winapp store package ./my-app --output ./packages --arch x64,arm64
+```
+
+**Publishing Options:**
+
+| Option | Description |
+| ------ | ----------- |
+| `-i, --inputFile` | Path to `.msix` or `.msixupload` file |
+| `-id, --appId` | Application ID (if not initialized) |
+| `-nc, --noCommit` | Keep submission in draft state |
+| `-f, --flightId` | Publish to a specific flight |
+| `-prp, --packageRolloutPercentage` | Gradual rollout percentage (1-100) |
+
+### create-external-catalog - Asset Management (v0.2.0+)
+
+Create an external catalog for streamlined asset management across applications.
+
+```bash
+winapp create-external-catalog [<output-directory>] [options]
+```
+
+**Example:**
+
+```bash
+# Create external catalog in current directory
+winapp create-external-catalog
+
+# Create in specific directory
+winapp create-external-catalog ./catalogs
+```
+
 ## Common Workflows
 
 ### Workflow 1: Initialize New Windows App Project
@@ -312,14 +385,17 @@ winapp get-winapp-path --global
 # 1. Navigate to project root
 cd my-project
 
-# 2. Initialize workspace (creates manifest, assets, certificate, SDK setup)
+# 2. Initialize workspace (creates manifest, assets, SDK setup)
 winapp init
 
-# 3. Your project now has:
-#    - AppxManifest.xml
-#    - Development certificate
+# 3. Generate a development certificate for signing (v0.2.0+: no longer automatic)
+winapp cert generate
+
+# 4. Your project now has:
+#    - AppxManifest.xml (or configured .csproj for .NET projects)
 #    - Windows SDK configuration
-#    - winapp.yaml configuration
+#    - winapp.yaml configuration (non-.NET projects only)
+#    - Development certificate (after running cert generate)
 ```
 
 ### Workflow 2: Debug with Package Identity
@@ -363,6 +439,7 @@ winapp pack ./build-output --cert ./mycert.pfx --cert-password secret
 - name: Initialize and Package
   run: |
     winapp init --no-prompt
+    winapp cert generate  # v0.2.0+: explicit cert generation
     winapp pack ./build-output --output MyApp.msix
 ```
 
@@ -383,6 +460,28 @@ npx winapp node create-addon
 
 # 5. Package for distribution
 npx winapp pack ./out --output MyElectronApp.msix
+```
+
+### Workflow 6: Publish to Microsoft Store (v0.2.0+)
+
+```bash
+# 1. Configure Store credentials (one-time setup)
+winapp store reconfigure --tenantId $TENANT_ID --sellerId $SELLER_ID --clientId $CLIENT_ID --clientSecret $CLIENT_SECRET
+
+# 2. Initialize project for Store (sets up app identity)
+winapp store init ./my-app
+
+# 3. Package for Store submission
+winapp store package ./my-app --arch x64,arm64
+
+# 4. Publish to Store
+winapp store publish ./my-app
+
+# Or publish with gradual rollout
+winapp store publish ./my-app --packageRolloutPercentage 10
+
+# Or publish as draft (no commit)
+winapp store publish ./my-app --noCommit
 ```
 
 ## Windows APIs Enabled by Package Identity
@@ -411,6 +510,9 @@ Package identity unlocks access to powerful Windows APIs:
 | SDK not found | Run `winapp restore` or `winapp update` to ensure SDKs are installed |
 | Signing fails | Verify certificate password and ensure cert is not expired |
 | Assets not generated | Run `winapp manifest update-assets <image-path>` with a valid image |
+| No certificate after init (v0.2.0+) | Run `winapp cert generate` explicitly - init no longer auto-generates certs |
+| Missing winapp.yaml for .NET (v0.2.0+) | This is expected - .NET projects configure packages in .csproj directly |
+| Store publish fails | Run `winapp store reconfigure` to verify credentials are set |
 
 ## Framework-Specific Guides
 
@@ -429,4 +531,5 @@ Package identity unlocks access to powerful Windows APIs:
 - [Sample Applications](https://github.com/microsoft/WinAppCli/tree/main/samples)
 - [Windows App SDK](https://learn.microsoft.com/windows/apps/windows-app-sdk/)
 - [MSIX Packaging Overview](https://learn.microsoft.com/windows/msix/overview)
+- [Microsoft Store Developer CLI](https://learn.microsoft.com/windows/apps/publish/msstore-dev-cli/commands)
 - [Package Identity Overview](https://learn.microsoft.com/windows/apps/desktop/modernize/package-identity-overview)

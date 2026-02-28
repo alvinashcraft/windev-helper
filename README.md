@@ -65,6 +65,9 @@ On non-Windows platforms, the extension provides an HTML-based preview renderer 
 - Generate development certificates
 - Install certificates for testing
 - Create debug identities for your apps
+- **Microsoft Store publishing** - Publish directly to the Microsoft Store from VS Code
+- Check submission status and manage Store apps
+- Create external catalogs for asset management
 
 ### 📝 Project & Item Templates
 

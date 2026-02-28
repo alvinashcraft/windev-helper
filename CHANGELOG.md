@@ -5,6 +5,45 @@ All notable changes to the WinDev Helper extension will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.6.0] - 2026-02-28 (Preview)
+
+> ⚠️ This is a preview release. To use stable releases only, disable pre-release versions in VS Code.
+
+### Added
+
+- **Microsoft Store Integration** (via winapp CLI v0.2.0)
+  - New **WinDev: Configure Microsoft Store Credentials** command to set up Partner Center authentication
+  - New **WinDev: List Microsoft Store Apps** command to view apps in your Store account
+  - New **WinDev: Publish to Microsoft Store** command with support for:
+    - Full release (100% rollout)
+    - Gradual rollout with configurable percentage
+    - Draft submissions (publish without committing)
+  - New **WinDev: Check Store Submission Status** command to monitor submission progress
+  - Wraps the Microsoft Store Developer CLI (`msstore`) through the `winapp store` subcommand
+
+- **External Catalog Support** (winapp CLI v0.2.0)
+  - New **WinDev: Create External Catalog** command for streamlined asset management
+
+- **Manifest Enhancements** (winapp CLI v0.2.0)
+  - Support for qualified names in AppxManifest files
+  - Support for manifest placeholders for dynamic content
+
+### Changed
+
+- **Updated for winapp CLI v0.2.0 Breaking Changes**
+  - `winapp init` no longer generates certificates automatically
+  - Initialize Project command now prompts to generate a certificate after initialization
+  - .NET projects configure NuGet packages directly in `.csproj` instead of `winapp.yaml`
+  - Project initialization detection updated to check both `winapp.yaml` AND `.csproj` files
+  - winapp CLI now uses NuGet global cache for packages (improved efficiency)
+
+### Improved
+
+- **Better .NET Project Support**
+  - Extension correctly detects initialized .NET projects that don't have `winapp.yaml`
+  - Restore Packages command works seamlessly with both .NET and non-.NET workflows
+  - Updated error messages to reflect new .NET project behavior
+
 ## [2.5.0] - 2026-02-07 (Preview)
 
 > ⚠️ This is a preview release. To use stable releases only, disable pre-release versions in VS Code.

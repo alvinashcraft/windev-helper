@@ -52,6 +52,13 @@ export const COMMANDS = {
     INSTALL_TEMPLATES: 'windev-helper.installTemplates',
     CHECK_WINAPP_CLI: 'windev-helper.checkWinAppCli',
     OPEN_XAML_PREVIEW: 'windev-helper.openXamlPreview',
+    // Microsoft Store commands (via winapp store subcommand)
+    STORE_LIST_APPS: 'windev-helper.storeListApps',
+    STORE_PUBLISH: 'windev-helper.storePublish',
+    STORE_SUBMISSION_STATUS: 'windev-helper.storeSubmissionStatus',
+    STORE_CONFIGURE: 'windev-helper.storeConfigure',
+    // External catalog command
+    CREATE_EXTERNAL_CATALOG: 'windev-helper.createExternalCatalog',
 } as const;
 
 /**
