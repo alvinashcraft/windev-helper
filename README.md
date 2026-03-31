@@ -62,7 +62,8 @@ On non-Windows platforms, the extension provides an HTML-based preview renderer 
 ### 📦 Packaging & Deployment
 
 - Create and sign MSIX packages
-- Generate development certificates
+- Generate development certificates with optional `.cer` public key export
+- View certificate details (subject, issuer, validity)
 - Install certificates for testing
 - Create debug identities for your apps
 - **Microsoft Store publishing** - Publish directly to the Microsoft Store from VS Code
@@ -175,6 +176,7 @@ dotnet new winuilib -n MyLib
 | `WinUI: Create MSIX Package` | Create an MSIX package |
 | `WinUI: Sign Package` | Sign an MSIX package or executable |
 | `WinUI: Generate Development Certificate` | Create a dev certificate |
+| `WinUI: View Certificate Info` | Inspect PFX certificate details |
 | `WinUI: Install Certificate` | Install a certificate |
 | `WinUI: Create Debug Identity` | Add temporary app identity |
 | `WinUI: Generate App Manifest` | Generate AppxManifest.xml |
@@ -229,7 +231,9 @@ This extension integrates with the **Windows App Development CLI (winapp)**, whi
 
 ### Certificates & Signing
 
-- `winapp cert` - Generate and install development certificates
+- `winapp cert generate` - Generate development certificates
+- `winapp cert info` - View certificate details (subject, issuer, validity)
+- `winapp cert install` - Install development certificates
 - `winapp sign` - Sign MSIX packages and executables
 
 ### Development Tools

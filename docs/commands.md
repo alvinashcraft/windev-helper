@@ -337,6 +337,22 @@ Installs a certificate to the local certificate store.
 
 ---
 
+### WinUI: View Certificate Info
+
+**Command ID:** `windev-helper.certificateInfo`
+
+Displays detailed information about a PFX certificate, including subject, issuer, and validity dates.
+
+**Usage:**
+
+1. Select the PFX certificate file to inspect
+2. Enter the certificate password
+3. Certificate details are shown in the WinUI Packaging output channel
+
+**Uses:** `winapp cert info` CLI command (v0.2.1+)
+
+---
+
 ## Identity & Manifest Commands
 
 ### WinUI: Create Debug Identity

@@ -59,6 +59,8 @@ export const COMMANDS = {
     STORE_CONFIGURE: 'windev-helper.storeConfigure',
     // External catalog command
     CREATE_EXTERNAL_CATALOG: 'windev-helper.createExternalCatalog',
+    // Certificate info command (v0.2.1+)
+    CERTIFICATE_INFO: 'windev-helper.certificateInfo',
 } as const;
 
 /**

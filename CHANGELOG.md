@@ -5,6 +5,32 @@ All notable changes to the WinDev Helper extension will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.7.0] - 2026-03-31 (Preview)
+
+> ⚠️ This is a preview release. To use stable releases only, disable pre-release versions in VS Code.
+
+### Added
+
+- **Certificate Info Command** (winapp CLI v0.2.1)
+  - New **WinDev: View Certificate Info** command to inspect PFX certificate details (subject, issuer, validity)
+  - Displays certificate information in the WinUI Packaging output channel
+
+- **Export Public Key as .cer** (winapp CLI v0.2.1)
+  - Generate Development Certificate now offers to export the public key as a `.cer` file via the `--export-cer` flag
+
+### Improved
+
+- **SVG Support for Asset Generation** (winapp CLI v0.2.1)
+  - `manifest update-assets` now accepts SVG files, converting them to bitmap images for all required sizes
+
+- **Automatic WinRT Component Discovery** (winapp CLI v0.2.1)
+  - Packaging automatically discovers and registers third-party WinRT components from `.winmd` files
+
+- **Packaging Bug Fixes** (winapp CLI v0.2.1)
+  - Prevents overwriting existing PRI resources during packaging
+  - Checks executable architecture before packaging
+  - Warns when `.pfx` files are found in the input folder
+
 ## [2.6.0] - 2026-02-28 (Preview)
 
 > ⚠️ This is a preview release. To use stable releases only, disable pre-release versions in VS Code.
