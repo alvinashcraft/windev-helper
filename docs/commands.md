@@ -251,7 +251,7 @@ Switches between grouped view (properties organized by category like Layout, App
 
 **Command ID:** `windevHelper.propertyPane.toggleDefaults`
 
-Toggles display of default (unset) properties. When enabled, shows all available properties for the selected control type from the built-in metadata database (~65 WinUI control types). Default values appear dimmed to distinguish them from explicitly set values.
+Toggles display of default (unset) properties. When enabled, shows all available properties for the selected control type from the built-in metadata database (~85 WinUI control types). Default values appear dimmed to distinguish them from explicitly set values.
 
 ---
 

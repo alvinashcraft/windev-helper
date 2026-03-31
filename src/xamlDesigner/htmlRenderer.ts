@@ -145,6 +145,26 @@ export class XamlHtmlRenderer {
             'CalendarView': this.renderCalendarView.bind(this),
             'DatePicker': this.renderDatePicker.bind(this),
             'TimePicker': this.renderTimePicker.bind(this),
+
+            // Phase 1: High-value controls
+            'TreeView': this.renderTreeView.bind(this),
+            'TreeViewItem': this.renderTreeViewItem.bind(this),
+            'ContentDialog': this.renderContentDialog.bind(this),
+            'AutoSuggestBox': this.renderAutoSuggestBox.bind(this),
+            'NumberBox': this.renderNumberBox.bind(this),
+            'GridView': this.renderGridView.bind(this),
+            'RichTextBlock': this.renderRichTextBlock.bind(this),
+            'BreadcrumbBar': this.renderBreadcrumbBar.bind(this),
+
+            // Phase 2: Commonly used controls
+            'TeachingTip': this.renderTeachingTip.bind(this),
+            'DropDownButton': this.renderDropDownButton.bind(this),
+            'SplitButton': this.renderSplitButton.bind(this),
+            'ToggleSplitButton': this.renderToggleSplitButton.bind(this),
+            'RatingControl': this.renderRatingControl.bind(this),
+            'ColorPicker': this.renderColorPicker.bind(this),
+            'PersonPicture': this.renderPersonPicture.bind(this),
+            'RichEditBox': this.renderRichEditBox.bind(this),
         };
 
         return renderers[tagName] || this.renderUnknownControl.bind(this);
@@ -866,6 +886,301 @@ export class XamlHtmlRenderer {
         return `<div id="${id}" class="xaml-timepicker" data-xaml-line="${element.sourceLocation.startLine}" style="${style.join('; ')}">
             ${header ? `<label>${this.escapeHtml(header)}</label>` : ''}
             <input type="time" />
+        </div>`;
+    }
+
+    // ==================== Phase 1: High-Value Controls ====================
+
+    private renderTreeView(element: XamlElement, id: string, options: RenderOptions): string {
+        const style = this.buildCommonStyles(element);
+        style.push('border: 1px solid var(--vscode-input-border)');
+        style.push('overflow: auto');
+        style.push('padding: 4px');
+
+        const children = this.renderChildren(element, options);
+
+        return `<div id="${id}" class="xaml-treeview" data-xaml-line="${element.sourceLocation.startLine}" style="${style.join('; ')}">${children}</div>`;
+    }
+
+    private renderTreeViewItem(element: XamlElement, id: string, options: RenderOptions): string {
+        const style = this.buildCommonStyles(element);
+        style.push('padding-left: 16px');
+
+        const content = element.attributes.get('Content') || element.textContent || '';
+        const isExpanded = element.attributes.get('IsExpanded') === 'True';
+        const children = this.renderChildren(element, options);
+        const hasChildren = element.children.length > 0;
+
+        const expandIcon = hasChildren ? (isExpanded ? '▾' : '▸') : '&nbsp;&nbsp;';
+
+        return `<div id="${id}" class="xaml-treeviewitem" data-xaml-line="${element.sourceLocation.startLine}" style="${style.join('; ')}">
+            <div class="treeview-item-header" style="display: flex; align-items: center; gap: 4px; padding: 2px 0; cursor: pointer">
+                <span class="tree-expand">${expandIcon}</span>
+                <span>${this.formatTextOrBinding(content, 'Content')}</span>
+            </div>
+            ${hasChildren ? `<div class="treeview-item-children" style="${isExpanded ? '' : 'display: none'}">${children}</div>` : ''}
+        </div>`;
+    }
+
+    private renderContentDialog(element: XamlElement, id: string, options: RenderOptions): string {
+        const style = this.buildCommonStyles(element);
+        style.push('border: 1px solid var(--vscode-editorWidget-border)');
+        style.push('border-radius: 8px');
+        style.push('padding: 24px');
+        style.push('background: var(--vscode-editorWidget-background)');
+        style.push('box-shadow: 0 8px 32px rgba(0,0,0,0.3)');
+        style.push('max-width: 480px');
+
+        const title = element.attributes.get('Title') || '';
+        const primaryButtonText = element.attributes.get('PrimaryButtonText') || '';
+        const secondaryButtonText = element.attributes.get('SecondaryButtonText') || '';
+        const closeButtonText = element.attributes.get('CloseButtonText') || '';
+        const children = this.renderChildren(element, options);
+
+        const buttons = [primaryButtonText, secondaryButtonText, closeButtonText].filter(Boolean);
+        const buttonHtml = buttons.length > 0
+            ? `<div class="dialog-buttons" style="display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px">${buttons.map((b, i) => `<button class="xaml-button" style="${i === 0 ? 'background: var(--vscode-button-background); color: var(--vscode-button-foreground)' : ''}">${this.escapeHtml(b)}</button>`).join('')}</div>`
+            : '';
+
+        return `<div id="${id}" class="xaml-contentdialog" data-xaml-line="${element.sourceLocation.startLine}" style="${style.join('; ')}">
+            ${title ? `<div class="dialog-title" style="font-size: 20px; font-weight: 600; margin-bottom: 12px">${this.formatTextOrBinding(title, 'Title')}</div>` : ''}
+            <div class="dialog-content">${children}</div>
+            ${buttonHtml}
+        </div>`;
+    }
+
+    private renderAutoSuggestBox(element: XamlElement, id: string, _options: RenderOptions): string {
+        const style = this.buildCommonStyles(element);
+
+        const text = element.attributes.get('Text') || '';
+        const placeholder = element.attributes.get('PlaceholderText') || 'Search';
+        const queryIcon = element.attributes.get('QueryIcon');
+
+        const displayValue = this.isBindingExpression(text)
+            ? '' : this.escapeHtml(text);
+        const displayPlaceholder = this.isBindingExpression(text)
+            ? `[${this.extractBindingPath(text)}]`
+            : this.escapeHtml(placeholder);
+
+        return `<div id="${id}" class="xaml-autosuggestbox" data-xaml-line="${element.sourceLocation.startLine}" style="${style.join('; ')}; display: flex; align-items: center; border: 1px solid var(--vscode-input-border); border-radius: 4px; padding: 0 8px">
+            <input type="text" value="${displayValue}" placeholder="${displayPlaceholder}" style="border: none; flex: 1; background: transparent; outline: none; padding: 6px 0; color: inherit" />
+            ${queryIcon !== undefined ? '<span style="opacity: 0.6">🔍</span>' : ''}
+        </div>`;
+    }
+
+    private renderNumberBox(element: XamlElement, id: string, _options: RenderOptions): string {
+        const style = this.buildCommonStyles(element);
+
+        const value = element.attributes.get('Value') || '0';
+        const header = element.attributes.get('Header') || '';
+        const placeholder = element.attributes.get('PlaceholderText') || '';
+        const min = element.attributes.get('Minimum');
+        const max = element.attributes.get('Maximum');
+        const spinButtonPlacement = element.attributes.get('SpinButtonPlacementMode');
+
+        const showSpinners = spinButtonPlacement === 'Inline' || spinButtonPlacement === 'Compact';
+        const displayValue = this.isBindingExpression(value) ? '' : this.escapeHtml(value);
+
+        return `<div id="${id}" class="xaml-numberbox" data-xaml-line="${element.sourceLocation.startLine}" style="${style.join('; ')}">
+            ${header ? `<label style="display: block; margin-bottom: 4px">${this.formatTextOrBinding(header, 'Header')}</label>` : ''}
+            <div style="display: flex; align-items: center; border: 1px solid var(--vscode-input-border); border-radius: 4px">
+                <input type="number" value="${displayValue}" placeholder="${this.escapeHtml(placeholder)}" ${min !== undefined ? `min="${min}"` : ''} ${max !== undefined ? `max="${max}"` : ''} style="border: none; flex: 1; background: transparent; outline: none; padding: 6px 8px; color: inherit" />
+                ${showSpinners ? '<span style="display: flex; flex-direction: column; padding: 0 4px; opacity: 0.6; font-size: 10px"><span>▲</span><span>▼</span></span>' : ''}
+            </div>
+        </div>`;
+    }
+
+    private renderGridView(element: XamlElement, id: string, options: RenderOptions): string {
+        const style = this.buildCommonStyles(element);
+        style.push('display: grid');
+        style.push('grid-template-columns: repeat(auto-fill, minmax(120px, 1fr))');
+        style.push('gap: 4px');
+
+        const children = this.renderChildren(element, options);
+
+        return `<div id="${id}" class="xaml-gridview" data-xaml-line="${element.sourceLocation.startLine}" style="${style.join('; ')}">${children}</div>`;
+    }
+
+    private renderRichTextBlock(element: XamlElement, id: string, options: RenderOptions): string {
+        const style = this.buildCommonStyles(element);
+
+        const fontSize = element.attributes.get('FontSize');
+        const fontWeight = element.attributes.get('FontWeight');
+        const foreground = element.attributes.get('Foreground');
+        const textWrapping = element.attributes.get('TextWrapping');
+
+        if (fontSize) {
+            style.push(`font-size: ${fontSize}px`);
+        }
+        if (fontWeight) {
+            style.push(`font-weight: ${this.convertFontWeight(fontWeight)}`);
+        }
+        if (foreground) {
+            style.push(`color: ${this.convertBrush(foreground)}`);
+        }
+        if (textWrapping === 'Wrap' || textWrapping === 'WrapWholeWords') {
+            style.push('white-space: normal');
+        }
+
+        const children = this.renderChildren(element, options);
+        const textContent = element.textContent || '';
+
+        return `<div id="${id}" class="xaml-richtextblock" data-xaml-line="${element.sourceLocation.startLine}" style="${style.join('; ')}">${children || this.escapeHtml(textContent)}</div>`;
+    }
+
+    private renderBreadcrumbBar(element: XamlElement, id: string, options: RenderOptions): string {
+        const style = this.buildCommonStyles(element);
+        style.push('display: flex');
+        style.push('align-items: center');
+        style.push('gap: 4px');
+
+        const children = element.children
+            .flatMap(child => this.unwrapPropertyElement(child, element.tagName))
+            .map((child, i, arr) => {
+                const html = this.renderElement(child, options);
+                return i < arr.length - 1
+                    ? `${html}<span class="breadcrumb-separator" style="opacity: 0.5">/</span>`
+                    : html;
+            }).join('');
+
+        return `<div id="${id}" class="xaml-breadcrumbbar" data-xaml-line="${element.sourceLocation.startLine}" style="${style.join('; ')}">${children}</div>`;
+    }
+
+    // ==================== Phase 2: Commonly Used Controls ====================
+
+    private renderTeachingTip(element: XamlElement, id: string, options: RenderOptions): string {
+        const style = this.buildCommonStyles(element);
+        style.push('border: 1px solid var(--vscode-editorWidget-border)');
+        style.push('border-radius: 8px');
+        style.push('padding: 16px');
+        style.push('background: var(--vscode-editorWidget-background)');
+        style.push('box-shadow: 0 4px 16px rgba(0,0,0,0.2)');
+        style.push('max-width: 360px');
+        style.push('position: relative');
+
+        const title = element.attributes.get('Title') || '';
+        const subtitle = element.attributes.get('Subtitle') || '';
+        const actionButtonContent = element.attributes.get('ActionButtonContent') || '';
+        const closeButtonContent = element.attributes.get('CloseButtonContent') || '';
+        const children = this.renderChildren(element, options);
+
+        return `<div id="${id}" class="xaml-teachingtip" data-xaml-line="${element.sourceLocation.startLine}" style="${style.join('; ')}">
+            <button style="position: absolute; top: 8px; right: 8px; background: none; border: none; cursor: pointer; opacity: 0.6; color: inherit">✕</button>
+            ${title ? `<div style="font-size: 16px; font-weight: 600; margin-bottom: 4px">${this.formatTextOrBinding(title, 'Title')}</div>` : ''}
+            ${subtitle ? `<div style="opacity: 0.8; margin-bottom: 8px">${this.formatTextOrBinding(subtitle, 'Subtitle')}</div>` : ''}
+            <div class="teachingtip-content">${children}</div>
+            ${(actionButtonContent || closeButtonContent) ? `<div style="display: flex; gap: 8px; margin-top: 12px">${actionButtonContent ? `<button class="xaml-button" style="background: var(--vscode-button-background); color: var(--vscode-button-foreground)">${this.escapeHtml(actionButtonContent)}</button>` : ''}${closeButtonContent ? `<button class="xaml-button">${this.escapeHtml(closeButtonContent)}</button>` : ''}</div>` : ''}
+        </div>`;
+    }
+
+    private renderDropDownButton(element: XamlElement, id: string, options: RenderOptions): string {
+        const style = this.buildCommonStyles(element);
+
+        const content = element.attributes.get('Content') || element.textContent || '';
+        const children = element.children.length > 0 ? this.renderChildren(element, options) : this.formatTextOrBinding(content, 'Content');
+
+        return `<button id="${id}" class="xaml-dropdownbutton" data-xaml-line="${element.sourceLocation.startLine}" style="${style.join('; ')}; display: inline-flex; align-items: center; gap: 4px">
+            <span>${children}</span>
+            <span style="font-size: 10px; opacity: 0.7">▾</span>
+        </button>`;
+    }
+
+    private renderSplitButton(element: XamlElement, id: string, options: RenderOptions): string {
+        const style = this.buildCommonStyles(element);
+
+        const content = element.attributes.get('Content') || element.textContent || '';
+        const children = element.children.length > 0 ? this.renderChildren(element, options) : this.formatTextOrBinding(content, 'Content');
+
+        return `<div id="${id}" class="xaml-splitbutton" data-xaml-line="${element.sourceLocation.startLine}" style="${style.join('; ')}; display: inline-flex; align-items: stretch">
+            <button style="border-right: 1px solid var(--vscode-input-border); padding: 4px 12px">${children}</button>
+            <button style="padding: 4px 6px; font-size: 10px">▾</button>
+        </div>`;
+    }
+
+    private renderToggleSplitButton(element: XamlElement, id: string, options: RenderOptions): string {
+        const style = this.buildCommonStyles(element);
+        const isChecked = element.attributes.get('IsChecked') === 'True';
+
+        const content = element.attributes.get('Content') || element.textContent || '';
+        const children = element.children.length > 0 ? this.renderChildren(element, options) : this.formatTextOrBinding(content, 'Content');
+
+        return `<div id="${id}" class="xaml-togglesplitbutton ${isChecked ? 'checked' : ''}" data-xaml-line="${element.sourceLocation.startLine}" style="${style.join('; ')}; display: inline-flex; align-items: stretch">
+            <button style="border-right: 1px solid var(--vscode-input-border); padding: 4px 12px; ${isChecked ? 'background: var(--vscode-button-background); color: var(--vscode-button-foreground)' : ''}">${children}</button>
+            <button style="padding: 4px 6px; font-size: 10px">▾</button>
+        </div>`;
+    }
+
+    private renderRatingControl(element: XamlElement, id: string, _options: RenderOptions): string {
+        const style = this.buildCommonStyles(element);
+        style.push('display: inline-flex');
+        style.push('gap: 2px');
+
+        const maxRating = parseInt(element.attributes.get('MaxRating') || '5');
+        const value = parseFloat(element.attributes.get('Value') || '0');
+        const caption = element.attributes.get('Caption') || '';
+
+        const stars = Array.from({ length: maxRating }, (_, i) =>
+            `<span style="font-size: 18px; color: ${i < value ? '#ffd700' : 'var(--vscode-editorWidget-border)'}; cursor: pointer">${i < value ? '★' : '☆'}</span>`
+        ).join('');
+
+        return `<div id="${id}" class="xaml-ratingcontrol" data-xaml-line="${element.sourceLocation.startLine}" style="${style.join('; ')}">
+            ${stars}
+            ${caption ? `<span style="margin-left: 8px; opacity: 0.7">${this.formatTextOrBinding(caption, 'Caption')}</span>` : ''}
+        </div>`;
+    }
+
+    private renderColorPicker(element: XamlElement, id: string, _options: RenderOptions): string {
+        const style = this.buildCommonStyles(element);
+        style.push('border: 1px solid var(--vscode-input-border)');
+        style.push('border-radius: 4px');
+        style.push('padding: 12px');
+
+        const isColorSpectrumVisible = element.attributes.get('IsColorSpectrumVisible') !== 'False';
+        const isAlphaEnabled = element.attributes.get('IsAlphaEnabled') !== 'False';
+
+        return `<div id="${id}" class="xaml-colorpicker" data-xaml-line="${element.sourceLocation.startLine}" style="${style.join('; ')}">
+            ${isColorSpectrumVisible ? '<div style="width: 200px; height: 200px; background: conic-gradient(red, yellow, lime, aqua, blue, magenta, red); border-radius: 50%; margin: 0 auto 12px"></div>' : ''}
+            <div style="display: flex; gap: 8px; align-items: center">
+                <input type="color" style="width: 40px; height: 30px; border: none; cursor: pointer" />
+                <span style="opacity: 0.7">#FF0000${isAlphaEnabled ? 'FF' : ''}</span>
+            </div>
+        </div>`;
+    }
+
+    private renderPersonPicture(element: XamlElement, id: string, _options: RenderOptions): string {
+        const style = this.buildCommonStyles(element);
+
+        const displayName = element.attributes.get('DisplayName') || '';
+        const initials = element.attributes.get('Initials') || '';
+        const width = element.attributes.get('Width') || '48';
+        const height = element.attributes.get('Height') || '48';
+
+        const displayInitials = initials || (displayName ? displayName.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase() : '??');
+
+        style.push(`width: ${this.parseDimension(width)}`);
+        style.push(`height: ${this.parseDimension(height)}`);
+        style.push('border-radius: 50%');
+        style.push('background: var(--vscode-button-background)');
+        style.push('color: var(--vscode-button-foreground)');
+        style.push('display: flex');
+        style.push('align-items: center');
+        style.push('justify-content: center');
+        style.push('font-weight: 600');
+        style.push('font-size: 16px');
+
+        return `<div id="${id}" class="xaml-personpicture" data-xaml-line="${element.sourceLocation.startLine}" style="${style.join('; ')}" title="${this.escapeHtml(displayName)}">${this.escapeHtml(displayInitials)}</div>`;
+    }
+
+    private renderRichEditBox(element: XamlElement, id: string, _options: RenderOptions): string {
+        const style = this.buildCommonStyles(element);
+
+        const header = element.attributes.get('Header') || '';
+        const placeholder = element.attributes.get('PlaceholderText') || '';
+        const isReadOnly = element.attributes.get('IsReadOnly') === 'True';
+
+        return `<div id="${id}" class="xaml-richeditbox" data-xaml-line="${element.sourceLocation.startLine}" style="${style.join('; ')}">
+            ${header ? `<label style="display: block; margin-bottom: 4px">${this.formatTextOrBinding(header, 'Header')}</label>` : ''}
+            <textarea class="xaml-textbox" placeholder="${this.escapeHtml(placeholder)}" ${isReadOnly ? 'readonly' : ''} style="min-height: 80px; width: 100%; resize: vertical; border: 1px solid var(--vscode-input-border); border-radius: 4px; padding: 8px; background: var(--vscode-input-background); color: var(--vscode-input-foreground)"></textarea>
         </div>`;
     }
 

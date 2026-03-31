@@ -18,6 +18,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Export Public Key as .cer** (winapp CLI v0.2.1)
   - Generate Development Certificate now offers to export the public key as a `.cer` file via the `--export-cer` flag
 
+- **Expanded XAML Preview Control Support** (Phase 1 & 2)
+  - Added HTML fallback renderers for 15 additional WinUI controls, bringing total to 69
+  - **Phase 1 (high-value):** TreeView, TreeViewItem, ContentDialog, AutoSuggestBox, NumberBox, GridView, RichTextBlock, BreadcrumbBar
+  - **Phase 2 (commonly used):** TeachingTip, DropDownButton, SplitButton, ToggleSplitButton, RatingControl, ColorPicker, PersonPicture, RichEditBox
+  - Native renderer on Windows already supports all WinUI controls natively
+
 ### Improved
 
 - **SVG Support for Asset Generation** (winapp CLI v0.2.1)
