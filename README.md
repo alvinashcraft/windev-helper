@@ -8,7 +8,7 @@ The **WinDev Helper** extension gives you the tools you need to build beautiful,
 
 This extension leverages **winapp**, the Windows App Development CLI, to provide a seamless development experience for WinUI apps in VS Code.
 
-> ⚠️ **Preview Release**: Version 2.x is currently in preview. It includes experimental features like native XAML preview. To get stable releases only, disable "Show Pre-Release Versions" in the VS Code extension settings.
+> ⚠️ **Preview Release**: The XAML preview pane and properties panel features in version 2.x are currently in preview. Please report any bugs or suggestions to our GitHub issues.
 
 ![WinDev Helper Extension](images/icon.png)
 
