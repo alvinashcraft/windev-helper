@@ -369,10 +369,32 @@ export class WinAppCli {
             if (options?.password) {
                 args.push('-p', options.password);
             }
+            if (options?.exportCer) {
+                args.push('--export-cer');
+            }
             await this.execute('cert', args);
             vscode.window.showInformationMessage('Certificate generated successfully.');
         } catch (error) {
             vscode.window.showErrorMessage(`Failed to generate certificate: ${error}`);
+        }
+    }
+
+    /**
+     * Display information about a PFX certificate (v0.2.1+)
+     * @param certPath Path to the .pfx certificate file
+     * @param password Certificate password
+     */
+    public async certInfo(certPath: string, password?: string): Promise<string> {
+        try {
+            const args: string[] = ['info', certPath];
+            if (password) {
+                args.push('--password', password);
+            }
+            args.push('--json');
+            return await this.execute('cert', args);
+        } catch (error) {
+            vscode.window.showErrorMessage(`Failed to get certificate info: ${error}`);
+            return '';
         }
     }
 
@@ -597,6 +619,7 @@ export interface CertificateOptions {
     subjectName?: string;
     outputPath?: string;
     password?: string;
+    exportCer?: boolean;
 }
 
 export interface SignOptions {

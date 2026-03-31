@@ -2,7 +2,7 @@
 
 This document provides a comprehensive guide to using the Windows App Development CLI (winapp) with the WinDev Helper extension.
 
-> **Note:** This guide covers winapp CLI v0.2.0 and later. See the [Breaking Changes](#breaking-changes-v020) section for migration notes.
+> **Note:** This guide covers winapp CLI v0.2.1 and later. See the [Breaking Changes](#breaking-changes-v020) section for migration notes.
 
 ## Overview
 
@@ -151,11 +151,17 @@ winapp package -i ./publish -o ./dist/MyApp.msix -m ./Package.appxmanifest
 
 #### winapp cert
 
-Generate and install development certificates.
+Generate, install, and inspect development certificates.
 
 ```bash
 # Generate a new certificate
 winapp cert generate -n <subject-name> -o <output-path> -p <password>
+
+# Generate with public key export (v0.2.1+)
+winapp cert generate -n <subject-name> -o <output-path> -p <password> --export-cer
+
+# View certificate info (v0.2.1+)
+winapp cert info <cert-path> --password <password>
 
 # Install a certificate
 winapp cert install <certificate-path>
@@ -168,10 +174,20 @@ winapp cert install <certificate-path>
 | `-n, --name` | Certificate subject name (e.g., CN=MyCompany) |
 | `-o, --output` | Output path for the .pfx file |
 | `-p, --password` | Password for the certificate |
+| `--export-cer` | Export public key as a .cer file (v0.2.1+) |
+| `--json` | Output in JSON format (v0.2.1+) |
+
+**Options for info:**
+
+| Option | Description |
+|--------|-------------|
+| `--password` | Certificate password |
+| `--json` | Output in JSON format |
 
 **VS Code commands:**
 
 - WinUI: Generate Development Certificate
+- WinUI: View Certificate Info
 - WinUI: Install Certificate
 
 **Example:**

@@ -2,7 +2,7 @@
   "name": "windev-helper",
   "displayName": "WinDev Helper",
   "description": "Build beautiful, performant WinUI apps with VS Code. Debug, build, package, and deploy Windows apps powered by the Windows App SDK.",
-  "version": "2.6.0",
+  "version": "2.7.0",
   "publisher": "alvinashcraft",
   "preview": true,
   "icon": "images/icon.png",
@@ -122,6 +122,11 @@
       {
         "command": "windev-helper.installCertificate",
         "title": "Install Certificate",
+        "category": "WinDev"
+      },
+      {
+        "command": "windev-helper.certificateInfo",
+        "title": "View Certificate Info",
         "category": "WinDev"
       },
       {

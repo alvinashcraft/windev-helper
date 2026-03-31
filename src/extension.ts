@@ -200,6 +200,12 @@ function registerCommands(context: vscode.ExtensionContext): void {
         })
     );
 
+    context.subscriptions.push(
+        vscode.commands.registerCommand(COMMANDS.CERTIFICATE_INFO, async () => {
+            await services.packageManager.viewCertificateInfo();
+        })
+    );
+
     // Identity and manifest commands
     context.subscriptions.push(
         vscode.commands.registerCommand(COMMANDS.CREATE_DEBUG_IDENTITY, async () => {

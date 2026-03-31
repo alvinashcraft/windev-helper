@@ -117,11 +117,13 @@ interface RenderResult {
 
 ### 4. HtmlFallbackRenderer
 
-- Existing implementation from POC branch
+- Supports 69 WinUI controls with HTML/CSS approximations
 - Used when:
   - Running on macOS/Linux without Azure configured
   - Native renderer fails to start
   - User explicitly prefers HTML preview
+- Control coverage includes layout panels, input controls, navigation, pickers, shapes, icons, dialogs, and more
+- Unknown controls render as labeled placeholder boxes
 
 ## Native Renderer Protocol
 

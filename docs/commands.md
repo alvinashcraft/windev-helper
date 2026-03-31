@@ -251,7 +251,7 @@ Switches between grouped view (properties organized by category like Layout, App
 
 **Command ID:** `windevHelper.propertyPane.toggleDefaults`
 
-Toggles display of default (unset) properties. When enabled, shows all available properties for the selected control type from the built-in metadata database (~65 WinUI control types). Default values appear dimmed to distinguish them from explicitly set values.
+Toggles display of default (unset) properties. When enabled, shows all available properties for the selected control type from the built-in metadata database (~85 WinUI control types). Default values appear dimmed to distinguish them from explicitly set values.
 
 ---
 
@@ -334,6 +334,22 @@ Installs a certificate to the local certificate store.
 2. The certificate is installed (may require elevation)
 
 **Uses:** `winapp cert install` CLI command
+
+---
+
+### WinUI: View Certificate Info
+
+**Command ID:** `windev-helper.certificateInfo`
+
+Displays detailed information about a PFX certificate, including subject, issuer, and validity dates.
+
+**Usage:**
+
+1. Select the PFX certificate file to inspect
+2. Enter the certificate password
+3. Certificate details are shown in the WinUI Packaging output channel
+
+**Uses:** `winapp cert info` CLI command (v0.2.1+)
 
 ---
 

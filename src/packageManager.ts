@@ -235,15 +235,62 @@ export class PackageManager {
             cancellable: false
         }, async () => {
             try {
+                const exportCer = await vscode.window.showQuickPick(
+                    ['No', 'Yes'],
+                    { placeHolder: 'Export public key as .cer file?' }
+                );
+
                 const options: CertificateOptions = {
                     subjectName: subjectName,
                     outputPath: outputUri.fsPath,
-                    password: password
+                    password: password,
+                    ...(exportCer === 'Yes' && { exportCer: true })
                 };
 
                 await this.winAppCli.generateCertificate(options);
             } catch (error) {
                 vscode.window.showErrorMessage(`Failed to generate certificate: ${error}`);
+            }
+        });
+    }
+
+    /**
+     * View certificate information (v0.2.1+)
+     */
+    public async viewCertificateInfo(): Promise<void> {
+        const certUri = await vscode.window.showOpenDialog({
+            canSelectFiles: true,
+            canSelectMany: false,
+            filters: {
+                'PFX Certificate': ['pfx', 'p12']
+            },
+            title: 'Select Certificate to Inspect'
+        });
+
+        if (!certUri || certUri.length === 0) {
+            return;
+        }
+
+        const password = await vscode.window.showInputBox({
+            prompt: 'Enter certificate password',
+            password: true,
+            title: 'Certificate Password'
+        });
+
+        if (password === undefined) {
+            return;
+        }
+
+        await vscode.window.withProgress({
+            location: vscode.ProgressLocation.Notification,
+            title: 'Reading certificate info...',
+            cancellable: false
+        }, async () => {
+            const result = await this.winAppCli.certInfo(certUri[0].fsPath, password || undefined);
+            if (result) {
+                this.outputChannel.appendLine('--- Certificate Information ---');
+                this.outputChannel.appendLine(result);
+                this.outputChannel.show();
             }
         });
     }

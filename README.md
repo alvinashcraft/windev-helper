@@ -29,6 +29,7 @@ On non-Windows platforms, the extension provides an HTML-based preview renderer 
 
 - **Cross-platform** - Works on macOS, Linux, and Windows
 - **Approximate rendering** - Uses HTML/CSS to approximate WinUI control appearance
+- **69 supported controls** - Layout, input, navigation, picker, shape, and icon controls
 - **Same interaction model** - Click-to-navigate and cursor sync work the same way
 - **Automatic fallback** - No configuration needed; the extension detects your platform
 
@@ -37,7 +38,7 @@ On non-Windows platforms, the extension provides an HTML-based preview renderer 
 ### � XAML Properties Pane (Preview)
 
 - **Full property inspection** - View all properties for the selected XAML element
-- **Rich metadata** - Built-in metadata for ~65 WinUI 3 control types with full inheritance
+- **Rich metadata** - Built-in metadata for ~85 WinUI 3 control types with full inheritance
 - **Attached properties** - ~35 attached property definitions (Grid.Row, Canvas.Left, ScrollViewer, etc.)
 - **Category grouping** - Properties organized by Layout, Appearance, Common, Content, Interaction, Text, Brushes, and Accessibility
 - **Set vs. default** - Toggle between showing only explicitly set properties and all available properties
@@ -62,7 +63,8 @@ On non-Windows platforms, the extension provides an HTML-based preview renderer 
 ### 📦 Packaging & Deployment
 
 - Create and sign MSIX packages
-- Generate development certificates
+- Generate development certificates with optional `.cer` public key export
+- View certificate details (subject, issuer, validity)
 - Install certificates for testing
 - Create debug identities for your apps
 - **Microsoft Store publishing** - Publish directly to the Microsoft Store from VS Code
@@ -175,6 +177,7 @@ dotnet new winuilib -n MyLib
 | `WinUI: Create MSIX Package` | Create an MSIX package |
 | `WinUI: Sign Package` | Sign an MSIX package or executable |
 | `WinUI: Generate Development Certificate` | Create a dev certificate |
+| `WinUI: View Certificate Info` | Inspect PFX certificate details |
 | `WinUI: Install Certificate` | Install a certificate |
 | `WinUI: Create Debug Identity` | Add temporary app identity |
 | `WinUI: Generate App Manifest` | Generate AppxManifest.xml |
@@ -229,7 +232,9 @@ This extension integrates with the **Windows App Development CLI (winapp)**, whi
 
 ### Certificates & Signing
 
-- `winapp cert` - Generate and install development certificates
+- `winapp cert generate` - Generate development certificates
+- `winapp cert info` - View certificate details (subject, issuer, validity)
+- `winapp cert install` - Install development certificates
 - `winapp sign` - Sign MSIX packages and executables
 
 ### Development Tools
@@ -267,7 +272,7 @@ MyApp/
 
 - **MSIX Packaged Apps**: Debugger attachment is not yet supported for packaged apps. They launch without a debugger; set `<WindowsPackageType>None</WindowsPackageType>` in your .csproj for full F5 debug support
 - **XAML Preview (Preview)**: Third-party controls (e.g., CommunityToolkit) are replaced with placeholder grids in the preview
-- **Properties Pane**: Metadata covers ~65 common WinUI controls; uncommon or third-party controls may have limited property defaults
+- **Properties Pane**: Metadata covers ~85 WinUI control types; third-party controls may have limited property defaults
 - XAML IntelliSense and Hot Reload are planned for future releases
 - Some advanced debugging scenarios may require Visual Studio
 - XAML Preview requires Windows (the native renderer uses WinUI 3)
@@ -294,8 +299,9 @@ Contributions are welcome! Please see our [Contributing Guide](docs/CONTRIBUTING
 - ✅ Bidirectional cursor/selection sync
 - ✅ Project resource support (App.xaml, merged dictionaries)
 - ✅ Data binding placeholder visualization
-- ✅ XAML Properties pane with full control metadata (~65 types)
+- ✅ XAML Properties pane with full control metadata (~85 types)
 - ✅ XAML preprocessor for third-party control tolerance
+- ✅ Expanded HTML fallback renderer coverage (69 controls)
 - ✅ MSIX packaged app deployment and launch
 - ✅ Improved debugging for packaged and unpackaged apps
 - 🔄 Debugger attachment for MSIX-packaged apps

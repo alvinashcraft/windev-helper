@@ -639,7 +639,7 @@ Sanitizes XAML before sending it to the native renderer, handling third-party co
 
 Provides a tree view showing properties for the selected XAML element:
 
-- **`controlMetadata.ts`**: Database of ~65 WinUI 3 control types with full inheritance chains, ~35 attached properties, category classification, and default values
+- **`controlMetadata.ts`**: Database of ~85 WinUI 3 control types with full inheritance chains, ~35 attached properties, category classification, and default values
 - **`propertyPaneProvider.ts`**: TreeDataProvider that merges explicit XAML attributes with metadata defaults; supports grouped and flat views
 - **`propertyPaneController.ts`**: Manages lifecycle, listens for cursor position changes, and registers view commands
 

@@ -2,7 +2,7 @@
 name: winapp-cli
 description: 'Windows App Development CLI (winapp) for building, packaging, and deploying Windows applications. Use when asked to initialize Windows app projects, create MSIX packages, generate AppxManifest.xml, manage development certificates, add package identity for debugging, sign packages, publish to Microsoft Store, or access Windows SDK build tools. Supports .NET, C++, Electron, Rust, Tauri, and cross-platform frameworks targeting Windows.'
 license: MIT
-version: '0.2.0'
+version: '0.2.1'
 ---
 
 # Windows App Development CLI (winapp)
@@ -163,11 +163,16 @@ winapp manifest update-assets <image-path>
 
 Updates image assets in AppxManifest.xml from a source image, generating all required sizes and aspect ratios.
 
+> **v0.2.1:** SVG files are now supported as input. The CLI converts SVG to bitmap images for all required asset sizes.
+
 **Example:**
 
 ```bash
 # Update all app assets from logo
 winapp manifest update-assets ./images/my-logo.png
+
+# Use SVG as source (v0.2.1+)
+winapp manifest update-assets ./images/my-logo.svg
 ```
 
 ### create-debug-identity - Add Package Identity for Debugging
@@ -200,7 +205,7 @@ winapp create-debug-identity ./bin/MyApp.exe --manifest ./AppxManifest.xml
 
 ### cert - Certificate Management
 
-Generate or install development certificates.
+Generate, inspect, or install development certificates.
 
 #### Generate Certificate
 
@@ -208,11 +213,49 @@ Generate or install development certificates.
 winapp cert generate
 ```
 
+**Options:**
+
+| Option | Description |
+| ------ | ----------- |
+| `-n, --name` | Certificate subject name |
+| `-o, --output` | Output path for the .pfx file |
+| `-p, --password` | Password for the certificate |
+| `--export-cer` | Export public key as a .cer file (v0.2.1+) |
+| `--json` | Output in JSON format (v0.2.1+) |
+
 **Example:**
 
 ```bash
 # Generate new development certificate
 winapp cert generate
+
+# Generate with public key export
+winapp cert generate -n "CN=MyCompany" -o ./devcert.pfx -p password --export-cer
+```
+
+#### View Certificate Info (v0.2.1+)
+
+Display detailed information about a PFX certificate including subject, issuer, and validity.
+
+```bash
+winapp cert info <cert-path> [options]
+```
+
+**Options:**
+
+| Option | Description |
+| ------ | ----------- |
+| `--password <pwd>` | Certificate password |
+| `--json` | Output in JSON format |
+
+**Example:**
+
+```bash
+# View certificate details
+winapp cert info ./devcert.pfx --password password
+
+# Get JSON output for scripting
+winapp cert info ./devcert.pfx --password password --json
 ```
 
 #### Install Certificate
@@ -508,8 +551,8 @@ Package identity unlocks access to powerful Windows APIs:
 | Certificate not trusted | Run `winapp cert install <cert-path>` to install to local machine store |
 | Package identity not working | Run `winapp create-debug-identity` after any manifest changes |
 | SDK not found | Run `winapp restore` or `winapp update` to ensure SDKs are installed |
-| Signing fails | Verify certificate password and ensure cert is not expired |
-| Assets not generated | Run `winapp manifest update-assets <image-path>` with a valid image |
+| Signing fails | Verify certificate password and ensure cert is not expired. Use `winapp cert info` to check validity (v0.2.1+) |
+| Assets not generated | Run `winapp manifest update-assets <image-path>` with a valid image (PNG or SVG) |
 | No certificate after init (v0.2.0+) | Run `winapp cert generate` explicitly - init no longer auto-generates certs |
 | Missing winapp.yaml for .NET (v0.2.0+) | This is expected - .NET projects configure packages in .csproj directly |
 | Store publish fails | Run `winapp store reconfigure` to verify credentials are set |
