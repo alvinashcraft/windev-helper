@@ -939,7 +939,7 @@ export class XamlHtmlRenderer {
 
         const buttons = [primaryButtonText, secondaryButtonText, closeButtonText].filter(Boolean);
         const buttonHtml = buttons.length > 0
-            ? `<div class="dialog-buttons" style="display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px">${buttons.map((b, i) => `<button class="xaml-button" style="${i === 0 ? 'background: var(--vscode-button-background); color: var(--vscode-button-foreground)' : ''}">${this.escapeHtml(b)}</button>`).join('')}</div>`
+            ? `<div class="dialog-buttons" style="display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px">${buttons.map((b, i) => `<button class="xaml-button" style="${i === 0 ? 'background: var(--vscode-button-background); color: var(--vscode-button-foreground)' : ''}">${this.formatTextOrBinding(b, 'Content')}</button>`).join('')}</div>`
             : '';
 
         return `<div id="${id}" class="xaml-contentdialog" data-xaml-line="${element.sourceLocation.startLine}" style="${style.join('; ')}">
@@ -981,10 +981,15 @@ export class XamlHtmlRenderer {
         const showSpinners = spinButtonPlacement === 'Inline' || spinButtonPlacement === 'Compact';
         const displayValue = this.isBindingExpression(value) ? '' : this.escapeHtml(value);
 
+        const minNum = min !== undefined ? parseFloat(min) : NaN;
+        const maxNum = max !== undefined ? parseFloat(max) : NaN;
+        const minAttr = Number.isFinite(minNum) ? ` min="${minNum}"` : '';
+        const maxAttr = Number.isFinite(maxNum) ? ` max="${maxNum}"` : '';
+
         return `<div id="${id}" class="xaml-numberbox" data-xaml-line="${element.sourceLocation.startLine}" style="${style.join('; ')}">
             ${header ? `<label style="display: block; margin-bottom: 4px">${this.formatTextOrBinding(header, 'Header')}</label>` : ''}
             <div style="display: flex; align-items: center; border: 1px solid var(--vscode-input-border); border-radius: 4px">
-                <input type="number" value="${displayValue}" placeholder="${this.escapeHtml(placeholder)}" ${min !== undefined ? `min="${min}"` : ''} ${max !== undefined ? `max="${max}"` : ''} style="border: none; flex: 1; background: transparent; outline: none; padding: 6px 8px; color: inherit" />
+                <input type="number" value="${displayValue}" placeholder="${this.escapeHtml(placeholder)}"${minAttr}${maxAttr} style="border: none; flex: 1; background: transparent; outline: none; padding: 6px 8px; color: inherit" />
                 ${showSpinners ? '<span style="display: flex; flex-direction: column; padding: 0 4px; opacity: 0.6; font-size: 10px"><span>▲</span><span>▼</span></span>' : ''}
             </div>
         </div>`;
@@ -1069,7 +1074,7 @@ export class XamlHtmlRenderer {
             ${title ? `<div style="font-size: 16px; font-weight: 600; margin-bottom: 4px">${this.formatTextOrBinding(title, 'Title')}</div>` : ''}
             ${subtitle ? `<div style="opacity: 0.8; margin-bottom: 8px">${this.formatTextOrBinding(subtitle, 'Subtitle')}</div>` : ''}
             <div class="teachingtip-content">${children}</div>
-            ${(actionButtonContent || closeButtonContent) ? `<div style="display: flex; gap: 8px; margin-top: 12px">${actionButtonContent ? `<button class="xaml-button" style="background: var(--vscode-button-background); color: var(--vscode-button-foreground)">${this.escapeHtml(actionButtonContent)}</button>` : ''}${closeButtonContent ? `<button class="xaml-button">${this.escapeHtml(closeButtonContent)}</button>` : ''}</div>` : ''}
+            ${(actionButtonContent || closeButtonContent) ? `<div style="display: flex; gap: 8px; margin-top: 12px">${actionButtonContent ? `<button class="xaml-button" style="background: var(--vscode-button-background); color: var(--vscode-button-foreground)">${this.formatTextOrBinding(actionButtonContent, 'Content')}</button>` : ''}${closeButtonContent ? `<button class="xaml-button">${this.formatTextOrBinding(closeButtonContent, 'Content')}</button>` : ''}</div>` : ''}
         </div>`;
     }
 
