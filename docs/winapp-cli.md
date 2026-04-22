@@ -2,7 +2,7 @@
 
 This document provides a comprehensive guide to using the Windows App Development CLI (winapp) with the WinDev Helper extension.
 
-> **Note:** This guide covers winapp CLI v0.2.1 and later. See the [Breaking Changes](#breaking-changes-v020) section for migration notes.
+> **Note:** This guide covers winapp CLI v0.3.0 and later. See the [Breaking Changes](#breaking-changes-v020) section for migration notes.
 
 ## Overview
 
@@ -16,6 +16,11 @@ The Windows App Development CLI (winapp) is a command-line tool that simplifies 
 - Debug identity creation
 - **Microsoft Store publishing** (v0.2.0+)
 - **External catalog management** (v0.2.0+)
+- **Run packaged apps** from build output (v0.3.0+)
+- **UI Automation** — inspect, interact with, and screenshot running apps (v0.3.0+)
+- **App execution aliases** — launch packaged apps by name (v0.3.0+)
+- **Shell completion** for all commands (v0.3.0+)
+- **`dotnet run` support** for packaged .NET apps (v0.3.0+)
 
 ## Installation
 

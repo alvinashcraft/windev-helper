@@ -2,7 +2,7 @@
 
 Welcome to the WinDev Helper extension documentation. This folder contains detailed guides and reference materials for using the extension.
 
-> ⚠️ **Preview Release**: Documentation for version 2.7 includes experimental features like native XAML preview and XAML properties pane.
+> ⚠️ **Preview Release**: Documentation for version 2.8 includes experimental features like native XAML preview and XAML properties pane.
 
 ## Contents
 

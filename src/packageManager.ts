@@ -569,6 +569,203 @@ export class PackageManager {
         });
     }
 
+    // ============================================
+    // Run & Manage Operations (v0.3.0+)
+    // ============================================
+
+    /**
+     * Run application as a packaged app (v0.3.0+)
+     */
+    public async runPackagedApp(projectUri?: vscode.Uri): Promise<void> {
+        const projectPath = projectUri ? path.dirname(projectUri.fsPath) :
+            vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+
+        if (!projectPath) {
+            vscode.window.showErrorMessage('No project selected.');
+            return;
+        }
+
+        // Ask for build output folder
+        const folderUris = await vscode.window.showOpenDialog({
+            defaultUri: vscode.Uri.file(projectPath),
+            canSelectFolders: true,
+            canSelectFiles: false,
+            canSelectMany: false,
+            openLabel: 'Select build output folder',
+            title: 'Select the folder containing your built app'
+        });
+
+        if (!folderUris || folderUris.length === 0) {
+            return;
+        }
+
+        const inputFolder = folderUris[0].fsPath;
+
+        // Ask for run options
+        const runMode = await vscode.window.showQuickPick(
+            [
+                { label: 'Run (wait for exit)', description: 'Launch and wait for the app to close' },
+                { label: 'Run detached', description: 'Launch and return control immediately' },
+                { label: 'Run with debug output', description: 'Capture OutputDebugString and crash dumps' },
+            ],
+            { placeHolder: 'Select run mode' }
+        );
+        if (!runMode) { return; }
+
+        const unregisterOnExit = await vscode.window.showQuickPick(
+            ['Yes', 'No'],
+            { placeHolder: 'Unregister package when app exits?' }
+        );
+        if (!unregisterOnExit) { return; }
+
+        await vscode.window.withProgress({
+            location: vscode.ProgressLocation.Notification,
+            title: 'Launching packaged app...',
+            cancellable: false
+        }, async () => {
+            try {
+                await this.winAppCli.run({
+                    inputFolder,
+                    detach: runMode.label.includes('detached'),
+                    debugOutput: runMode.label.includes('debug'),
+                    unregisterOnExit: unregisterOnExit === 'Yes',
+                });
+            } catch (error) {
+                vscode.window.showErrorMessage(`Failed to run packaged app: ${error}`);
+            }
+        });
+    }
+
+    /**
+     * Unregister a sideloaded dev package (v0.3.0+)
+     */
+    public async unregisterPackage(): Promise<void> {
+        const packageName = await vscode.window.showInputBox({
+            prompt: 'Enter the package name to unregister (leave empty for current project)',
+            placeHolder: 'Package name (optional)',
+            ignoreFocusOut: true
+        });
+
+        await vscode.window.withProgress({
+            location: vscode.ProgressLocation.Notification,
+            title: 'Unregistering dev package...',
+            cancellable: false
+        }, async () => {
+            await this.winAppCli.unregister(packageName || undefined);
+        });
+    }
+
+    /**
+     * Add an app execution alias to the manifest (v0.3.0+)
+     */
+    public async addManifestAlias(): Promise<void> {
+        const alias = await vscode.window.showInputBox({
+            prompt: 'Enter the app execution alias (e.g., "myapp")',
+            placeHolder: 'myapp',
+            ignoreFocusOut: true,
+            validateInput: (value) => {
+                if (!value.trim()) {
+                    return 'Alias cannot be empty';
+                }
+                if (/[^a-zA-Z0-9._-]/.test(value)) {
+                    return 'Alias can only contain letters, numbers, dots, hyphens, and underscores';
+                }
+                return null;
+            }
+        });
+        if (!alias) { return; }
+
+        await vscode.window.withProgress({
+            location: vscode.ProgressLocation.Notification,
+            title: 'Adding app execution alias...',
+            cancellable: false
+        }, async () => {
+            await this.winAppCli.manifestAddAlias(alias);
+        });
+    }
+
+    // ============================================
+    // UI Automation Operations (v0.3.0+)
+    // ============================================
+
+    /**
+     * List all visible windows (v0.3.0+)
+     */
+    public async uiListWindows(): Promise<void> {
+        const appName = await vscode.window.showInputBox({
+            prompt: 'Enter app name to filter (leave empty for all windows)',
+            placeHolder: 'App name (optional)',
+            ignoreFocusOut: true
+        });
+
+        await vscode.window.withProgress({
+            location: vscode.ProgressLocation.Notification,
+            title: 'Listing windows...',
+            cancellable: false
+        }, async () => {
+            const result = await this.winAppCli.uiListWindows(appName || undefined);
+            if (result) {
+                this.outputChannel.appendLine('--- Windows ---');
+                this.outputChannel.appendLine(result);
+                this.outputChannel.show();
+            }
+        });
+    }
+
+    /**
+     * Inspect UI tree of a running app (v0.3.0+)
+     */
+    public async uiInspect(): Promise<void> {
+        const appName = await vscode.window.showInputBox({
+            prompt: 'Enter the app name to inspect',
+            placeHolder: 'App name',
+            ignoreFocusOut: true
+        });
+        if (!appName) { return; }
+
+        await vscode.window.withProgress({
+            location: vscode.ProgressLocation.Notification,
+            title: 'Inspecting UI tree...',
+            cancellable: false
+        }, async () => {
+            const result = await this.winAppCli.uiInspect(appName);
+            if (result) {
+                this.outputChannel.appendLine(`--- UI Tree: ${appName} ---`);
+                this.outputChannel.appendLine(result);
+                this.outputChannel.show();
+            }
+        });
+    }
+
+    /**
+     * Take a screenshot of an app window (v0.3.0+)
+     */
+    public async uiScreenshot(): Promise<void> {
+        const appName = await vscode.window.showInputBox({
+            prompt: 'Enter the app name to screenshot',
+            placeHolder: 'App name',
+            ignoreFocusOut: true
+        });
+        if (!appName) { return; }
+
+        const outputUri = await vscode.window.showSaveDialog({
+            defaultUri: vscode.Uri.file('screenshot.png'),
+            filters: {
+                'PNG Image': ['png']
+            },
+            title: 'Save Screenshot'
+        });
+        if (!outputUri) { return; }
+
+        await vscode.window.withProgress({
+            location: vscode.ProgressLocation.Notification,
+            title: 'Taking screenshot...',
+            cancellable: false
+        }, async () => {
+            await this.winAppCli.uiScreenshot(appName, outputUri.fsPath);
+        });
+    }
+
     /**
      * Dispose of resources
      */

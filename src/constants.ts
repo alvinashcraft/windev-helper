@@ -61,6 +61,14 @@ export const COMMANDS = {
     CREATE_EXTERNAL_CATALOG: 'windev-helper.createExternalCatalog',
     // Certificate info command (v0.2.1+)
     CERTIFICATE_INFO: 'windev-helper.certificateInfo',
+    // Run & manage commands (v0.3.0+)
+    RUN_PACKAGED_APP: 'windev-helper.runPackagedApp',
+    UNREGISTER_PACKAGE: 'windev-helper.unregisterPackage',
+    MANIFEST_ADD_ALIAS: 'windev-helper.manifestAddAlias',
+    // UI Automation commands (v0.3.0+)
+    UI_LIST_WINDOWS: 'windev-helper.uiListWindows',
+    UI_INSPECT: 'windev-helper.uiInspect',
+    UI_SCREENSHOT: 'windev-helper.uiScreenshot',
 } as const;
 
 /**

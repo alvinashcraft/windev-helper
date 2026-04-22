@@ -2,7 +2,7 @@
   "name": "windev-helper",
   "displayName": "WinDev Helper",
   "description": "Build beautiful, performant WinUI apps with VS Code. Debug, build, package, and deploy Windows apps powered by the Windows App SDK.",
-  "version": "2.7.0",
+  "version": "2.8.0",
   "publisher": "alvinashcraft",
   "preview": true,
   "icon": "images/icon.png",
@@ -202,6 +202,36 @@
       {
         "command": "windev-helper.createExternalCatalog",
         "title": "Create External Catalog",
+        "category": "WinDev"
+      },
+      {
+        "command": "windev-helper.runPackagedApp",
+        "title": "Run as Packaged App",
+        "category": "WinDev"
+      },
+      {
+        "command": "windev-helper.unregisterPackage",
+        "title": "Unregister Dev Package",
+        "category": "WinDev"
+      },
+      {
+        "command": "windev-helper.manifestAddAlias",
+        "title": "Add App Execution Alias",
+        "category": "WinDev"
+      },
+      {
+        "command": "windev-helper.uiListWindows",
+        "title": "UI: List Windows",
+        "category": "WinDev"
+      },
+      {
+        "command": "windev-helper.uiInspect",
+        "title": "UI: Inspect App",
+        "category": "WinDev"
+      },
+      {
+        "command": "windev-helper.uiScreenshot",
+        "title": "UI: Take Screenshot",
         "category": "WinDev"
       },
       {

@@ -596,6 +596,151 @@ export class WinAppCli {
         }
     }
 
+    // ============================================
+    // Run & Unregister Commands (v0.3.0+)
+    // ============================================
+
+    /**
+     * Run an application as a packaged app (v0.3.0+)
+     * Registers a loose package, launches the app, and preserves LocalState across re-deploys.
+     * @param options Run options
+     */
+    public async run(options: RunOptions): Promise<void> {
+        try {
+            const args: string[] = [];
+            if (options.inputFolder) {
+                args.push(options.inputFolder);
+            }
+            if (options.manifest) {
+                args.push('--manifest', options.manifest);
+            }
+            if (options.detach) {
+                args.push('--detach');
+            }
+            if (options.unregisterOnExit) {
+                args.push('--unregister-on-exit');
+            }
+            if (options.debugOutput) {
+                args.push('--debug-output');
+            }
+            if (options.symbols) {
+                args.push('--symbols');
+            }
+            await this.execute('run', args);
+            vscode.window.showInformationMessage('Packaged app launched successfully.');
+        } catch (error) {
+            vscode.window.showErrorMessage(`Failed to run packaged app: ${error}`);
+        }
+    }
+
+    /**
+     * Unregister a sideloaded dev package (v0.3.0+)
+     * Cleanup counterpart to `winapp run`.
+     * @param packageName Optional package name to unregister
+     */
+    public async unregister(packageName?: string): Promise<void> {
+        try {
+            const args: string[] = [];
+            if (packageName) {
+                args.push(packageName);
+            }
+            await this.execute('unregister', args);
+            vscode.window.showInformationMessage('Package unregistered successfully.');
+        } catch (error) {
+            vscode.window.showErrorMessage(`Failed to unregister package: ${error}`);
+        }
+    }
+
+    // ============================================
+    // Manifest Add Alias Command (v0.3.0+)
+    // ============================================
+
+    /**
+     * Add an app execution alias to the manifest (v0.3.0+)
+     * Adds a uap5:AppExecutionAlias so a packaged app can be launched by name.
+     * @param alias The alias name (e.g., "myapp")
+     * @param manifestPath Optional path to the manifest file
+     */
+    public async manifestAddAlias(alias: string, manifestPath?: string): Promise<void> {
+        try {
+            const args: string[] = ['add-alias', alias];
+            if (manifestPath) {
+                args.push('--manifest', manifestPath);
+            }
+            await this.execute('manifest', args);
+            vscode.window.showInformationMessage(`App execution alias '${alias}' added to manifest.`);
+        } catch (error) {
+            vscode.window.showErrorMessage(`Failed to add alias: ${error}`);
+        }
+    }
+
+    // ============================================
+    // UI Automation Commands (v0.3.0+)
+    // ============================================
+
+    /**
+     * List all visible windows (v0.3.0+)
+     * @param appName Optional app name filter
+     */
+    public async uiListWindows(appName?: string): Promise<string> {
+        try {
+            const args: string[] = ['list-windows'];
+            if (appName) {
+                args.push('-a', appName);
+            }
+            return await this.execute('ui', args);
+        } catch (error) {
+            vscode.window.showErrorMessage(`Failed to list windows: ${error}`);
+            return '';
+        }
+    }
+
+    /**
+     * Inspect the UI tree of a running app (v0.3.0+)
+     * @param appName App name to inspect
+     * @param interactive Whether to use interactive mode
+     */
+    public async uiInspect(appName: string, interactive: boolean = false): Promise<string> {
+        try {
+            const args: string[] = ['inspect', '-a', appName];
+            if (interactive) {
+                args.push('-i');
+            }
+            return await this.execute('ui', args);
+        } catch (error) {
+            vscode.window.showErrorMessage(`Failed to inspect UI: ${error}`);
+            return '';
+        }
+    }
+
+    /**
+     * Take a screenshot of an app window (v0.3.0+)
+     * @param appName App name to screenshot
+     * @param outputPath Output file path for the screenshot
+     */
+    public async uiScreenshot(appName: string, outputPath: string): Promise<void> {
+        try {
+            await this.execute('ui', ['screenshot', '-a', appName, '-o', outputPath]);
+            vscode.window.showInformationMessage(`Screenshot saved to ${outputPath}`);
+        } catch (error) {
+            vscode.window.showErrorMessage(`Failed to take screenshot: ${error}`);
+        }
+    }
+
+    /**
+     * Search for UI elements by name (v0.3.0+)
+     * @param query Search query
+     * @param appName App name to search in
+     */
+    public async uiSearch(query: string, appName: string): Promise<string> {
+        try {
+            return await this.execute('ui', ['search', query, '-a', appName]);
+        } catch (error) {
+            vscode.window.showErrorMessage(`Failed to search UI elements: ${error}`);
+            return '';
+        }
+    }
+
     /**
      * Dispose of resources
      */
@@ -654,4 +799,15 @@ export interface StorePackageOptions {
     output?: string;
     arch?: ('x86' | 'x64' | 'arm64')[];
     version?: string;
+}
+
+// Run options (v0.3.0+)
+
+export interface RunOptions {
+    inputFolder?: string;
+    manifest?: string;
+    detach?: boolean;
+    unregisterOnExit?: boolean;
+    debugOutput?: boolean;
+    symbols?: boolean;
 }
