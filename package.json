@@ -291,32 +291,84 @@
       ]
     },
     "menus": {
-      "view/title": [
+      "explorer/context": [
         {
-          "command": "windevHelper.propertyPane.refresh",
-          "when": "view == windevHelper.propertyPane",
-          "group": "navigation"
+          "command": "windev-helper.addPage",
+          "when": "explorerResourceIsFolder && resourceFilename != 'bin' && resourceFilename != 'obj'",
+          "group": "winui@1"
         },
         {
-          "command": "windevHelper.propertyPane.toggleGrouping",
-          "when": "view == windevHelper.propertyPane",
-          "group": "navigation"
+          "command": "windev-helper.addUserControl",
+          "when": "explorerResourceIsFolder && resourceFilename != 'bin' && resourceFilename != 'obj'",
+          "group": "winui@2"
         },
         {
-          "command": "windevHelper.propertyPane.toggleDefaults",
-          "when": "view == windevHelper.propertyPane",
-          "group": "navigation"
+          "command": "windev-helper.addWindow",
+          "when": "explorerResourceIsFolder && resourceFilename != 'bin' && resourceFilename != 'obj'",
+          "group": "winui@3"
+        },
+        {
+          "command": "windev-helper.addViewModel",
+          "when": "explorerResourceIsFolder && resourceFilename != 'bin' && resourceFilename != 'obj'",
+          "group": "winui@4"
         }
       ],
-      "view/item/context": [
+      "csharp.solutionExplorer.context": [
         {
-          "command": "windevHelper.propertyPane.copyValue",
-          "when": "view == windevHelper.propertyPane && viewItem == property || viewItem == boundProperty",
-          "group": "inline"
+          "command": "windev-helper.addPage",
+          "when": "csharp.solutionExplorer.itemType == 'folder' || csharp.solutionExplorer.itemType == 'project'",
+          "group": "winui@1"
         },
         {
-          "command": "windevHelper.propertyPane.goToDefinition",
-          "when": "view == windevHelper.propertyPane && viewItem == property || viewItem == boundProperty",
+          "command": "windev-helper.addUserControl",
+          "when": "csharp.solutionExplorer.itemType == 'folder' || csharp.solutionExplorer.itemType == 'project'",
+          "group": "winui@2"
+        },
+        {
+          "command": "windev-helper.addWindow",
+          "when": "csharp.solutionExplorer.itemType == 'folder' || csharp.solutionExplorer.itemType == 'project'",
+          "group": "winui@3"
+        },
+        {
+          "command": "windev-helper.addViewModel",
+          "when": "csharp.solutionExplorer.itemType == 'folder' || csharp.solutionExplorer.itemType == 'project'",
+          "group": "winui@4"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "windev-helper.buildProject",
+          "when": "windevHelper.isWinUIProject"
+        },
+        {
+          "command": "windev-helper.rebuildProject",
+          "when": "windevHelper.isWinUIProject"
+        },
+        {
+          "command": "windev-helper.cleanProject",
+          "when": "windevHelper.isWinUIProject"
+        },
+        {
+          "command": "windev-helper.debugProject",
+          "when": "windevHelper.isWinUIProject"
+        },
+        {
+          "command": "windev-helper.runWithoutDebugging",
+          "when": "windevHelper.isWinUIProject"
+        },
+        {
+          "command": "windev-helper.createMsixPackage",
+          "when": "windevHelper.isWinUIProject"
+        },
+        {
+          "command": "windev-helper.openXamlPreview",
+          "when": "resourceExtname == .xaml || editorLangId == xaml"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "windev-helper.openXamlPreview",
+          "when": "resourceExtname == .xaml || editorLangId == xaml",
           "group": "navigation"
         }
       ]
@@ -399,89 +451,6 @@
           "description": "Theme for XAML preview. 'auto' follows VS Code theme or project's App.xaml RequestedTheme."
         }
       }
-    },
-    "menus": {
-      "explorer/context": [
-        {
-          "command": "windev-helper.addPage",
-          "when": "explorerResourceIsFolder && resourceFilename != 'bin' && resourceFilename != 'obj'",
-          "group": "winui@1"
-        },
-        {
-          "command": "windev-helper.addUserControl",
-          "when": "explorerResourceIsFolder && resourceFilename != 'bin' && resourceFilename != 'obj'",
-          "group": "winui@2"
-        },
-        {
-          "command": "windev-helper.addWindow",
-          "when": "explorerResourceIsFolder && resourceFilename != 'bin' && resourceFilename != 'obj'",
-          "group": "winui@3"
-        },
-        {
-          "command": "windev-helper.addViewModel",
-          "when": "explorerResourceIsFolder && resourceFilename != 'bin' && resourceFilename != 'obj'",
-          "group": "winui@4"
-        }
-      ],
-      "csharp.solutionExplorer.context": [
-        {
-          "command": "windev-helper.addPage",
-          "when": "csharp.solutionExplorer.itemType == 'folder' || csharp.solutionExplorer.itemType == 'project'",
-          "group": "winui@1"
-        },
-        {
-          "command": "windev-helper.addUserControl",
-          "when": "csharp.solutionExplorer.itemType == 'folder' || csharp.solutionExplorer.itemType == 'project'",
-          "group": "winui@2"
-        },
-        {
-          "command": "windev-helper.addWindow",
-          "when": "csharp.solutionExplorer.itemType == 'folder' || csharp.solutionExplorer.itemType == 'project'",
-          "group": "winui@3"
-        },
-        {
-          "command": "windev-helper.addViewModel",
-          "when": "csharp.solutionExplorer.itemType == 'folder' || csharp.solutionExplorer.itemType == 'project'",
-          "group": "winui@4"
-        }
-      ],
-      "commandPalette": [
-        {
-          "command": "windev-helper.buildProject",
-          "when": "windevHelper.isWinUIProject"
-        },
-        {
-          "command": "windev-helper.rebuildProject",
-          "when": "windevHelper.isWinUIProject"
-        },
-        {
-          "command": "windev-helper.cleanProject",
-          "when": "windevHelper.isWinUIProject"
-        },
-        {
-          "command": "windev-helper.debugProject",
-          "when": "windevHelper.isWinUIProject"
-        },
-        {
-          "command": "windev-helper.runWithoutDebugging",
-          "when": "windevHelper.isWinUIProject"
-        },
-        {
-          "command": "windev-helper.createMsixPackage",
-          "when": "windevHelper.isWinUIProject"
-        },
-        {
-          "command": "windev-helper.openXamlPreview",
-          "when": "resourceExtname == .xaml || editorLangId == xaml"
-        }
-      ],
-      "editor/title": [
-        {
-          "command": "windev-helper.openXamlPreview",
-          "when": "resourceExtname == .xaml || editorLangId == xaml",
-          "group": "navigation"
-        }
-      ]
     },
     "keybindings": [
       {
@@ -616,16 +585,16 @@
     "test": "vscode-test"
   },
   "devDependencies": {
-    "@types/vscode": "^1.108.1",
     "@types/mocha": "^10.0.10",
     "@types/node": "22.x",
-    "@vscode/vsce": "^3.2.2",
-    "typescript-eslint": "^8.52.0",
-    "eslint": "^9.39.2",
+    "@types/vscode": "^1.108.1",
+    "@vscode/test-cli": "^0.0.12",
+    "@vscode/test-electron": "^2.5.2",
+    "@vscode/vsce": "^3.9.1",
     "esbuild": "^0.27.2",
+    "eslint": "^9.39.2",
     "npm-run-all": "^4.1.5",
     "typescript": "^5.9.3",
-    "@vscode/test-cli": "^0.0.12",
-    "@vscode/test-electron": "^2.5.2"
+    "typescript-eslint": "^8.52.0"
   }
 }
