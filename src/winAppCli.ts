@@ -604,8 +604,9 @@ export class WinAppCli {
      * Run an application as a packaged app (v0.3.0+)
      * Registers a loose package, launches the app, and preserves LocalState across re-deploys.
      * @param options Run options
+     * @param cwd Optional working directory for the command
      */
-    public async run(options: RunOptions): Promise<void> {
+    public async run(options: RunOptions, cwd?: string): Promise<void> {
         try {
             const args: string[] = [];
             if (options.inputFolder) {
@@ -626,7 +627,7 @@ export class WinAppCli {
             if (options.symbols) {
                 args.push('--symbols');
             }
-            await this.execute('run', args);
+            await this.execute('run', args, cwd);
             vscode.window.showInformationMessage('Packaged app launched successfully.');
         } catch (error) {
             vscode.window.showErrorMessage(`Failed to run packaged app: ${error}`);
@@ -637,14 +638,15 @@ export class WinAppCli {
      * Unregister a sideloaded dev package (v0.3.0+)
      * Cleanup counterpart to `winapp run`.
      * @param packageName Optional package name to unregister
+     * @param cwd Optional working directory for the command
      */
-    public async unregister(packageName?: string): Promise<void> {
+    public async unregister(packageName?: string, cwd?: string): Promise<void> {
         try {
             const args: string[] = [];
             if (packageName) {
                 args.push(packageName);
             }
-            await this.execute('unregister', args);
+            await this.execute('unregister', args, cwd);
             vscode.window.showInformationMessage('Package unregistered successfully.');
         } catch (error) {
             vscode.window.showErrorMessage(`Failed to unregister package: ${error}`);
@@ -660,14 +662,15 @@ export class WinAppCli {
      * Adds a uap5:AppExecutionAlias so a packaged app can be launched by name.
      * @param alias The alias name (e.g., "myapp")
      * @param manifestPath Optional path to the manifest file
+     * @param cwd Optional working directory for the command
      */
-    public async manifestAddAlias(alias: string, manifestPath?: string): Promise<void> {
+    public async manifestAddAlias(alias: string, manifestPath?: string, cwd?: string): Promise<void> {
         try {
             const args: string[] = ['add-alias', alias];
             if (manifestPath) {
                 args.push('--manifest', manifestPath);
             }
-            await this.execute('manifest', args);
+            await this.execute('manifest', args, cwd);
             vscode.window.showInformationMessage(`App execution alias '${alias}' added to manifest.`);
         } catch (error) {
             vscode.window.showErrorMessage(`Failed to add alias: ${error}`);

@@ -313,13 +313,13 @@ function registerCommands(context: vscode.ExtensionContext): void {
 
     context.subscriptions.push(
         vscode.commands.registerCommand(COMMANDS.UNREGISTER_PACKAGE, async () => {
-            await services.packageManager.unregisterPackage();
+            await services.packageManager.unregisterPackage(services.projectManager.currentProject);
         })
     );
 
     context.subscriptions.push(
         vscode.commands.registerCommand(COMMANDS.MANIFEST_ADD_ALIAS, async () => {
-            await services.packageManager.addManifestAlias();
+            await services.packageManager.addManifestAlias(services.projectManager.currentProject);
         })
     );
 

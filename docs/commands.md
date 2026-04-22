@@ -452,7 +452,7 @@ Launches an application as a packaged app from a build output folder. Prompts fo
 
 **Command ID:** `windev-helper.unregisterPackage`
 
-Removes a sideloaded dev package registered by `winapp run`. Prompts for an optional package name.
+Removes a sideloaded dev package registered by `winapp run`. Runs in the context of the current project. Prompts for an optional package name (leave empty to let the CLI discover it).
 
 **Uses:** `winapp unregister` CLI command
 
@@ -467,7 +467,8 @@ Adds a `uap5:AppExecutionAlias` to the manifest so a packaged app can be launche
 **Usage:**
 
 1. Enter the alias name (e.g., "myapp")
-2. The alias is added to the manifest
+2. The manifest is automatically discovered from the current project
+3. The alias is added to the manifest
 
 **Uses:** `winapp manifest add-alias` CLI command (v0.3.0+)
 

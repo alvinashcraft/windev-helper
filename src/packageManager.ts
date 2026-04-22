@@ -629,7 +629,7 @@ export class PackageManager {
                     detach: runMode.label.includes('detached'),
                     debugOutput: runMode.label.includes('debug'),
                     unregisterOnExit: unregisterOnExit === 'Yes',
-                });
+                }, projectPath);
             } catch (error) {
                 vscode.window.showErrorMessage(`Failed to run packaged app: ${error}`);
             }
@@ -639,9 +639,12 @@ export class PackageManager {
     /**
      * Unregister a sideloaded dev package (v0.3.0+)
      */
-    public async unregisterPackage(): Promise<void> {
+    public async unregisterPackage(projectUri?: vscode.Uri): Promise<void> {
+        const projectPath = projectUri ? path.dirname(projectUri.fsPath) :
+            vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+
         const packageName = await vscode.window.showInputBox({
-            prompt: 'Enter the package name to unregister (leave empty for current project)',
+            prompt: 'Enter the package name to unregister (leave empty to let the CLI discover it)',
             placeHolder: 'Package name (optional)',
             ignoreFocusOut: true
         });
@@ -651,14 +654,17 @@ export class PackageManager {
             title: 'Unregistering dev package...',
             cancellable: false
         }, async () => {
-            await this.winAppCli.unregister(packageName || undefined);
+            await this.winAppCli.unregister(packageName || undefined, projectPath);
         });
     }
 
     /**
      * Add an app execution alias to the manifest (v0.3.0+)
      */
-    public async addManifestAlias(): Promise<void> {
+    public async addManifestAlias(projectUri?: vscode.Uri): Promise<void> {
+        const projectPath = projectUri ? path.dirname(projectUri.fsPath) :
+            vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+
         const alias = await vscode.window.showInputBox({
             prompt: 'Enter the app execution alias (e.g., "myapp")',
             placeHolder: 'myapp',
@@ -675,12 +681,15 @@ export class PackageManager {
         });
         if (!alias) { return; }
 
+        // Resolve manifest path from the project
+        const manifestPath = projectPath ? await this.findManifest(projectPath) : undefined;
+
         await vscode.window.withProgress({
             location: vscode.ProgressLocation.Notification,
             title: 'Adding app execution alias...',
             cancellable: false
         }, async () => {
-            await this.winAppCli.manifestAddAlias(alias);
+            await this.winAppCli.manifestAddAlias(alias, manifestPath, projectPath);
         });
     }
 
