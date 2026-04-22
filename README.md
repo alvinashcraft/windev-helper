@@ -67,9 +67,19 @@ On non-Windows platforms, the extension provides an HTML-based preview renderer 
 - View certificate details (subject, issuer, validity)
 - Install certificates for testing
 - Create debug identities for your apps
+- **Run as packaged app** - Launch apps as packaged apps from build output
+- **Unregister dev packages** - Clean up sideloaded packages
+- **Add app execution aliases** - Launch packaged apps by name from the terminal
 - **Microsoft Store publishing** - Publish directly to the Microsoft Store from VS Code
 - Check submission status and manage Store apps
 - Create external catalogs for asset management
+
+### 🧪 UI Automation
+
+- **List windows** - Enumerate visible app windows
+- **Inspect UI trees** - Walk the UI Automation tree of any running Windows app
+- **Take screenshots** - Capture app window screenshots
+- Enables automated testing and agentic workflows via `winapp ui`
 
 ### 📝 Project & Item Templates
 
@@ -188,6 +198,12 @@ dotnet new winuilib -n MyLib
 | `WinUI: Select Target Platform` | Switch x86/x64/ARM64 |
 | `WinUI: Install WinUI Templates` | Install dotnet templates |
 | `WinUI: Check WinApp CLI Installation` | Verify CLI is installed |
+| `WinDev: Run as Packaged App` | Launch app as a packaged app |
+| `WinDev: Unregister Dev Package` | Remove a sideloaded dev package |
+| `WinDev: Add App Execution Alias` | Add launch alias to manifest |
+| `WinDev: UI: List Windows` | List visible app windows |
+| `WinDev: UI: Inspect App` | Inspect UI Automation tree |
+| `WinDev: UI: Take Screenshot` | Capture app window screenshot |
 
 ## Extension Settings
 
@@ -241,6 +257,14 @@ This extension integrates with the **Windows App Development CLI (winapp)**, whi
 
 - `winapp tool` - Access Windows SDK tools
 - `winapp get-winapp-path` - Get paths to installed SDK components
+
+### Run & Automation (v0.3.0+)
+
+- `winapp run` - Run a build output as a packaged app
+- `winapp unregister` - Remove a sideloaded dev package
+- `winapp manifest add-alias` - Add an app execution alias to the manifest
+- `winapp ui` - UI Automation: list windows, inspect trees, click, screenshot, and more
+- `winapp complete` - Set up shell tab completion
 
 Learn more at [github.com/microsoft/WinAppCli](https://github.com/microsoft/WinAppCli).
 

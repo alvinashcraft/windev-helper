@@ -1,8 +1,8 @@
 ---
 name: winapp-cli
-description: 'Windows App Development CLI (winapp) for building, packaging, and deploying Windows applications. Use when asked to initialize Windows app projects, create MSIX packages, generate AppxManifest.xml, manage development certificates, add package identity for debugging, sign packages, publish to Microsoft Store, or access Windows SDK build tools. Supports .NET, C++, Electron, Rust, Tauri, and cross-platform frameworks targeting Windows.'
+description: 'Windows App Development CLI (winapp) for building, packaging, running, and deploying Windows applications. Use when asked to initialize Windows app projects, create MSIX packages, run packaged apps, generate AppxManifest.xml, manage development certificates, add package identity for debugging, sign packages, publish to Microsoft Store, automate UI testing, or access Windows SDK build tools. Supports .NET, C++, Electron, Rust, Tauri, and cross-platform frameworks targeting Windows.'
 license: MIT
-version: '0.2.1'
+version: '0.3.0'
 ---
 
 # Windows App Development CLI (winapp)
@@ -25,6 +25,10 @@ Use this skill when you need to:
 - Access Windows APIs that require package identity (notifications, Windows AI, shell integration)
 - Publish applications to the Microsoft Store (via `winapp store` subcommand)
 - Create external catalogs for asset management
+- Run apps as packaged apps from a build output folder (`winapp run`)
+- Automate UI testing and interaction with running apps (`winapp ui`)
+- Add app execution aliases to manifests
+- Enable `dotnet run` support for packaged .NET apps
 
 ## Prerequisites
 
@@ -58,6 +62,8 @@ winapp init [<base-directory>] [options]
 > **v0.2.0 Breaking Change:** `init` no longer generates a certificate automatically. Run `winapp cert generate` explicitly when you need a dev signing certificate. The `--no-cert` flag has been removed.
 >
 > **v0.2.0 .NET Projects:** When `winapp init` detects a `.csproj`, it configures NuGet packages in the project file directly instead of creating a `winapp.yaml`. This is the expected behavior for .NET projects.
+
+> **v0.3.0 .NET Projects:** `winapp init` now also sets up the `Microsoft.Windows.SDK.BuildTools.WinApp` NuGet package, enabling `dotnet run` support for packaged apps.
 
 **Example:**
 
@@ -420,6 +426,135 @@ winapp create-external-catalog
 winapp create-external-catalog ./catalogs
 ```
 
+### run - Run Packaged App (v0.3.0+)
+
+Pack a folder and run it as a packaged app. Registers a loose package, launches the app, and preserves `LocalState` across re-deploys.
+
+```bash
+winapp run <input-folder> [options]
+```
+
+**Options:**
+
+| Option | Description |
+| ------ | ----------- |
+| `--manifest <path>` | Path to the AppxManifest.xml |
+| `--detach` | Launch and return control immediately |
+| `--unregister-on-exit` | Clean up registered package when app closes |
+| `--debug-output` | Capture OutputDebugString and crash dumps |
+| `--symbols` | Download PDBs from Microsoft Symbol Server |
+
+**Examples:**
+
+```bash
+# Run a built app as packaged
+winapp run ./bin/Debug
+
+# Run with custom manifest
+winapp run ./bin/Debug --manifest ./Package.appxmanifest
+
+# Run detached (for CI/automation)
+winapp run ./bin/Debug --detach --unregister-on-exit
+
+# Run with debug output and symbol resolution
+winapp run ./bin/Debug --debug-output --symbols
+```
+
+### unregister - Remove Dev Package (v0.3.0+)
+
+Cleanup counterpart to `winapp run`. Safely removes a sideloaded dev package.
+
+```bash
+winapp unregister [<package-name>]
+```
+
+**Example:**
+
+```bash
+# Unregister the dev package
+winapp unregister
+```
+
+### manifest add-alias - Add Execution Alias (v0.3.0+)
+
+Adds a `uap5:AppExecutionAlias` to the manifest so a packaged app can be launched by name from the command line.
+
+```bash
+winapp manifest add-alias <alias> [--manifest <path>]
+```
+
+**Example:**
+
+```bash
+# Add an alias so the app can be launched as "myapp" from terminal
+winapp manifest add-alias myapp
+```
+
+> **v0.3.0 Note:** `winapp init` and `winapp manifest generate` now create `Package.appxmanifest` (matching the Visual Studio convention) instead of `appxmanifest.xml`.
+
+### ui - UI Automation (v0.3.0+)
+
+UI Automation built into the CLI. Inspect and interact with any running Windows application.
+
+```bash
+winapp ui <subcommand> [options]
+```
+
+**Subcommands:**
+
+| Subcommand | Description |
+| ---------- | ----------- |
+| `list-windows` | List all visible top-level windows |
+| `inspect` | Walk the full UI Automation tree of a window |
+| `search` | Find elements by name, type, or automation ID |
+| `click` | Click an element by automation ID |
+| `set-value` | Set a value on an element (e.g., TextBox) |
+| `screenshot` | Capture a window screenshot |
+| `wait-for` | Block until a specific element appears |
+
+**Common Options:**
+
+| Option | Description |
+| ------ | ----------- |
+| `-a, --app <name>` | Target app name |
+| `-i` | Interactive mode (for inspect) |
+| `-o, --output <path>` | Output file path (for screenshot) |
+| `-t, --timeout <ms>` | Timeout in milliseconds (for wait-for) |
+
+**Examples:**
+
+```bash
+# List all visible windows
+winapp ui list-windows
+
+# Inspect UI tree of a specific app
+winapp ui inspect -a "My App" -i
+
+# Click a button by automation ID
+winapp ui click "btn-save-d1" -a "My App"
+
+# Take a screenshot
+winapp ui screenshot -a "My App" -o screenshot.png
+
+# Set a TextBox value
+winapp ui set-value "txt-name-a3" "Hello" -a "My App"
+
+# Wait for an element to appear
+winapp ui wait-for "Done" -a "My App" -t 10000
+```
+
+### complete - Shell Completion (v0.3.0+)
+
+Set up tab completion for all winapp commands.
+
+```bash
+# PowerShell (permanent)
+winapp complete --setup powershell >> $PROFILE
+
+# PowerShell (current session)
+winapp complete --setup powershell | Out-String | Invoke-Expression
+```
+
 ## Common Workflows
 
 ### Workflow 1: Initialize New Windows App Project
@@ -527,6 +662,43 @@ winapp store publish ./my-app --packageRolloutPercentage 10
 winapp store publish ./my-app --noCommit
 ```
 
+### Workflow 7: Run and Test Packaged App (v0.3.0+)
+
+```bash
+# 1. Build your app
+dotnet build
+
+# 2. Run as packaged app
+winapp run ./bin/Debug/net10.0-windows10.0.26100.0/win-x64
+
+# 3. Or use dotnet run (with Microsoft.Windows.SDK.BuildTools.WinApp NuGet package)
+dotnet run
+
+# 4. Clean up when done
+winapp unregister
+```
+
+### Workflow 8: UI Automation Testing (v0.3.0+)
+
+```bash
+# 1. Build and run the app
+winapp run ./bin/Debug --detach
+
+# 2. Wait for the app to be ready
+winapp ui wait-for "MainWindow" -a "My App" -t 10000
+
+# 3. Interact with UI elements
+winapp ui set-value "txt-name" "Test User" -a "My App"
+winapp ui click "btn-submit" -a "My App"
+
+# 4. Verify results
+winapp ui search "Success" -a "My App"
+winapp ui screenshot -a "My App" -o result.png
+
+# 5. Clean up
+winapp unregister
+```
+
 ## Windows APIs Enabled by Package Identity
 
 Package identity unlocks access to powerful Windows APIs:
@@ -556,6 +728,8 @@ Package identity unlocks access to powerful Windows APIs:
 | No certificate after init (v0.2.0+) | Run `winapp cert generate` explicitly - init no longer auto-generates certs |
 | Missing winapp.yaml for .NET (v0.2.0+) | This is expected - .NET projects configure packages in .csproj directly |
 | Store publish fails | Run `winapp store reconfigure` to verify credentials are set |
+| UI automation can't find window | Use `winapp ui list-windows` to verify app name; try with quotes for names with spaces |
+| `dotnet run` doesn't launch packaged | Install `Microsoft.Windows.SDK.BuildTools.WinApp` NuGet package or run `winapp init` |
 
 ## Framework-Specific Guides
 
@@ -576,3 +750,6 @@ Package identity unlocks access to powerful Windows APIs:
 - [MSIX Packaging Overview](https://learn.microsoft.com/windows/msix/overview)
 - [Microsoft Store Developer CLI](https://learn.microsoft.com/windows/apps/publish/msstore-dev-cli/commands)
 - [Package Identity Overview](https://learn.microsoft.com/windows/apps/desktop/modernize/package-identity-overview)
+- [UI Automation Getting Started](https://github.com/microsoft/WinAppCli/blob/main/docs/ui-automation.md)
+- [dotnet run Support](https://github.com/microsoft/WinAppCli/blob/main/docs/dotnet-run-support.md)
+- [Shell Completion Guide](https://github.com/microsoft/WinAppCli/blob/main/docs/guides/shell-completion.md)

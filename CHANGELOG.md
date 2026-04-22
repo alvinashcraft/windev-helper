@@ -5,6 +5,37 @@ All notable changes to the WinDev Helper extension will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.8.0] - 2026-04-22
+
+> ⚠️ The preview pane and properties panel features are currently in preview. Please report any bugs or suggestions to our GitHub issues.
+
+### Added
+
+- **Run as Packaged App** (winapp CLI v0.3.0)
+  - New **WinDev: Run as Packaged App** command to launch apps as packaged apps from a build output folder
+  - Supports detached mode, debug output with crash dumps, and automatic unregister on exit
+  - Equivalent to Visual Studio's F5 experience for packaged apps
+
+- **Unregister Dev Package** (winapp CLI v0.3.0)
+  - New **WinDev: Unregister Dev Package** command to clean up sideloaded dev packages
+
+- **UI Automation** (winapp CLI v0.3.0)
+  - New **WinDev: UI: List Windows** command to enumerate visible app windows
+  - New **WinDev: UI: Inspect App** command to walk the UI Automation tree of a running app
+  - New **WinDev: UI: Take Screenshot** command to capture app window screenshots
+  - Enables agentic and automated testing workflows
+
+- **Add App Execution Alias** (winapp CLI v0.3.0)
+  - New **WinDev: Add App Execution Alias** command to add `uap5:AppExecutionAlias` to manifests
+  - Allows launching packaged apps by name from the command line
+
+### Changed
+
+- **Updated for winapp CLI v0.3.0**
+  - `winapp init` and `winapp manifest generate` now create `Package.appxmanifest` (VS convention) instead of `appxmanifest.xml`
+  - .NET projects initialized with `winapp init` now include `Microsoft.Windows.SDK.BuildTools.WinApp` NuGet package for `dotnet run` support
+  - `get-winapp-path` gracefully falls back to global cache when local cache is missing
+
 ## [2.7.0] - 2026-03-31
 
 > ⚠️ The preview pane and properties panel features are currently in preview. Please report any bugs or suggestions to our GitHub issues.

@@ -430,6 +430,80 @@ Creates an external catalog for streamlined asset management across applications
 
 ---
 
+## Run & Automation Commands
+
+These commands provide packaged app launch and UI automation capabilities. They require winapp CLI v0.3.0 or later.
+
+### WinDev: Run as Packaged App
+
+**Command ID:** `windev-helper.runPackagedApp`
+
+Launches an application as a packaged app from a build output folder. Prompts for:
+
+1. Build output folder containing your compiled app
+2. Run mode: normal, detached, or with debug output
+3. Whether to unregister the package on exit
+
+**Uses:** `winapp run` CLI command
+
+---
+
+### WinDev: Unregister Dev Package
+
+**Command ID:** `windev-helper.unregisterPackage`
+
+Removes a sideloaded dev package registered by `winapp run`. Runs in the context of the current project. Prompts for an optional package name (leave empty to let the CLI discover it).
+
+**Uses:** `winapp unregister` CLI command
+
+---
+
+### WinDev: Add App Execution Alias
+
+**Command ID:** `windev-helper.manifestAddAlias`
+
+Adds a `uap5:AppExecutionAlias` to the manifest so a packaged app can be launched by name from the command line.
+
+**Usage:**
+
+1. Enter the alias name (e.g., "myapp")
+2. The manifest is automatically discovered from the current project
+3. The alias is added to the manifest
+
+**Uses:** `winapp manifest add-alias` CLI command (v0.3.0+)
+
+---
+
+### WinDev: UI: List Windows
+
+**Command ID:** `windev-helper.uiListWindows`
+
+Lists all visible top-level windows. Optionally filter by app name. Results appear in the WinUI Packaging output channel.
+
+**Uses:** `winapp ui list-windows` CLI command
+
+---
+
+### WinDev: UI: Inspect App
+
+**Command ID:** `windev-helper.uiInspect`
+
+Walks the full UI Automation tree of a running app. Prompts for the app name.
+
+**Uses:** `winapp ui inspect` CLI command
+
+---
+
+### WinDev: UI: Take Screenshot
+
+**Command ID:** `windev-helper.uiScreenshot`
+
+Captures a screenshot of an app window. Prompts for the app name and output file location.
+
+**Uses:** `winapp ui screenshot` CLI command
+
+---
+
 ### WinUI: Generate App Manifest
 
 **Command ID:** `windev-helper.generateManifest`

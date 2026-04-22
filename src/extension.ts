@@ -304,6 +304,44 @@ function registerCommands(context: vscode.ExtensionContext): void {
         })
     );
 
+    // Run & manage commands (v0.3.0+)
+    context.subscriptions.push(
+        vscode.commands.registerCommand(COMMANDS.RUN_PACKAGED_APP, async () => {
+            await services.packageManager.runPackagedApp(services.projectManager.currentProject);
+        })
+    );
+
+    context.subscriptions.push(
+        vscode.commands.registerCommand(COMMANDS.UNREGISTER_PACKAGE, async () => {
+            await services.packageManager.unregisterPackage(services.projectManager.currentProject);
+        })
+    );
+
+    context.subscriptions.push(
+        vscode.commands.registerCommand(COMMANDS.MANIFEST_ADD_ALIAS, async () => {
+            await services.packageManager.addManifestAlias(services.projectManager.currentProject);
+        })
+    );
+
+    // UI Automation commands (v0.3.0+)
+    context.subscriptions.push(
+        vscode.commands.registerCommand(COMMANDS.UI_LIST_WINDOWS, async () => {
+            await services.packageManager.uiListWindows();
+        })
+    );
+
+    context.subscriptions.push(
+        vscode.commands.registerCommand(COMMANDS.UI_INSPECT, async () => {
+            await services.packageManager.uiInspect();
+        })
+    );
+
+    context.subscriptions.push(
+        vscode.commands.registerCommand(COMMANDS.UI_SCREENSHOT, async () => {
+            await services.packageManager.uiScreenshot();
+        })
+    );
+
     // XAML Preview command
     context.subscriptions.push(
         vscode.commands.registerCommand(COMMANDS.OPEN_XAML_PREVIEW, async () => {
