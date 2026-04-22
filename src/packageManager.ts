@@ -647,6 +647,11 @@ export class PackageManager {
         const projectPath = projectUri ? path.dirname(projectUri.fsPath) :
             vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
 
+        if (!projectPath) {
+            vscode.window.showErrorMessage('No WinUI project selected or workspace folder open');
+            return;
+        }
+
         const packageName = await vscode.window.showInputBox({
             prompt: 'Enter the package name to unregister (leave empty to let the CLI discover it)',
             placeHolder: 'Package name (optional)',
