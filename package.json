@@ -313,6 +313,20 @@
           "group": "winui@4"
         }
       ],
+      "view/title": [
+        {
+          "command": "windevHelper.propertyPane.refresh",
+          "when": "view == windevHelper.propertyPane",
+          "group": "navigation"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "windevHelper.propertyPane.copyValue",
+          "when": "view == windevHelper.propertyPane",
+          "group": "inline"
+        }
+      ],
       "csharp.solutionExplorer.context": [
         {
           "command": "windev-helper.addPage",
