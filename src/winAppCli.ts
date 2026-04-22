@@ -608,10 +608,12 @@ export class WinAppCli {
      */
     public async run(options: RunOptions, cwd?: string): Promise<void> {
         try {
-            const args: string[] = [];
-            if (options.inputFolder) {
-                args.push(options.inputFolder);
+            const inputFolder = options.inputFolder.trim();
+            if (!inputFolder) {
+                throw new Error('An input folder is required to run a packaged app.');
             }
+
+            const args: string[] = [inputFolder];
             if (options.manifest) {
                 args.push('--manifest', options.manifest);
             }
@@ -807,7 +809,7 @@ export interface StorePackageOptions {
 // Run options (v0.3.0+)
 
 export interface RunOptions {
-    inputFolder?: string;
+    inputFolder: string;
     manifest?: string;
     detach?: boolean;
     unregisterOnExit?: boolean;
