@@ -766,13 +766,19 @@ export class PackageManager {
         });
         if (!appName) { return; }
 
-        const outputUri = await vscode.window.showSaveDialog({
-            defaultUri: vscode.Uri.file('screenshot.png'),
+        const workspaceUri = vscode.workspace.workspaceFolders?.[0]?.uri;
+        const saveDialogOptions: vscode.SaveDialogOptions = {
             filters: {
                 'PNG Image': ['png']
             },
             title: 'Save Screenshot'
-        });
+        };
+
+        if (workspaceUri) {
+            saveDialogOptions.defaultUri = vscode.Uri.joinPath(workspaceUri, 'screenshot.png');
+        }
+
+        const outputUri = await vscode.window.showSaveDialog(saveDialogOptions);
         if (!outputUri) { return; }
 
         await vscode.window.withProgress({
