@@ -602,11 +602,15 @@ export class PackageManager {
         const inputFolder = folderUris[0].fsPath;
 
         // Ask for run options
-        const runMode = await vscode.window.showQuickPick(
+        type RunModePick = vscode.QuickPickItem & {
+            mode: 'wait' | 'detach' | 'debugOutput';
+        };
+
+        const runMode = await vscode.window.showQuickPick<RunModePick>(
             [
-                { label: 'Run (wait for exit)', description: 'Launch and wait for the app to close' },
-                { label: 'Run detached', description: 'Launch and return control immediately' },
-                { label: 'Run with debug output', description: 'Capture OutputDebugString and crash dumps' },
+                { label: 'Run (wait for exit)', description: 'Launch and wait for the app to close', mode: 'wait' },
+                { label: 'Run detached', description: 'Launch and return control immediately', mode: 'detach' },
+                { label: 'Run with debug output', description: 'Capture OutputDebugString and crash dumps', mode: 'debugOutput' },
             ],
             { placeHolder: 'Select run mode' }
         );
@@ -626,8 +630,8 @@ export class PackageManager {
             try {
                 await this.winAppCli.run({
                     inputFolder,
-                    detach: runMode.label.includes('detached'),
-                    debugOutput: runMode.label.includes('debug'),
+                    detach: runMode.mode === 'detach',
+                    debugOutput: runMode.mode === 'debugOutput',
                     unregisterOnExit: unregisterOnExit === 'Yes',
                 }, projectPath);
             } catch (error) {
