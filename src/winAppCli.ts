@@ -37,20 +37,85 @@ export class WinAppCli {
         '--certificatePassword'
     ]);
 
+    /** Cached parsed CLI version (major, minor, patch). `null` once detection has failed. */
+    private cachedVersion: { major: number; minor: number; patch: number } | null | undefined;
+
     /**
      * Build a display-safe version of the command by redacting values
-     * that follow known sensitive flags.
+     * that follow known sensitive flags. Anything after a bare `--`
+     * separator is treated as application passthrough and fully redacted,
+     * because we cannot know whether it contains secrets such as API keys
+     * or connection strings.
      */
     private redactArgs(args: string[]): string[] {
         const redacted: string[] = [];
+        let inPassthrough = false;
         for (let i = 0; i < args.length; i++) {
-            redacted.push(args[i]);
-            if (WinAppCli.SENSITIVE_ARG_KEYS.has(args[i]) && i + 1 < args.length) {
+            const arg = args[i];
+            if (inPassthrough) {
+                redacted.push('********');
+                continue;
+            }
+            redacted.push(arg);
+            if (arg === '--') {
+                inPassthrough = true;
+                continue;
+            }
+            if (WinAppCli.SENSITIVE_ARG_KEYS.has(arg) && i + 1 < args.length) {
                 redacted.push('********');
                 i++; // skip the actual value
             }
         }
         return redacted;
+    }
+
+    /**
+     * Parse a semantic version string of the form `MAJOR.MINOR.PATCH[-pre]`.
+     * Returns `null` if the input does not match.
+     */
+    private parseSemver(input: string): { major: number; minor: number; patch: number } | null {
+        const match = input.match(/(\d+)\.(\d+)\.(\d+)/);
+        if (!match) {
+            return null;
+        }
+        return {
+            major: parseInt(match[1], 10),
+            minor: parseInt(match[2], 10),
+            patch: parseInt(match[3], 10),
+        };
+    }
+
+    /**
+     * Detect and cache the installed winapp CLI version. Returns `null` if
+     * the CLI is not available or the version cannot be parsed.
+     */
+    public async getVersion(): Promise<{ major: number; minor: number; patch: number } | null> {
+        if (this.cachedVersion !== undefined) {
+            return this.cachedVersion;
+        }
+        try {
+            const output = await this.execute('--version');
+            this.cachedVersion = this.parseSemver(output.trim());
+        } catch {
+            this.cachedVersion = null;
+        }
+        return this.cachedVersion;
+    }
+
+    /**
+     * Returns `true` when the installed winapp CLI supports forwarding
+     * application arguments after `--` (introduced in v0.3.1). When the
+     * version cannot be determined, returns `true` so the caller is not
+     * blocked, since unsupported syntax will surface as a CLI error.
+     */
+    public async supportsRunAppArgs(): Promise<boolean> {
+        const v = await this.getVersion();
+        if (!v) {
+            return true;
+        }
+        return (v.major > 0) ||
+            (v.major === 0 && v.minor > 3) ||
+            (v.major === 0 && v.minor === 3 && v.patch >= 1);
     }
 
     /**

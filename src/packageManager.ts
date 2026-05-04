@@ -623,13 +623,18 @@ export class PackageManager {
         if (!unregisterOnExit) { return; }
 
         // v0.3.1+: optional application arguments forwarded after `--`.
-        const appArgsInput = await vscode.window.showInputBox({
-            prompt: 'Optional application arguments (space-separated, forwarded after --). Leave empty for none.',
-            placeHolder: '--my-flag value',
-            ignoreFocusOut: true
-        });
-        if (appArgsInput === undefined) { return; }
-        const appArgs = this.parseAppArgs(appArgsInput);
+        // Only prompt when the installed CLI actually supports the passthrough
+        // syntax so users on older CLIs aren't given an unsupported option.
+        let appArgs: string[] = [];
+        if (await this.winAppCli.supportsRunAppArgs()) {
+            const appArgsInput = await vscode.window.showInputBox({
+                prompt: 'Optional application arguments (forwarded after --). Quote values with spaces; use \\" or \\\\ to escape. Leave empty for none.',
+                placeHolder: '--my-flag value',
+                ignoreFocusOut: true
+            });
+            if (appArgsInput === undefined) { return; }
+            appArgs = this.parseAppArgs(appArgsInput);
+        }
 
         await vscode.window.withProgress({
             location: vscode.ProgressLocation.Notification,
@@ -651,8 +656,17 @@ export class PackageManager {
     }
 
     /**
-     * Tokenize a free-form argument string into argv entries, honoring
-     * single and double quotes so users can pass values containing spaces.
+     * Tokenize a free-form argument string into argv entries.
+     *
+     * Rules:
+     * - Whitespace separates tokens.
+     * - Single (`'`) and double (`"`) quotes group characters into a single
+     *   token, including empty strings (e.g. `--name ""` yields two tokens).
+     * - Inside double quotes, `\"`, `\\`, and `\'` are recognised as escape
+     *   sequences so users can include literal quote characters in a value.
+     *   Other backslash sequences are passed through as-is.
+     * - Single-quoted segments are treated literally (no escape processing),
+     *   matching common POSIX shell behaviour.
      */
     private parseAppArgs(input: string): string[] {
         const trimmed = input.trim();
@@ -662,34 +676,59 @@ export class PackageManager {
 
         const tokens: string[] = [];
         let current = '';
+        let hasToken = false; // true once we have started a token (incl. empty quoted)
         let quote: '"' | "'" | null = null;
+
+        const flush = () => {
+            if (hasToken) {
+                tokens.push(current);
+            }
+            current = '';
+            hasToken = false;
+        };
 
         for (let i = 0; i < trimmed.length; i++) {
             const ch = trimmed[i];
-            if (quote) {
-                if (ch === quote) {
-                    quote = null;
-                } else {
-                    current += ch;
+
+            if (quote === '"') {
+                if (ch === '\\' && i + 1 < trimmed.length) {
+                    const next = trimmed[i + 1];
+                    if (next === '"' || next === '\\' || next === "'") {
+                        current += next;
+                        i++;
+                        continue;
+                    }
                 }
+                if (ch === '"') {
+                    quote = null;
+                    continue;
+                }
+                current += ch;
                 continue;
             }
+
+            if (quote === "'") {
+                if (ch === "'") {
+                    quote = null;
+                    continue;
+                }
+                current += ch;
+                continue;
+            }
+
             if (ch === '"' || ch === "'") {
                 quote = ch;
+                hasToken = true; // even an empty quoted string counts as a token
                 continue;
             }
             if (ch === ' ' || ch === '\t') {
-                if (current.length > 0) {
-                    tokens.push(current);
-                    current = '';
-                }
+                flush();
                 continue;
             }
             current += ch;
+            hasToken = true;
         }
-        if (current.length > 0) {
-            tokens.push(current);
-        }
+        flush();
         return tokens;
     }
 

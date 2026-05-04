@@ -12,9 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - **Application argument passthrough for `Run as Packaged App`** (winapp CLI v0.3.1)
-  - The **WinDev: Run as Packaged App** command now prompts for optional application arguments
-  - Arguments are forwarded to the launched app verbatim using the new `--` passthrough syntax (no quote escaping required)
-  - New `appArgs` option on the `WinAppCli.run()` API for programmatic callers
+  - The **WinDev: Run as Packaged App** command now prompts for optional application arguments when the installed CLI is v0.3.1+
+  - The input is tokenized (whitespace splits arguments; single/double quotes group values containing spaces; inside double quotes `\"`, `\\`, and `\'` are honored as escape sequences) and then forwarded to the launched app via the new `--` passthrough syntax
+  - New `appArgs` option on the `WinAppCli.run()` API for programmatic callers, where each array element is sent as a separate argv entry without further parsing
+  - Application passthrough arguments are fully redacted in the WinUI CLI output channel since they may contain secrets such as API keys or connection strings
 
 ### Changed
 
