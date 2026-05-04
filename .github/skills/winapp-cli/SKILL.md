@@ -1,755 +1,116 @@
 ---
 name: winapp-cli
-description: 'Windows App Development CLI (winapp) for building, packaging, running, and deploying Windows applications. Use when asked to initialize Windows app projects, create MSIX packages, run packaged apps, generate AppxManifest.xml, manage development certificates, add package identity for debugging, sign packages, publish to Microsoft Store, automate UI testing, or access Windows SDK build tools. Supports .NET, C++, Electron, Rust, Tauri, and cross-platform frameworks targeting Windows.'
-license: MIT
-version: '0.3.0'
+description: 'Windows App Development CLI (winapp) for building, packaging, signing, debugging, and UI-automating Windows applications. Use when asked to initialize Windows app projects, create MSIX packages, manage AppxManifest.xml or development certificates, run an app as packaged for debugging, automate Windows UI via Microsoft UI Automation, publish to the Microsoft Store, or access Windows SDK build tools. Covers commands like init, pack, run, unregister, manifest, cert, sign, store, ui, and tool. Supports .NET (csproj), C++, Electron, Rust, Tauri, Flutter, and other Windows frameworks.'
 ---
 
-# Windows App Development CLI (winapp)
+# Windows App Development CLI
 
-The Windows App Development CLI (`winapp`) is a command-line interface for managing Windows SDKs, MSIX packaging, generating app identity, manifests, certificates, and using build tools with any app framework. It bridges the gap between cross-platform development and Windows-native capabilities.
-
-## When to Use This Skill
-
-Use this skill when you need to:
-
-- Initialize a Windows app project with SDK setup, manifests, and certificates
-- Create MSIX packages from application directories
-- Generate or manage AppxManifest.xml files
-- Create and install development certificates for signing
-- Add package identity for debugging Windows APIs
-- Sign MSIX packages or executables
-- Access Windows SDK build tools from any framework
-- Build Windows apps using cross-platform frameworks (Electron, Rust, Tauri, Qt)
-- Set up CI/CD pipelines for Windows app deployment
-- Access Windows APIs that require package identity (notifications, Windows AI, shell integration)
-- Publish applications to the Microsoft Store (via `winapp store` subcommand)
-- Create external catalogs for asset management
-- Run apps as packaged apps from a build output folder (`winapp run`)
-- Automate UI testing and interaction with running apps (`winapp ui`)
-- Add app execution aliases to manifests
-- Enable `dotnet run` support for packaged .NET apps
+`winapp` manages Windows SDKs, MSIX packaging, app identity, manifests, certificates, signing, store publishing, and UI automation for any framework targeting Windows (.NET/csproj, C++, Electron, Rust, Tauri, Flutter, etc.). Public preview — subject to change.
 
 ## Prerequisites
 
 - Windows 10 or later
-- winapp CLI installed via one of these methods:
-  - **WinGet**: `winget install Microsoft.WinAppCli --source winget`
-  - **NPM** (for Electron): `npm install @microsoft/winappcli --save-dev`
-  - **GitHub Actions/Azure DevOps**: Use [setup-WinAppCli](https://github.com/microsoft/setup-WinAppCli) action
-  - **Manual**: Download from [GitHub Releases](https://github.com/microsoft/WinAppCli/releases/latest)
+- Install via one of:
+  - WinGet: `winget install Microsoft.WinAppCli --source winget`
+  - npm (Electron/Node): `npm install @microsoft/winappcli --save-dev`
+  - CI: [`setup-WinAppCli`](https://github.com/microsoft/setup-WinAppCli) GitHub Action
+  - Manual: [GitHub Releases](https://github.com/microsoft/WinAppCli/releases/latest)
 
-## Core Commands Reference
+## Commands
 
-### init - Initialize Project Workspace
+| Command | Purpose |
+| ------- | ------- |
+| `init` | Initialize project: SDKs (`stable`/`preview`/`experimental`/`none`), manifest, `winapp.yaml`. **`.csproj` projects skip `winapp.yaml`** and use NuGet directly. **Does not auto-generate a cert** (v0.2.0+). |
+| `restore` / `update` | Restore or update SDK package versions (`--setup-sdks preview` for preview SDKs). |
+| `pack <dir>` | Build MSIX. Flags: `--generate-cert`, `--cert <pfx> --cert-password`, `--self-contained` (bundles WinAppSDK runtime), `--output`. Auto-discovers third-party WinRT components from `.winmd` (v0.2.1+). |
+| `run <dir> [-- <app args>]` | Pack as loose layout and launch as packaged app — ideal for IDE F5 debugging without producing an MSIX. Supports `--` arg passthrough (v0.3.1+). (v0.3.0+) |
+| `create-debug-identity <exe>` | Add sparse package identity to an exe so it can call identity-gated APIs (notifications, Windows AI, shell integration) without full packaging. |
+| `unregister` | Remove sideloaded dev packages registered by `run` / `create-debug-identity`. |
+| `manifest` | Generate `AppxManifest.xml`; supports placeholders and qualified names. `manifest update-assets <image>` generates all required icon sizes from one source (PNG **or SVG**, v0.2.1+). |
+| `cert generate` / `install` / `info` | Manage dev certs. `cert info <pfx> --password <pwd>` shows subject/issuer/validity. `--export-cer` exports the public key. `--json` available on `generate` and `info`. (v0.2.1+) |
+| `sign <target> --cert <pfx>` | Sign MSIX or exe; optional timestamp server. |
+| `tool` | Run Windows SDK build tools with paths configured. |
+| `store` | Run Microsoft Store Developer CLI for store submission/validation/publishing. |
+| `create-external-catalog` | Generate `CodeIntegrityExternal.cat` for TrustedLaunch sparse packages. |
+| `ui list-windows` / `inspect` / `click` / `search` / `wait-for` / `get-focused` | UI automation via Microsoft UI Automation. All support `--json`. **JSON envelopes for `inspect`, `get-focused`, `search`, and `wait-for` changed in v0.3.1** — see [`references/ui-json-envelope.md`](./references/ui-json-envelope.md) (other `ui` subcommands keep their pre-0.3.1 output). (v0.3.0+) |
+| `node create-addon` / `add-electron-debug-identity` / `clear-electron-debug-identity` | Electron/Node helpers. All commands also exposed as typed JS/TS functions from `@microsoft/winappcli` (v0.2.1+). |
 
-Initializes a directory with required assets (manifest, certificates, libraries) for building a modern Windows app.
+CI tip: pass `--no-prompt` to skip interactive prompts.
 
-```bash
-winapp init [<base-directory>] [options]
-```
+## Workflow
 
-**Key Options:**
+Standard init → package flow:
 
-| Option | Description |
-| ------ | ----------- |
-| `--setup-sdks <mode>` | SDK installation: `stable` (default), `preview`, `experimental`, `none` |
-| `--config-dir <dir>` | Directory to read/store configuration |
-| `--no-prompt` | Use defaults without prompting |
-| `--config-only` | Only create/validate configuration file |
-| `--no-gitignore` | Don't update .gitignore file |
+1. **Initialize the project** in your app folder. Sets up SDK refs, manifest, and `winapp.yaml` (`.csproj` projects skip the YAML and configure NuGet directly).
 
-> **v0.2.0 Breaking Change:** `init` no longer generates a certificate automatically. Run `winapp cert generate` explicitly when you need a dev signing certificate. The `--no-cert` flag has been removed.
->
-> **v0.2.0 .NET Projects:** When `winapp init` detects a `.csproj`, it configures NuGet packages in the project file directly instead of creating a `winapp.yaml`. This is the expected behavior for .NET projects.
+   ```bash
+   winapp init        # add --no-prompt in CI
+   ```
 
-> **v0.3.0 .NET Projects:** `winapp init` now also sets up the `Microsoft.Windows.SDK.BuildTools.WinApp` NuGet package, enabling `dotnet run` support for packaged apps.
+2. **Generate a dev signing certificate** — required for sideloading. `init` no longer creates one for non-`.csproj` projects (v0.2.0+). Pin the output path so later steps can reference it.
 
-**Example:**
+   ```bash
+   winapp cert generate --publisher "CN=My Company" --output ./mycert.pfx --install
+   ```
 
-```bash
-# Initialize with defaults
-winapp init
+3. **Build your app** with the framework's own toolchain (`dotnet build`, `npm run build`, `cargo build`, etc.).
+4. **Package as MSIX**, signing with the cert from step 2.
 
-# Initialize with preview SDKs
-winapp init --setup-sdks preview
+   ```bash
+   winapp pack ./build-output --cert ./mycert.pfx --cert-password password --output MyApp.msix
+   ```
 
-# Initialize without prompts (CI/CD)
-winapp init --no-prompt
-```
+5. **(Optional) Re-sign with a production cert** before distribution.
 
-### restore - Restore Workspace Packages
+   ```bash
+   winapp sign MyApp.msix --cert ./prod.pfx --cert-password $env:CERT_PWD
+   ```
 
-Restore packages from `winapp.yaml` (or `.csproj` for .NET projects) and ensure workspace is ready.
+6. **(Optional) Submit to the Microsoft Store** with `winapp store …` (wraps the Store Developer CLI).
 
-```bash
-winapp restore [<base-directory>] [options]
-```
+### Alternate flows
 
-**Options:**
+- **Debug identity-gated APIs without packaging** (notifications, Windows AI, shell):
 
-| Option | Description |
-| ------ | ----------- |
-| `--config-dir <dir>` | Directory to read configuration from |
-| `-v, --verbose` | Enable verbose output |
-| `-q, --quiet` | Suppress progress messages |
+  ```bash
+  winapp create-debug-identity ./bin/MyApp.exe
+  ./bin/MyApp.exe
+  ```
 
-> **v0.2.0 Note:** winapp now uses the NuGet global cache for packages instead of `%userprofile%/.winapp/packages`. This avoids duplicate downloads if you already have packages cached.
+- **Run as packaged app for IDE F5** (loose layout; app args after `--`):
 
-**Example:**
+  ```bash
+  winapp run ./bin/Debug/net10.0-windows10.0.26100.0/win-x64 \
+    --manifest ./appxmanifest.xml -- --my-flag value
+  ```
 
-```bash
-# Restore packages in current directory
-winapp restore
+- **Electron**:
 
-# Restore with verbose output
-winapp restore --verbose
-```
+  ```bash
+  npx winapp init
+  npx winapp node add-electron-debug-identity
+  npx winapp pack ./out --output MyElectronApp.msix
+  ```
 
-### pack (package) - Create MSIX Package
+## Gotchas
 
-Create an MSIX package from a prepared package directory.
-
-```bash
-winapp pack <input-folder> [options]
-```
-
-**Key Options:**
-
-| Option | Description |
-| ------ | ----------- |
-| `--output <file>` | Output MSIX filename (defaults to `<name>.msix`) |
-| `--name <name>` | Package name (default: from manifest) |
-| `--cert <path>` | Path to signing certificate (auto-signs if provided) |
-| `--cert-password <pwd>` | Certificate password (default: `password`) |
-| `--generate-cert` | Generate a new development certificate |
-| `--install-cert` | Install certificate to machine |
-| `--manifest <path>` | Path to AppxManifest.xml |
-| `--self-contained` | Bundle Windows App SDK runtime |
-| `--skip-pri` | Skip PRI file generation |
-
-**Examples:**
-
-```bash
-# Basic packaging
-winapp pack ./build-output
-
-# Package with signing
-winapp pack ./my-app --cert ./devcert.pfx --cert-password MyPassword
-
-# Generate cert and package
-winapp pack ./my-app --generate-cert --output MyApp.msix
-
-# Self-contained deployment
-winapp pack ./my-app --self-contained
-```
-
-### manifest - AppxManifest.xml Management
-
-Generate and manage AppxManifest.xml files.
-
-#### Generate Manifest
-
-```bash
-winapp manifest generate <directory>
-```
-
-**Example:**
-
-```bash
-# Generate manifest in project directory
-winapp manifest generate ./my-app
-```
-
-#### Update Image Assets
-
-```bash
-winapp manifest update-assets <image-path>
-```
-
-Updates image assets in AppxManifest.xml from a source image, generating all required sizes and aspect ratios.
-
-> **v0.2.1:** SVG files are now supported as input. The CLI converts SVG to bitmap images for all required asset sizes.
-
-**Example:**
-
-```bash
-# Update all app assets from logo
-winapp manifest update-assets ./images/my-logo.png
-
-# Use SVG as source (v0.2.1+)
-winapp manifest update-assets ./images/my-logo.svg
-```
-
-### create-debug-identity - Add Package Identity for Debugging
-
-Create and install a temporary package for debugging. Required for testing APIs that need package identity without full packaging.
-
-```bash
-winapp create-debug-identity [<entrypoint>] [options]
-```
-
-**Options:**
-
-| Option | Description |
-| ------ | ----------- |
-| `--manifest <path>` | Path to the appxmanifest.xml |
-| `--no-install` | Do not install the package after creation |
-| `-v, --verbose` | Enable verbose output |
-
-**Example:**
-
-```bash
-# Add identity to executable
-winapp create-debug-identity ./bin/MyApp.exe
-
-# With custom manifest
-winapp create-debug-identity ./bin/MyApp.exe --manifest ./AppxManifest.xml
-```
-
-**Note:** Must be called every time the appxmanifest.xml is modified for changes to take effect.
-
-### cert - Certificate Management
-
-Generate, inspect, or install development certificates.
-
-#### Generate Certificate
-
-```bash
-winapp cert generate
-```
-
-**Options:**
-
-| Option | Description |
-| ------ | ----------- |
-| `-n, --name` | Certificate subject name |
-| `-o, --output` | Output path for the .pfx file |
-| `-p, --password` | Password for the certificate |
-| `--export-cer` | Export public key as a .cer file (v0.2.1+) |
-| `--json` | Output in JSON format (v0.2.1+) |
-
-**Example:**
-
-```bash
-# Generate new development certificate
-winapp cert generate
-
-# Generate with public key export
-winapp cert generate -n "CN=MyCompany" -o ./devcert.pfx -p password --export-cer
-```
-
-#### View Certificate Info (v0.2.1+)
-
-Display detailed information about a PFX certificate including subject, issuer, and validity.
-
-```bash
-winapp cert info <cert-path> [options]
-```
-
-**Options:**
-
-| Option | Description |
-| ------ | ----------- |
-| `--password <pwd>` | Certificate password |
-| `--json` | Output in JSON format |
-
-**Example:**
-
-```bash
-# View certificate details
-winapp cert info ./devcert.pfx --password password
-
-# Get JSON output for scripting
-winapp cert info ./devcert.pfx --password password --json
-```
-
-#### Install Certificate
-
-```bash
-winapp cert install <cert-path>
-```
-
-**Example:**
-
-```bash
-# Install certificate to local machine store
-winapp cert install ./devcert.pfx
-```
-
-### sign - Sign Packages
-
-Sign a file or package with a certificate.
-
-```bash
-winapp sign <file-path> <cert-path> [options]
-```
-
-**Options:**
-
-| Option | Description |
-| ------ | ----------- |
-| `--password <pwd>` | Certificate password (default: `password`) |
-| `--timestamp <url>` | Timestamp server URL |
-| `-v, --verbose` | Enable verbose output |
-
-**Example:**
-
-```bash
-# Sign MSIX package
-winapp sign ./MyApp.msix ./devcert.pfx --password MyPassword
-
-# Sign with timestamp
-winapp sign ./MyApp.msix ./cert.pfx --timestamp http://timestamp.digicert.com
-```
-
-### update - Update Packages and Tools
-
-Update packages in `winapp.yaml` and install/update build tools in cache.
-
-```bash
-winapp update [options]
-```
-
-**Options:**
-
-| Option | Description |
-| ------ | ----------- |
-| `--setup-sdks <mode>` | SDK installation mode: `stable`, `preview`, `experimental`, `none` |
-| `-v, --verbose` | Enable verbose output |
-
-**Example:**
-
-```bash
-# Update to latest stable
-winapp update
-
-# Update to preview SDKs
-winapp update --setup-sdks preview
-```
-
-### run-buildtool (tool) - Access SDK Build Tools
-
-Run a build tool command with Windows SDK paths configured.
-
-```bash
-winapp tool [options] [[--] <additional arguments>...]
-```
-
-**Example:**
-
-```bash
-# Run a build tool with SDK paths
-winapp tool -- makeappx pack /d ./app /p ./app.msix
-```
-
-### get-winapp-path - Get SDK Paths
-
-Get the path to the `.winapp` directory.
-
-```bash
-winapp get-winapp-path [--global]
-```
-
-**Example:**
-
-```bash
-# Get local .winapp path
-winapp get-winapp-path
-
-# Get global .winapp path
-winapp get-winapp-path --global
-```
-
-### store - Microsoft Store Integration (v0.2.0+)
-
-Run Microsoft Store Developer CLI commands directly from winapp. This wraps the `msstore` CLI, enabling integrated Store development workflows.
-
-```bash
-winapp store <subcommand> [options]
-```
-
-**Available Subcommands:**
-
-| Subcommand | Description |
-| ---------- | ----------- |
-| `reconfigure` | Configure Store credentials (tenantId, sellerId, clientId, clientSecret) |
-| `apps list` | List all applications in your Store account |
-| `apps get <productId>` | Get details of a specific application |
-| `submission status <productId>` | Get submission status |
-| `submission publish <productId>` | Publish a submission |
-| `publish <path>` | Package and publish application to Store |
-| `package <path>` | Package application for Store submission |
-| `init <path>` | Initialize project for Store publishing |
-
-**Examples:**
-
-```bash
-# Configure Store credentials
-winapp store reconfigure --tenantId xxx --sellerId xxx --clientId xxx --clientSecret xxx
-
-# List Store apps
-winapp store apps list
-
-# Publish to Store
-winapp store publish ./my-app
-
-# Package for Store
-winapp store package ./my-app --output ./packages --arch x64,arm64
-```
-
-**Publishing Options:**
-
-| Option | Description |
-| ------ | ----------- |
-| `-i, --inputFile` | Path to `.msix` or `.msixupload` file |
-| `-id, --appId` | Application ID (if not initialized) |
-| `-nc, --noCommit` | Keep submission in draft state |
-| `-f, --flightId` | Publish to a specific flight |
-| `-prp, --packageRolloutPercentage` | Gradual rollout percentage (1-100) |
-
-### create-external-catalog - Asset Management (v0.2.0+)
-
-Create an external catalog for streamlined asset management across applications.
-
-```bash
-winapp create-external-catalog [<output-directory>] [options]
-```
-
-**Example:**
-
-```bash
-# Create external catalog in current directory
-winapp create-external-catalog
-
-# Create in specific directory
-winapp create-external-catalog ./catalogs
-```
-
-### run - Run Packaged App (v0.3.0+)
-
-Pack a folder and run it as a packaged app. Registers a loose package, launches the app, and preserves `LocalState` across re-deploys.
-
-```bash
-winapp run <input-folder> [options]
-```
-
-**Options:**
-
-| Option | Description |
-| ------ | ----------- |
-| `--manifest <path>` | Path to the AppxManifest.xml |
-| `--detach` | Launch and return control immediately |
-| `--unregister-on-exit` | Clean up registered package when app closes |
-| `--debug-output` | Capture OutputDebugString and crash dumps |
-| `--symbols` | Download PDBs from Microsoft Symbol Server |
-
-**Examples:**
-
-```bash
-# Run a built app as packaged
-winapp run ./bin/Debug
-
-# Run with custom manifest
-winapp run ./bin/Debug --manifest ./Package.appxmanifest
-
-# Run detached (for CI/automation)
-winapp run ./bin/Debug --detach --unregister-on-exit
-
-# Run with debug output and symbol resolution
-winapp run ./bin/Debug --debug-output --symbols
-```
-
-### unregister - Remove Dev Package (v0.3.0+)
-
-Cleanup counterpart to `winapp run`. Safely removes a sideloaded dev package.
-
-```bash
-winapp unregister [<package-name>]
-```
-
-**Example:**
-
-```bash
-# Unregister the dev package
-winapp unregister
-```
-
-### manifest add-alias - Add Execution Alias (v0.3.0+)
-
-Adds a `uap5:AppExecutionAlias` to the manifest so a packaged app can be launched by name from the command line.
-
-```bash
-winapp manifest add-alias <alias> [--manifest <path>]
-```
-
-**Example:**
-
-```bash
-# Add an alias so the app can be launched as "myapp" from terminal
-winapp manifest add-alias myapp
-```
-
-> **v0.3.0 Note:** `winapp init` and `winapp manifest generate` now create `Package.appxmanifest` (matching the Visual Studio convention) instead of `appxmanifest.xml`.
-
-### ui - UI Automation (v0.3.0+)
-
-UI Automation built into the CLI. Inspect and interact with any running Windows application.
-
-```bash
-winapp ui <subcommand> [options]
-```
-
-**Subcommands:**
-
-| Subcommand | Description |
-| ---------- | ----------- |
-| `list-windows` | List all visible top-level windows |
-| `inspect` | Walk the full UI Automation tree of a window |
-| `search` | Find elements by name, type, or automation ID |
-| `click` | Click an element by automation ID |
-| `set-value` | Set a value on an element (e.g., TextBox) |
-| `screenshot` | Capture a window screenshot |
-| `wait-for` | Block until a specific element appears |
-
-**Common Options:**
-
-| Option | Description |
-| ------ | ----------- |
-| `-a, --app <name>` | Target app name |
-| `-i` | Interactive mode (for inspect) |
-| `-o, --output <path>` | Output file path (for screenshot) |
-| `-t, --timeout <ms>` | Timeout in milliseconds (for wait-for) |
-
-**Examples:**
-
-```bash
-# List all visible windows
-winapp ui list-windows
-
-# Inspect UI tree of a specific app
-winapp ui inspect -a "My App" -i
-
-# Click a button by automation ID
-winapp ui click "btn-save-d1" -a "My App"
-
-# Take a screenshot
-winapp ui screenshot -a "My App" -o screenshot.png
-
-# Set a TextBox value
-winapp ui set-value "txt-name-a3" "Hello" -a "My App"
-
-# Wait for an element to appear
-winapp ui wait-for "Done" -a "My App" -t 10000
-```
-
-### complete - Shell Completion (v0.3.0+)
-
-Set up tab completion for all winapp commands.
-
-```bash
-# PowerShell (permanent)
-winapp complete --setup powershell >> $PROFILE
-
-# PowerShell (current session)
-winapp complete --setup powershell | Out-String | Invoke-Expression
-```
-
-## Common Workflows
-
-### Workflow 1: Initialize New Windows App Project
-
-```bash
-# 1. Navigate to project root
-cd my-project
-
-# 2. Initialize workspace (creates manifest, assets, SDK setup)
-winapp init
-
-# 3. Generate a development certificate for signing (v0.2.0+: no longer automatic)
-winapp cert generate
-
-# 4. Your project now has:
-#    - AppxManifest.xml (or configured .csproj for .NET projects)
-#    - Windows SDK configuration
-#    - winapp.yaml configuration (non-.NET projects only)
-#    - Development certificate (after running cert generate)
-```
-
-### Workflow 2: Debug with Package Identity
-
-For testing Windows APIs that require package identity (notifications, Windows AI, shell integration):
-
-```bash
-# 1. Initialize project if not done
-winapp init
-
-# 2. Build your application
-# (your build command here)
-
-# 3. Add debug identity to your executable
-winapp create-debug-identity ./bin/MyApp.exe
-
-# 4. Run your app - it now has package identity for debugging
-./bin/MyApp.exe
-```
-
-### Workflow 3: Package for Distribution
-
-```bash
-# 1. Build your application
-# (your build command here)
-
-# 2. Create MSIX package with signing
-winapp pack ./build-output --generate-cert --output MyApp.msix
-
-# Or with existing certificate
-winapp pack ./build-output --cert ./mycert.pfx --cert-password secret
-```
-
-### Workflow 4: CI/CD Pipeline Setup
-
-```yaml
-# GitHub Actions example
-- name: Setup winapp CLI
-  uses: microsoft/setup-WinAppCli@v1
-
-- name: Initialize and Package
-  run: |
-    winapp init --no-prompt
-    winapp cert generate  # v0.2.0+: explicit cert generation
-    winapp pack ./build-output --output MyApp.msix
-```
-
-### Workflow 5: Electron App Integration
-
-```bash
-# 1. Install via npm
-npm install @microsoft/winappcli --save-dev
-
-# 2. Initialize project
-npx winapp init
-
-# 3. Add debug identity for Electron
-npx winapp node add-electron-debug-identity
-
-# 4. Create native addon (C++ or C#)
-npx winapp node create-addon
-
-# 5. Package for distribution
-npx winapp pack ./out --output MyElectronApp.msix
-```
-
-### Workflow 6: Publish to Microsoft Store (v0.2.0+)
-
-```bash
-# 1. Configure Store credentials (one-time setup)
-winapp store reconfigure --tenantId $TENANT_ID --sellerId $SELLER_ID --clientId $CLIENT_ID --clientSecret $CLIENT_SECRET
-
-# 2. Initialize project for Store (sets up app identity)
-winapp store init ./my-app
-
-# 3. Package for Store submission
-winapp store package ./my-app --arch x64,arm64
-
-# 4. Publish to Store
-winapp store publish ./my-app
-
-# Or publish with gradual rollout
-winapp store publish ./my-app --packageRolloutPercentage 10
-
-# Or publish as draft (no commit)
-winapp store publish ./my-app --noCommit
-```
-
-### Workflow 7: Run and Test Packaged App (v0.3.0+)
-
-```bash
-# 1. Build your app
-dotnet build
-
-# 2. Run as packaged app
-winapp run ./bin/Debug/net10.0-windows10.0.26100.0/win-x64
-
-# 3. Or use dotnet run (with Microsoft.Windows.SDK.BuildTools.WinApp NuGet package)
-dotnet run
-
-# 4. Clean up when done
-winapp unregister
-```
-
-### Workflow 8: UI Automation Testing (v0.3.0+)
-
-```bash
-# 1. Build and run the app
-winapp run ./bin/Debug --detach
-
-# 2. Wait for the app to be ready
-winapp ui wait-for "MainWindow" -a "My App" -t 10000
-
-# 3. Interact with UI elements
-winapp ui set-value "txt-name" "Test User" -a "My App"
-winapp ui click "btn-submit" -a "My App"
-
-# 4. Verify results
-winapp ui search "Success" -a "My App"
-winapp ui screenshot -a "My App" -o result.png
-
-# 5. Clean up
-winapp unregister
-```
-
-## Windows APIs Enabled by Package Identity
-
-Package identity unlocks access to powerful Windows APIs:
-
-| API Category | Examples |
-| ------------ | -------- |
-| **Notifications** | Interactive native notifications, notification management |
-| **Windows AI** | On-device LLM, text/image AI APIs (Phi Silica, Windows ML) |
-| **Shell Integration** | Explorer, Taskbar, Share sheet integration |
-| **Protocol Handlers** | Custom URI schemes (`yourapp://`) |
-| **Web-to-App Linking** | Direct website-to-app navigation |
-| **Device Access** | Camera, microphone, location (with consent) |
-| **Background Tasks** | Run when app is closed |
-| **File Associations** | Open file types with your app |
-| **Startup Tasks** | Launch at Windows login |
-| **App Services** | Expose APIs to other apps |
+- **`winapp ui --json` envelope reshaped in v0.3.1** — `ui inspect`, `ui get-focused`, `ui search`, and `ui wait-for` use new shapes; per-element `id` / `parentSelector` / `windowHandle` are removed (use `selector`). Full schemas in [`references/ui-json-envelope.md`](./references/ui-json-envelope.md).
+- **`winapp init` no longer auto-generates a certificate** (v0.2.0+) — run `winapp cert generate` explicitly. The old `--no-cert` flag was removed.
+- **`.csproj` projects skip `winapp.yaml`** — SDK packages live in the project file. Hybrid setups need adjustment.
+- **NuGet global cache, not `%userprofile%/.winapp/packages`** (v0.2.0+) — scripts depending on the old folder will break.
+- **Re-run `create-debug-identity` after any manifest change** — identity is bound at registration time.
 
 ## Troubleshooting
 
-| Issue | Solution |
-| ----- | -------- |
-| Certificate not trusted | Run `winapp cert install <cert-path>` to install to local machine store |
-| Package identity not working | Run `winapp create-debug-identity` after any manifest changes |
-| SDK not found | Run `winapp restore` or `winapp update` to ensure SDKs are installed |
-| Signing fails | Verify certificate password and ensure cert is not expired. Use `winapp cert info` to check validity (v0.2.1+) |
-| Assets not generated | Run `winapp manifest update-assets <image-path>` with a valid image (PNG or SVG) |
-| No certificate after init (v0.2.0+) | Run `winapp cert generate` explicitly - init no longer auto-generates certs |
-| Missing winapp.yaml for .NET (v0.2.0+) | This is expected - .NET projects configure packages in .csproj directly |
-| Store publish fails | Run `winapp store reconfigure` to verify credentials are set |
-| UI automation can't find window | Use `winapp ui list-windows` to verify app name; try with quotes for names with spaces |
-| `dotnet run` doesn't launch packaged | Install `Microsoft.Windows.SDK.BuildTools.WinApp` NuGet package or run `winapp init` |
-
-## Framework-Specific Guides
-
-| Framework | Guide |
-| --------- | ----- |
-| .NET | [Get Started with .NET](https://github.com/microsoft/WinAppCli/blob/main/docs/guides/dotnet.md) |
-| C++/CMake | [Get Started with C++](https://github.com/microsoft/WinAppCli/blob/main/docs/guides/cpp.md) |
-| Electron | [Get Started with Electron](https://github.com/microsoft/WinAppCli/blob/main/docs/electron-get-started.md) |
-| Rust | [Get Started with Rust](https://github.com/microsoft/WinAppCli/blob/main/docs/guides/rust.md) |
-| Tauri | [Get Started with Tauri](https://github.com/microsoft/WinAppCli/blob/main/docs/guides/tauri.md) |
+| Issue | Fix |
+| ----- | --- |
+| Certificate not trusted | `winapp cert install <pfx>` to add to local machine store |
+| Identity-gated API fails | Re-run `create-debug-identity` after manifest changes |
+| SDK not found | `winapp restore` or `winapp update` |
+| `run` / `create-debug-identity` registration error `0x800704EC` | Developer Mode is off — enable it in **Settings → Privacy & security → For developers** (or `Set-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\AppModelUnlock' -Name AllowDevelopmentWithoutDevLicense -Value 1`), then retry |
+| `run` / `create-debug-identity` registration error `0x80073CFB` | Package already registered with a conflicting identity — run `winapp unregister` (or `winapp unregister --force` if registered from a different project tree), then retry |
 
 ## References
 
-- [GitHub Repository](https://github.com/microsoft/WinAppCli)
-- [Full CLI Documentation](https://github.com/microsoft/WinAppCli/blob/main/docs/usage.md)
-- [Sample Applications](https://github.com/microsoft/WinAppCli/tree/main/samples)
-- [Windows App SDK](https://learn.microsoft.com/windows/apps/windows-app-sdk/)
-- [MSIX Packaging Overview](https://learn.microsoft.com/windows/msix/overview)
-- [Microsoft Store Developer CLI](https://learn.microsoft.com/windows/apps/publish/msstore-dev-cli/commands)
-- [Package Identity Overview](https://learn.microsoft.com/windows/apps/desktop/modernize/package-identity-overview)
-- [UI Automation Getting Started](https://github.com/microsoft/WinAppCli/blob/main/docs/ui-automation.md)
-- [dotnet run Support](https://github.com/microsoft/WinAppCli/blob/main/docs/dotnet-run-support.md)
-- [Shell Completion Guide](https://github.com/microsoft/WinAppCli/blob/main/docs/guides/shell-completion.md)
+- [winapp CLI repo](https://github.com/microsoft/WinAppCli) · [Full usage docs](https://github.com/microsoft/WinAppCli/blob/main/docs/usage.md) · [.NET guide](https://github.com/microsoft/WinAppCli/blob/main/docs/guides/dotnet.md) · [Samples](https://github.com/microsoft/WinAppCli/tree/main/samples)
+- [Windows App SDK](https://learn.microsoft.com/windows/apps/windows-app-sdk/) · [MSIX overview](https://learn.microsoft.com/windows/msix/overview) · [Package identity overview](https://learn.microsoft.com/windows/apps/desktop/modernize/package-identity-overview)
