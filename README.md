@@ -260,7 +260,7 @@ This extension integrates with the **Windows App Development CLI (winapp)**, whi
 
 ### Run & Automation (v0.3.0+)
 
-- `winapp run` - Run a build output as a packaged app
+- `winapp run` - Run a build output as a packaged app (v0.3.1+: forward application args after `--`)
 - `winapp unregister` - Remove a sideloaded dev package
 - `winapp manifest add-alias` - Add an app execution alias to the manifest
 - `winapp ui` - UI Automation: list windows, inspect trees, click, screenshot, and more
