@@ -622,6 +622,15 @@ export class PackageManager {
         );
         if (!unregisterOnExit) { return; }
 
+        // v0.3.1+: optional application arguments forwarded after `--`.
+        const appArgsInput = await vscode.window.showInputBox({
+            prompt: 'Optional application arguments (space-separated, forwarded after --). Leave empty for none.',
+            placeHolder: '--my-flag value',
+            ignoreFocusOut: true
+        });
+        if (appArgsInput === undefined) { return; }
+        const appArgs = this.parseAppArgs(appArgsInput);
+
         await vscode.window.withProgress({
             location: vscode.ProgressLocation.Notification,
             title: 'Launching packaged app...',
@@ -633,11 +642,55 @@ export class PackageManager {
                     detach: runMode.mode === 'detach',
                     debugOutput: runMode.mode === 'debugOutput',
                     unregisterOnExit: unregisterOnExit === 'Yes',
+                    ...(appArgs.length > 0 ? { appArgs } : {}),
                 }, projectPath);
             } catch (error) {
                 vscode.window.showErrorMessage(`Failed to run packaged app: ${error}`);
             }
         });
+    }
+
+    /**
+     * Tokenize a free-form argument string into argv entries, honoring
+     * single and double quotes so users can pass values containing spaces.
+     */
+    private parseAppArgs(input: string): string[] {
+        const trimmed = input.trim();
+        if (!trimmed) {
+            return [];
+        }
+
+        const tokens: string[] = [];
+        let current = '';
+        let quote: '"' | "'" | null = null;
+
+        for (let i = 0; i < trimmed.length; i++) {
+            const ch = trimmed[i];
+            if (quote) {
+                if (ch === quote) {
+                    quote = null;
+                } else {
+                    current += ch;
+                }
+                continue;
+            }
+            if (ch === '"' || ch === "'") {
+                quote = ch;
+                continue;
+            }
+            if (ch === ' ' || ch === '\t') {
+                if (current.length > 0) {
+                    tokens.push(current);
+                    current = '';
+                }
+                continue;
+            }
+            current += ch;
+        }
+        if (current.length > 0) {
+            tokens.push(current);
+        }
+        return tokens;
     }
 
     /**

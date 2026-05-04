@@ -5,6 +5,33 @@ All notable changes to the WinDev Helper extension will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.9.0] - 2026-05-04
+
+> ⚠️ The preview pane and properties panel features are currently in preview. Please report any bugs or suggestions to our GitHub issues.
+
+### Added
+
+- **Application argument passthrough for `Run as Packaged App`** (winapp CLI v0.3.1)
+  - The **WinDev: Run as Packaged App** command now prompts for optional application arguments
+  - Arguments are forwarded to the launched app verbatim using the new `--` passthrough syntax (no quote escaping required)
+  - New `appArgs` option on the `WinAppCli.run()` API for programmatic callers
+
+### Changed
+
+- **Updated for winapp CLI v0.3.1**
+  - Inherits the new plain progress streaming when running inside CI or AI-agent terminals (GitHub Actions, Azure DevOps, Copilot CLI, Claude Code, etc.); interactive terminals continue to render the animated spinner tree
+  - `winapp ui inspect --interactive` now collapses non-interactive ancestors and surfaces them as `ancestorPath` on surviving descendants, with `+more` markers for truncated subtrees
+
+### Fixed
+
+- **winapp CLI bug fixes inherited from v0.3.1**
+  - `winapp run` no longer accidentally selects `createdump.exe` when multiple `.exe` files exist alongside the app
+  - `winapp register` now reports package-already-exists conflicts (HRESULT `0x80073CFB`) with an actionable hint instead of a misleading Developer Mode error
+  - `winapp unregister` is safer for per-package removals: fixed a containment check that could misclassify sibling directories and a safety check that could be bypassed when multiple packages were classified together
+  - Failed operations now surface real exception messages instead of `(null)` in status output
+  - NuGet version range parsing on cache-warm runs no longer breaks when brackets are pre-stripped
+  - Forward compatibility with WinAppSDK 2.0.1's new major-only framework package naming (`Microsoft.WindowsAppRuntime.2`)
+
 ## [2.8.0] - 2026-04-22
 
 > ⚠️ The preview pane and properties panel features are currently in preview. Please report any bugs or suggestions to our GitHub issues.

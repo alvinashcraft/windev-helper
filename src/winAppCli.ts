@@ -629,6 +629,11 @@ export class WinAppCli {
             if (options.symbols) {
                 args.push('--symbols');
             }
+            // v0.3.1+: pass application arguments after `--` so the CLI forwards them
+            // verbatim to the launched app without requiring quote escaping.
+            if (options.appArgs && options.appArgs.length > 0) {
+                args.push('--', ...options.appArgs);
+            }
             await this.execute('run', args, cwd);
             vscode.window.showInformationMessage('Packaged app launched successfully.');
         } catch (error) {
@@ -815,4 +820,9 @@ export interface RunOptions {
     unregisterOnExit?: boolean;
     debugOutput?: boolean;
     symbols?: boolean;
+    /**
+     * Application arguments forwarded to the launched app via `--` (v0.3.1+).
+     * Each entry is passed as a separate argv element, no shell escaping required.
+     */
+    appArgs?: string[];
 }
