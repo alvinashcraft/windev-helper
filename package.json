@@ -44,8 +44,7 @@
   ],
   "main": "./dist/extension.js",
   "extensionDependencies": [
-    "ms-dotnettools.csharp",
-    "ms-dotnettools.csdevkit"
+    "ms-dotnettools.csharp"
   ],
   "contributes": {
     "commands": [

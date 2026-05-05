@@ -6,7 +6,7 @@ This is a VS Code extension for WinUI 3 development using the Windows App SDK.
 
 - **Type:** VS Code Extension (TypeScript)
 - **Target:** WinUI 3 / Windows App SDK developers
-- **Dependencies:** C# Dev Kit, .NET SDK, Windows App Development CLI (winapp)
+- **Dependencies:** C# extension (required, open source); C# Dev Kit (optional, enables Solution Explorer integration); .NET SDK; Windows App Development CLI (winapp)
 
 ## Development
 
