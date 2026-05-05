@@ -20,6 +20,8 @@ export const CONFIG = {
     AUTO_RESTORE_ON_OPEN: 'autoRestoreOnOpen',
     SHOW_STATUS_BAR_ITEMS: 'showStatusBarItems',
     CERTIFICATE_PATH: 'certificatePath',
+    TEMPLATES_SOURCE: 'templates.source',
+    TEMPLATES_ALLOW_PRERELEASE: 'templates.allowPrerelease',
 } as const;
 
 /**
@@ -69,6 +71,11 @@ export const COMMANDS = {
     UI_LIST_WINDOWS: 'windev-helper.uiListWindows',
     UI_INSPECT: 'windev-helper.uiInspect',
     UI_SCREENSHOT: 'windev-helper.uiScreenshot',
+    // Parity commands with the official Microsoft WinApp VS Code extension (v2.10.0+)
+    MANIFEST_UPDATE_ASSETS: 'windev-helper.manifestUpdateAssets',
+    RUN_SDK_TOOL: 'windev-helper.runSdkTool',
+    GET_WINAPP_PATH: 'windev-helper.getWinAppPath',
+    CONFIGURE_WINAPP_DEBUG: 'windev-helper.configureWinAppDebug',
 } as const;
 
 /**
@@ -79,6 +86,7 @@ export const OUTPUT_CHANNELS = {
     PACKAGING: 'WinUI Packaging',
     TEMPLATES: 'WinUI Templates',
     WINAPP_CLI: 'WinApp CLI',
+    WINAPP_DEBUG: 'WinApp Debug',
 } as const;
 
 /**
@@ -87,6 +95,14 @@ export const OUTPUT_CHANNELS = {
 export const DEBUG_TYPES = {
     WINUI: 'winui',
     CORECLR: 'coreclr',
+    /**
+     * Custom WinApp debug type (parity with the official Microsoft WinApp
+     * VS Code extension). Launches the build output via `winapp run` so the
+     * app gets package identity, then attaches a child debugger.
+     */
+    WINAPP: 'winapp',
+    CPPVSDBG: 'cppvsdbg',
+    NODE: 'node',
 } as const;
 
 /**
@@ -117,3 +133,40 @@ export const DEFAULTS = {
     TARGET_FRAMEWORK: 'net8.0-windows10.0.19041.0',
     TIMESTAMP_URL: 'http://timestamp.digicert.com',
 } as const;
+
+/**
+ * Identifiers for the supported `dotnet new` template packages.
+ *
+ * - `OFFICIAL`: Microsoft.WindowsAppSDK.WinUI.CSharp.Templates (alpha) ships the
+ *   blank-app, MVVM, NavigationView, library, and unit-test templates plus the
+ *   common item templates (page, window, user control, templated control,
+ *   resource dictionary, RESW, dialog).
+ * - `COMMUNITY`: VijayAnand.WinUITemplates is the long-standing community pack
+ *   that this extension has used since launch and remains the default for users
+ *   who already rely on its short names (`winuilib`, `-mvvm` flag).
+ */
+export const TEMPLATE_PACKAGES = {
+    OFFICIAL: 'Microsoft.WindowsAppSDK.WinUI.CSharp.Templates',
+    COMMUNITY: 'VijayAnand.WinUITemplates',
+} as const;
+
+/**
+ * Project template short names exposed by the supported template packages.
+ * The `OFFICIAL` package adds dedicated MVVM, NavigationView, library, and
+ * unit-test templates; the `COMMUNITY` package uses a single `winui` template
+ * with a `-mvvm` flag and a `winuilib` library template.
+ */
+export const TEMPLATE_NAMES = {
+    OFFICIAL: {
+        BLANK: 'winui',
+        MVVM: 'winui-mvvm',
+        NAVIGATION_VIEW: 'winui-navview',
+        LIBRARY: 'winui-lib',
+        UNIT_TEST: 'winui-unittest',
+    },
+    COMMUNITY: {
+        BLANK: 'winui',
+        LIBRARY: 'winuilib',
+    },
+} as const;
+

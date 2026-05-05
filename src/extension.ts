@@ -4,6 +4,7 @@
 
 import * as vscode from 'vscode';
 import { DebugConfigurationProvider } from './debugConfigurationProvider';
+import { WinAppDebugConfigurationProvider } from './winAppDebugProvider';
 import { ServiceLocator } from './serviceLocator';
 import { COMMANDS, CONFIG, DEBUG_TYPES } from './constants';
 import { XamlPreviewController } from './xamlPreview';
@@ -14,6 +15,7 @@ let services: ServiceLocator;
 let previewController: XamlPreviewController;
 let propertyPaneController: PropertyPaneController;
 let designerSelectionSubscription: vscode.Disposable | undefined;
+let winAppDebugProvider: WinAppDebugConfigurationProvider | undefined;
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
     console.log('WinDev Helper extension is now active');
@@ -53,6 +55,19 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     );
     context.subscriptions.push(
         vscode.debug.registerDebugConfigurationProvider(DEBUG_TYPES.WINUI, debugProvider)
+    );
+
+    // Register the `winapp` debug type — parity with the official Microsoft
+    // WinApp VS Code extension. Launches the build output via `winapp run`
+    // (package identity) and attaches the requested debugger.
+    winAppDebugProvider = new WinAppDebugConfigurationProvider(services.winAppCli);
+    context.subscriptions.push(
+        vscode.debug.registerDebugConfigurationProvider(DEBUG_TYPES.WINAPP, winAppDebugProvider),
+        vscode.debug.registerDebugConfigurationProvider(
+            DEBUG_TYPES.WINAPP,
+            winAppDebugProvider,
+            vscode.DebugConfigurationProviderTriggerKind.Dynamic
+        )
     );
 
     // Register all commands
@@ -342,6 +357,31 @@ function registerCommands(context: vscode.ExtensionContext): void {
         })
     );
 
+    // Parity commands with the official Microsoft WinApp VS Code extension
+    context.subscriptions.push(
+        vscode.commands.registerCommand(COMMANDS.MANIFEST_UPDATE_ASSETS, async () => {
+            await services.packageManager.manifestUpdateAssets(services.projectManager.currentProject);
+        })
+    );
+
+    context.subscriptions.push(
+        vscode.commands.registerCommand(COMMANDS.RUN_SDK_TOOL, async () => {
+            await services.packageManager.runSdkTool();
+        })
+    );
+
+    context.subscriptions.push(
+        vscode.commands.registerCommand(COMMANDS.GET_WINAPP_PATH, async () => {
+            await services.packageManager.getWinAppPath();
+        })
+    );
+
+    context.subscriptions.push(
+        vscode.commands.registerCommand(COMMANDS.CONFIGURE_WINAPP_DEBUG, async () => {
+            await services.packageManager.configureWinAppDebug(services.projectManager.currentProject);
+        })
+    );
+
     // XAML Preview command
     context.subscriptions.push(
         vscode.commands.registerCommand(COMMANDS.OPEN_XAML_PREVIEW, async () => {
@@ -361,4 +401,5 @@ export function deactivate(): void {
     if (ServiceLocator.isInitialized) {
         services.dispose();
     }
+    winAppDebugProvider?.dispose();
 }

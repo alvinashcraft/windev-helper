@@ -2,7 +2,7 @@
   "name": "windev-helper",
   "displayName": "WinDev Helper",
   "description": "Build beautiful, performant WinUI apps with VS Code. Debug, build, package, and deploy Windows apps powered by the Windows App SDK.",
-  "version": "2.9.0",
+  "version": "2.10.0",
   "publisher": "alvinashcraft",
   "preview": true,
   "icon": "images/icon.png",
@@ -235,6 +235,26 @@
         "category": "WinDev"
       },
       {
+        "command": "windev-helper.manifestUpdateAssets",
+        "title": "Update Manifest Assets",
+        "category": "WinDev"
+      },
+      {
+        "command": "windev-helper.runSdkTool",
+        "title": "Run SDK Tool",
+        "category": "WinDev"
+      },
+      {
+        "command": "windev-helper.getWinAppPath",
+        "title": "Get WinApp Path",
+        "category": "WinDev"
+      },
+      {
+        "command": "windev-helper.configureWinAppDebug",
+        "title": "Configure WinApp Debug & Tasks",
+        "category": "WinDev"
+      },
+      {
         "command": "windev-helper.openXamlPreview",
         "title": "Open XAML Preview",
         "category": "WinDev",
@@ -463,6 +483,26 @@
           ],
           "default": "auto",
           "description": "Theme for XAML preview. 'auto' follows VS Code theme or project's App.xaml RequestedTheme."
+        },
+        "windevHelper.templates.source": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "official",
+            "community"
+          ],
+          "enumDescriptions": [
+            "Prefer the official Microsoft templates if installed; otherwise fall back to the community templates.",
+            "Use the official Microsoft.WindowsAppSDK.WinUI.CSharp.Templates package (currently in alpha).",
+            "Use the community VijayAnand.WinUITemplates package."
+          ],
+          "default": "auto",
+          "description": "Which dotnet template package to use when scaffolding WinUI projects and items."
+        },
+        "windevHelper.templates.allowPrerelease": {
+          "type": "boolean",
+          "default": true,
+          "description": "Allow installing prerelease versions of the official Microsoft WinUI template package (the alpha is required while the package is still in preview)."
         }
       }
     },
@@ -572,6 +612,76 @@
               "project": "${workspaceFolder}/${1:MyApp}.csproj",
               "configuration": "${2:Debug}",
               "platform": "${3:x64}"
+            }
+          }
+        ]
+      },
+      {
+        "type": "winapp",
+        "label": "WinApp",
+        "languages": [
+          "csharp",
+          "cpp",
+          "c",
+          "javascript",
+          "typescript"
+        ],
+        "configurationAttributes": {
+          "launch": {
+            "properties": {
+              "inputFolder": {
+                "type": "string",
+                "description": "Path to the build output folder containing your app binaries (e.g., ${workspaceFolder}/bin/Debug/net8.0-windows10.0.22621). If not set, you will be prompted to select a folder."
+              },
+              "manifest": {
+                "type": "string",
+                "description": "Path to the AppxManifest.xml file. If not set, the CLI auto-detects from the input folder or current directory."
+              },
+              "debuggerType": {
+                "type": "string",
+                "enum": [
+                  "coreclr",
+                  "cppvsdbg",
+                  "node"
+                ],
+                "default": "coreclr",
+                "description": "Underlying debugger to use after the app is launched with package identity."
+              },
+              "workingDirectory": {
+                "type": "string",
+                "description": "Working directory for the application. Defaults to the build output folder."
+              },
+              "args": {
+                "type": [
+                  "string",
+                  "array"
+                ],
+                "description": "Command-line arguments to pass to the application (forwarded after `--`)."
+              },
+              "outputAppxDirectory": {
+                "type": "string",
+                "description": "Output directory for the loose-layout package. Defaults to an AppX folder inside the input folder."
+              }
+            }
+          }
+        },
+        "initialConfigurations": [
+          {
+            "type": "winapp",
+            "request": "launch",
+            "name": "WinApp: Launch and Attach"
+          }
+        ],
+        "configurationSnippets": [
+          {
+            "label": "WinApp: Launch and Attach",
+            "description": "Launch a Windows app with package identity via 'winapp run' and attach the debugger.",
+            "body": {
+              "type": "winapp",
+              "request": "launch",
+              "name": "WinApp: Launch and Attach",
+              "preLaunchTask": "${1:winapp: build}",
+              "debuggerType": "${2|coreclr,cppvsdbg,node|}"
             }
           }
         ]

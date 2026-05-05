@@ -694,6 +694,9 @@ export class WinAppCli {
             if (options.symbols) {
                 args.push('--symbols');
             }
+            if (options.outputAppxDirectory) {
+                args.push('--output', options.outputAppxDirectory);
+            }
             // v0.3.1+: pass application arguments after `--` so the CLI forwards them
             // verbatim to the launched app without requiring quote escaping.
             if (options.appArgs && options.appArgs.length > 0) {
@@ -746,6 +749,27 @@ export class WinAppCli {
             vscode.window.showInformationMessage(`App execution alias '${alias}' added to manifest.`);
         } catch (error) {
             vscode.window.showErrorMessage(`Failed to add alias: ${error}`);
+        }
+    }
+
+    /**
+     * Generate all required app icon assets from a single source image (v0.2.1+).
+     * Wraps `winapp manifest update-assets <image>`. Accepts PNG, JPG, GIF, BMP,
+     * or SVG sources.
+     * @param imagePath Path to the source image
+     * @param manifestPath Optional path to the manifest file
+     * @param cwd Optional working directory for the command
+     */
+    public async manifestUpdateAssets(imagePath: string, manifestPath?: string, cwd?: string): Promise<void> {
+        try {
+            const args: string[] = ['update-assets', imagePath];
+            if (manifestPath) {
+                args.push('--manifest', manifestPath);
+            }
+            await this.execute('manifest', args, cwd);
+            vscode.window.showInformationMessage('Manifest assets updated successfully.');
+        } catch (error) {
+            vscode.window.showErrorMessage(`Failed to update manifest assets: ${error}`);
         }
     }
 
@@ -885,6 +909,11 @@ export interface RunOptions {
     unregisterOnExit?: boolean;
     debugOutput?: boolean;
     symbols?: boolean;
+    /**
+     * Output directory for the loose-layout package produced by
+     * `winapp run`. Defaults to an `AppX` folder inside `inputFolder`.
+     */
+    outputAppxDirectory?: string;
     /**
      * Application arguments forwarded to the launched app via `--` (v0.3.1+).
      * Each entry is passed as a separate argv element, no shell escaping required.
