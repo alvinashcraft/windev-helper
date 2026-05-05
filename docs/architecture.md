@@ -531,11 +531,12 @@ Custom debugger type:
 ```json
 {
   "extensionDependencies": [
-    "ms-dotnettools.csharp",
-    "ms-dotnettools.csdevkit"
+    "ms-dotnettools.csharp"
   ]
 }
 ```
+
+C# Dev Kit (`ms-dotnettools.csdevkit`) is a **soft / recommended** dependency. The `csharp.solutionExplorer.context` menu contributions registered in `package.json` only become visible when C# Dev Kit is installed; without it, the same commands remain accessible from the Command Palette and the file Explorer context menu, so all functionality continues to work.
 
 ### External Tools
 

@@ -305,7 +305,24 @@ Include:
 2. Update CHANGELOG.md
 3. Create a release PR to `main`
 4. After merge, tag the release
-5. Publish to VS Code Marketplace
+5. Publish to the VS Code Marketplace and Open VSX:
+
+   ```powershell
+   # Build the .vsix once
+   npm run package
+
+   # One-shot: publish the most recent .vsix to BOTH registries
+   $env:VSCE_PAT = '<your-marketplace-token>'
+   $env:OVSX_PAT = '<your-openvsx-token>'
+   npm run publish:all          # or: npm run publish:all:prerelease
+
+   # Or publish individually if you need finer control:
+   npm run publish              # Visual Studio Marketplace
+   $vsix = (Get-ChildItem windev-helper-*.vsix | Sort-Object LastWriteTime -Descending | Select-Object -First 1).FullName
+   npm run publish:openvsx -- $vsix
+   ```
+
+   `publish:all` runs `vsce publish` first; if that fails, the Open VSX step is skipped so the two registries don't drift out of sync. See the [Open VSX publishing docs](https://github.com/EclipseFdn/open-vsx.org/wiki/Publishing-Extensions) for first-time setup.
 
 ---
 

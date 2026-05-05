@@ -44,6 +44,13 @@ This release brings WinDev Helper closer to feature parity with the official [Mi
 ### Changed
 
 - **`winapp run`** now accepts an `outputAppxDirectory` option (mirrors `--output`) so the loose-layout package can be redirected when needed by the new debug type
+- **C# Dev Kit is now an optional / recommended dependency** ([#7](https://github.com/alvinashcraft/windev-helper/issues/7))
+  - Removed `ms-dotnettools.csdevkit` from `extensionDependencies` so users who cannot use C# Dev Kit under [its proprietary license](https://aka.ms/vs/csdevkit/license) are no longer forced to install it
+  - The open-source `ms-dotnettools.csharp` extension remains required
+  - All build, debug, packaging, manifest, certificate, and template features continue to work without C# Dev Kit. The only feature gated by C# Dev Kit is the Solution Explorer context-menu shortcut for `Add New Page` / `User Control` / `Window` / `ViewModel` — those commands remain available from the Command Palette and the file Explorer context menu
+- **Open VSX Registry support**
+  - Added `ovsx` as a devDependency and new `publish:openvsx` / `publish:openvsx:prerelease` npm scripts so the extension can be published to [Open VSX](https://open-vsx.org/) alongside the Visual Studio Marketplace
+  - Removing the C# Dev Kit hard dependency unblocks publishing to Open VSX, which means the extension can now be installed in editors such as [VSCodium](https://vscodium.com/), [Cursor](https://cursor.com/), and [Windsurf](https://codeium.com/windsurf) that use the Open VSX Registry instead of the Microsoft marketplace
 
 ## [2.9.0] - 2026-05-04
 
