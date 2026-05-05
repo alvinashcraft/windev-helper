@@ -702,6 +702,8 @@
     "publish:prerelease": "npx vsce publish --pre-release --allow-star-activation",
     "publish:openvsx": "npx ovsx publish --packagePath",
     "publish:openvsx:prerelease": "npx ovsx publish --pre-release --packagePath",
+    "publish:all": "node scripts/publish-all.mjs",
+    "publish:all:prerelease": "node scripts/publish-all.mjs --pre-release",
     "compile-tests": "tsc -p . --outDir out",
     "watch-tests": "tsc -p . -w --outDir out",
     "pretest": "npm run compile-tests && npm run compile && npm run lint",

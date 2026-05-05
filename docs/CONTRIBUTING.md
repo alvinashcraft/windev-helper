@@ -311,17 +311,18 @@ Include:
    # Build the .vsix once
    npm run package
 
-   # Visual Studio Marketplace (requires VSCE_PAT)
-   npm run publish
+   # One-shot: publish the most recent .vsix to BOTH registries
+   $env:VSCE_PAT = '<your-marketplace-token>'
+   $env:OVSX_PAT = '<your-openvsx-token>'
+   npm run publish:all          # or: npm run publish:all:prerelease
 
-   # Open VSX Registry (requires OVSX_PAT for the alvinashcraft namespace)
-   $vsix = Get-ChildItem windev-helper-*.vsix | Sort-Object LastWriteTime -Descending | Select-Object -First 1
-   npm run publish:openvsx -- $vsix.FullName
+   # Or publish individually if you need finer control:
+   npm run publish              # Visual Studio Marketplace
+   $vsix = (Get-ChildItem windev-helper-*.vsix | Sort-Object LastWriteTime -Descending | Select-Object -First 1).FullName
+   npm run publish:openvsx -- $vsix
    ```
 
-   Use `publish:prerelease` and `publish:openvsx:prerelease` for preview builds.
-
-   See the [Open VSX publishing docs](https://github.com/EclipseFdn/open-vsx.org/wiki/Publishing-Extensions) for setting up the namespace and PAT the first time.
+   `publish:all` runs `vsce publish` first; if that fails, the Open VSX step is skipped so the two registries don't drift out of sync. See the [Open VSX publishing docs](https://github.com/EclipseFdn/open-vsx.org/wiki/Publishing-Extensions) for first-time setup.
 
 ---
 
