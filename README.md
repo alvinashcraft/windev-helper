@@ -87,7 +87,7 @@ On non-Windows platforms, the extension provides an HTML-based preview renderer 
 - Create WinUI class libraries
 - Add new Pages, Windows, and User Controls to your project
 - **Automatic MVVM setup** - Global usings for CommunityToolkit.Mvvm are automatically added when creating views
-- Powered by [WinUI Templates](https://github.com/egvijayanand/winui-templates)
+- Supports both the [official Microsoft Windows App SDK templates](https://www.nuget.org/packages/Microsoft.WindowsAppSDK.WinUI.CSharp.Templates) (currently in alpha) and the [community WinUI Templates](https://github.com/egvijayanand/winui-templates); pick a preference via `windevHelper.templates.source`
 
 ### 🛠️ App Manifest Management
 
@@ -116,7 +116,9 @@ This extension requires the following VS Code extensions:
 - **.NET 8 SDK** or later - [Download](https://dotnet.microsoft.com/download)
 - **Windows App SDK** - Automatically referenced in WinUI projects
 - **Windows App Development CLI (winapp)** - [Learn more](https://github.com/microsoft/WinAppCli)
-- **WinUI Templates** - Install with: `dotnet new install VijayAnand.WinUITemplates`
+- **WinUI Templates** - Install with `WinUI: Install WinUI Templates`, or directly:
+  - Official (alpha): `dotnet new install Microsoft.WindowsAppSDK.WinUI.CSharp.Templates::*-*`
+  - Community: `dotnet new install VijayAnand.WinUITemplates`
 
 ### System Requirements
 
@@ -132,7 +134,9 @@ This extension requires the following VS Code extensions:
 # Install .NET 8 SDK (if not already installed)
 winget install Microsoft.DotNet.SDK.8
 
-# Install WinUI Templates
+# Install WinUI Templates (pick one)
+dotnet new install Microsoft.WindowsAppSDK.WinUI.CSharp.Templates::*-*
+# or the community pack
 dotnet new install VijayAnand.WinUITemplates
 
 # Install Windows App Development CLI
@@ -204,6 +208,10 @@ dotnet new winuilib -n MyLib
 | `WinDev: UI: List Windows` | List visible app windows |
 | `WinDev: UI: Inspect App` | Inspect UI Automation tree |
 | `WinDev: UI: Take Screenshot` | Capture app window screenshot |
+| `WinDev: Update Manifest Assets` | Auto-generate app icon assets from a single source image |
+| `WinDev: Run SDK Tool` | Run `makeappx`, `signtool`, `mt`, or `makepri` via `winapp tool` |
+| `WinDev: Get WinApp Path` | Show paths to installed Windows SDK components |
+| `WinDev: Configure WinApp Debug & Tasks` | Scaffold `.vscode/launch.json` and `.vscode/tasks.json` for the `winapp` debug type |
 
 ## Extension Settings
 
@@ -222,6 +230,8 @@ This extension contributes the following settings:
 | `windevHelper.preview.width` | number | `800` | Default preview width |
 | `windevHelper.preview.height` | number | `600` | Default preview height |
 | `windevHelper.preview.updateDelay` | number | `300` | Delay (ms) before updating preview after edits |
+| `windevHelper.templates.source` | string | `auto` | Template package preference: `auto`, `official`, or `community` |
+| `windevHelper.templates.allowPrerelease` | boolean | `true` | Install prerelease versions of the official Microsoft template pack while it remains in alpha |
 
 ## Keyboard Shortcuts
 

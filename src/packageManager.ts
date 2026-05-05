@@ -882,6 +882,275 @@ export class PackageManager {
         });
     }
 
+    // ============================================
+    // Parity commands with the official Microsoft WinApp VS Code extension
+    // ============================================
+
+    /**
+     * Auto-generate all required app icon assets from a single source image
+     * (PNG, JPG, GIF, BMP, or SVG). Wraps `winapp manifest update-assets`.
+     */
+    public async manifestUpdateAssets(projectUri?: vscode.Uri): Promise<void> {
+        const projectPath = projectUri ? path.dirname(projectUri.fsPath) :
+            vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+
+        const imageUris = await vscode.window.showOpenDialog({
+            canSelectFiles: true,
+            canSelectFolders: false,
+            canSelectMany: false,
+            filters: {
+                'Source images': ['png', 'jpg', 'jpeg', 'gif', 'bmp', 'svg']
+            },
+            title: 'Select source image to generate manifest assets from'
+        });
+        if (!imageUris || imageUris.length === 0) { return; }
+
+        const manifestPath = projectPath ? await this.findManifest(projectPath) : undefined;
+
+        await vscode.window.withProgress({
+            location: vscode.ProgressLocation.Notification,
+            title: 'Generating manifest assets...',
+            cancellable: false
+        }, async () => {
+            await this.winAppCli.manifestUpdateAssets(imageUris[0].fsPath, manifestPath, projectPath);
+        });
+    }
+
+    /**
+     * Run a Windows SDK tool (makeappx, signtool, mt, makepri) with custom
+     * arguments. Wraps `winapp tool <name> -- <args>`.
+     */
+    public async runSdkTool(): Promise<void> {
+        const toolName = await vscode.window.showQuickPick(
+            [
+                { label: 'makeappx', description: 'Create or extract MSIX packages' },
+                { label: 'signtool', description: 'Sign packages and executables' },
+                { label: 'mt', description: 'Manifest tool' },
+                { label: 'makepri', description: 'Build the package resource index' },
+            ],
+            { placeHolder: 'Select an SDK tool to run' }
+        );
+        if (!toolName) { return; }
+
+        const argsInput = await vscode.window.showInputBox({
+            prompt: `Arguments to pass to ${toolName.label} (leave empty for help)`,
+            placeHolder: '/?',
+            ignoreFocusOut: true
+        });
+        if (argsInput === undefined) { return; }
+
+        const args = this.parseAppArgs(argsInput);
+
+        await vscode.window.withProgress({
+            location: vscode.ProgressLocation.Notification,
+            title: `Running ${toolName.label}...`,
+            cancellable: false
+        }, async () => {
+            try {
+                const output = await this.winAppCli.tool(toolName.label, args);
+                if (output) {
+                    this.outputChannel.appendLine(`--- ${toolName.label} output ---`);
+                    this.outputChannel.appendLine(output);
+                    this.outputChannel.show();
+                }
+            } catch (error) {
+                vscode.window.showErrorMessage(`${toolName.label} failed: ${error}`);
+            }
+        });
+    }
+
+    /**
+     * Display paths to installed SDK components (winapp get-winapp-path).
+     */
+    public async getWinAppPath(): Promise<void> {
+        await vscode.window.withProgress({
+            location: vscode.ProgressLocation.Notification,
+            title: 'Resolving WinApp SDK paths...',
+            cancellable: false
+        }, async () => {
+            try {
+                const output = await this.winAppCli.getSdkPaths();
+                if (output) {
+                    this.outputChannel.appendLine('--- WinApp SDK paths ---');
+                    this.outputChannel.appendLine(output);
+                    this.outputChannel.show();
+                }
+            } catch (error) {
+                vscode.window.showErrorMessage(`Failed to resolve SDK paths: ${error}`);
+            }
+        });
+    }
+
+    /**
+     * Scaffold .vscode/launch.json and .vscode/tasks.json with the recommended
+     * `winapp` debug configuration and a build pre-launch task. Mirrors the
+     * sample shown in the Microsoft WinApp VS Code extension blog post.
+     */
+    public async configureWinAppDebug(projectUri?: vscode.Uri): Promise<void> {
+        const workspaceFolder = projectUri
+            ? vscode.workspace.getWorkspaceFolder(projectUri)
+            : vscode.workspace.workspaceFolders?.[0];
+
+        if (!workspaceFolder) {
+            vscode.window.showErrorMessage('No workspace folder is open. Open a folder first.');
+            return;
+        }
+
+        const projectKindPick = await vscode.window.showQuickPick(
+            [
+                { label: '.NET (C# / WinUI 3 / WPF / WinForms)', value: 'dotnet' as const, description: 'Uses `dotnet build` and the C# debugger (coreclr)' },
+                { label: 'C / C++ (CMake or MSBuild)', value: 'cpp' as const, description: 'Uses MSBuild and the cppvsdbg debugger' },
+                { label: 'Node.js / Electron', value: 'node' as const, description: 'Uses npm/yarn build and the node debugger' },
+                { label: 'Other (no preLaunchTask)', value: 'other' as const, description: 'Just adds the winapp debug config' },
+            ],
+            { placeHolder: 'Select your project type' }
+        );
+        if (!projectKindPick) { return; }
+
+        const vscodeDir = path.join(workspaceFolder.uri.fsPath, '.vscode');
+        try {
+            await fs.promises.mkdir(vscodeDir, { recursive: true });
+        } catch (error) {
+            vscode.window.showErrorMessage(`Failed to create .vscode folder: ${error}`);
+            return;
+        }
+
+        const buildTaskLabel = 'winapp: build';
+
+        const buildTask = this.buildTaskForKind(projectKindPick.value, buildTaskLabel);
+
+        const launchConfig: Record<string, unknown> = {
+            type: 'winapp',
+            request: 'launch',
+            name: 'WinApp: Launch and Attach',
+        };
+
+        if (buildTask) {
+            launchConfig.preLaunchTask = buildTaskLabel;
+        }
+
+        switch (projectKindPick.value) {
+            case 'cpp':
+                launchConfig.debuggerType = 'cppvsdbg';
+                break;
+            case 'node':
+                launchConfig.debuggerType = 'node';
+                break;
+            // dotnet/other use the default coreclr debugger
+        }
+
+        try {
+            const launchPath = path.join(vscodeDir, 'launch.json');
+            await this.mergeJsonArrayFile(launchPath, {
+                version: '0.2.0',
+                configurations: [],
+            }, 'configurations', launchConfig, (existing) => existing.name === launchConfig.name);
+
+            if (buildTask) {
+                const tasksPath = path.join(vscodeDir, 'tasks.json');
+                await this.mergeJsonArrayFile(tasksPath, {
+                    version: '2.0.0',
+                    tasks: [],
+                }, 'tasks', buildTask, (existing) => existing.label === buildTaskLabel);
+            }
+
+            const action = await vscode.window.showInformationMessage(
+                buildTask
+                    ? 'WinApp debug configuration and build task added to .vscode/launch.json and .vscode/tasks.json.'
+                    : 'WinApp debug configuration added to .vscode/launch.json.',
+                'Open launch.json'
+            );
+
+            if (action === 'Open launch.json') {
+                const doc = await vscode.workspace.openTextDocument(path.join(vscodeDir, 'launch.json'));
+                await vscode.window.showTextDocument(doc);
+            }
+        } catch (error) {
+            vscode.window.showErrorMessage(`Failed to write debug configuration: ${error}`);
+        }
+    }
+
+    /**
+     * Returns the recommended pre-launch build task for the given project
+     * kind, or `undefined` when no automated build is appropriate.
+     */
+    private buildTaskForKind(kind: 'dotnet' | 'cpp' | 'node' | 'other', label: string): Record<string, unknown> | undefined {
+        switch (kind) {
+            case 'dotnet':
+                return {
+                    label,
+                    command: 'dotnet',
+                    type: 'process',
+                    args: ['build', '${workspaceFolder}'],
+                    problemMatcher: '$msCompile',
+                    group: { kind: 'build', isDefault: true },
+                };
+            case 'cpp':
+                return {
+                    label,
+                    command: 'msbuild',
+                    type: 'process',
+                    args: ['${workspaceFolder}', '/t:Build', '/p:Configuration=Debug'],
+                    problemMatcher: '$msCompile',
+                    group: { kind: 'build', isDefault: true },
+                };
+            case 'node':
+                return {
+                    label,
+                    command: 'npm',
+                    type: 'shell',
+                    args: ['run', 'build'],
+                    problemMatcher: [],
+                    group: { kind: 'build', isDefault: true },
+                };
+            case 'other':
+            default:
+                return undefined;
+        }
+    }
+
+    /**
+     * Read or create a JSON file shaped as `{ <arrayKey>: [...] }`, then
+     * append `entry` to the array unless an existing element already matches
+     * `matches(existing)`. Preserves any unrelated keys in the file.
+     */
+    private async mergeJsonArrayFile(
+        filePath: string,
+        defaultShape: Record<string, unknown>,
+        arrayKey: string,
+        entry: Record<string, unknown>,
+        matches: (existing: Record<string, unknown>) => boolean
+    ): Promise<void> {
+        let parsed: Record<string, unknown> = { ...defaultShape };
+
+        try {
+            const raw = await fs.promises.readFile(filePath, 'utf-8');
+            const stripped = raw.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:"])\/\/.*$/gm, '$1');
+            const existing = JSON.parse(stripped);
+            if (existing && typeof existing === 'object' && !Array.isArray(existing)) {
+                parsed = existing as Record<string, unknown>;
+            }
+        } catch {
+            // File missing or unparseable — fall back to the default shape.
+        }
+
+        const list = Array.isArray(parsed[arrayKey])
+            ? (parsed[arrayKey] as Record<string, unknown>[])
+            : [];
+
+        const alreadyPresent = list.some(matches);
+        if (!alreadyPresent) {
+            list.push(entry);
+        }
+        parsed[arrayKey] = list;
+
+        if (parsed.version === undefined && defaultShape.version !== undefined) {
+            parsed.version = defaultShape.version;
+        }
+
+        await fs.promises.writeFile(filePath, JSON.stringify(parsed, null, 4) + '\n', 'utf-8');
+    }
+
     /**
      * Dispose of resources
      */

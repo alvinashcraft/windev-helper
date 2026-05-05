@@ -5,6 +5,46 @@ All notable changes to the WinDev Helper extension will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.10.0] - 2026-05-05
+
+> ⚠️ The preview pane and properties panel features are currently in preview. Please report any bugs or suggestions to our GitHub issues.
+
+This release brings WinDev Helper closer to feature parity with the official [Microsoft WinApp VS Code extension](https://marketplace.visualstudio.com/items?itemName=Microsoft-WinAppCLI.winapp) and adds support for the new official Microsoft Windows App SDK templates.
+
+### Added
+
+- **`winapp` debug type** (parity with the official Microsoft WinApp VS Code extension)
+  - New custom debug type that launches the build output via `winapp run` (so the app gets package identity) and then attaches the requested debugger
+  - Supports `coreclr` (default, C# / .NET via C# Dev Kit), `cppvsdbg` (C / C++), and `node` (Node.js / Electron) child debuggers
+  - Configuration properties: `inputFolder`, `manifest`, `debuggerType`, `workingDirectory`, `args`, `outputAppxDirectory`
+  - Auto-detects the build output folder by scanning for `.exe` files (skips `createdump.exe`, `apphost.exe`, and `singlefilehost.exe`)
+  - Includes an initial configuration so picking *WinApp* from the F5 picker works without an existing `launch.json`
+
+- **WinDev: Configure WinApp Debug & Tasks**
+  - Scaffolds `.vscode/launch.json` and `.vscode/tasks.json` with the recommended `winapp` configuration plus a matching `preLaunchTask` (build) — based on the sample shown in [Chiara Mooney's announcement post](https://devblogs.microsoft.com/ifdef-windows/announcing-the-winapp-vs-code-extension-run-debug-and-package-windows-apps-in-vs-code/)
+  - Prompts for project type (.NET, C/C++, Node.js/Electron, or Other) and emits the appropriate build task
+  - Merges into existing files without overwriting unrelated entries
+
+- **WinDev: Update Manifest Assets** (winapp CLI v0.2.1+)
+  - Wraps `winapp manifest update-assets` to auto-generate all required app icon sizes from a single source image (PNG, JPG, GIF, BMP, or SVG)
+
+- **WinDev: Run SDK Tool**
+  - Provides direct access to `makeappx`, `signtool`, `mt`, and `makepri` via `winapp tool`, with custom argument tokenization
+
+- **WinDev: Get WinApp Path**
+  - Surfaces the paths reported by `winapp get-winapp-path` in the WinUI Packaging output channel
+
+- **Support for the official Microsoft WinUI templates** ([Microsoft.WindowsAppSDK.WinUI.CSharp.Templates](https://www.nuget.org/packages/Microsoft.WindowsAppSDK.WinUI.CSharp.Templates))
+  - The package is currently in alpha. **WinDev: Install WinUI Templates** now lets you choose between the official Microsoft pack and the existing community pack
+  - **WinDev: Create WinUI Project** offers the official `winui`, `winui-mvvm`, `winui-navview`, and `winui-unittest` variants when the official pack is selected
+  - **WinDev: Create WinUI Library** uses `winui-lib` (official) or `winuilib` (community) automatically
+  - New `windevHelper.templates.source` setting (`auto`, `official`, `community`) controls the preference; `auto` prefers the official pack when installed and falls back to the community pack
+  - New `windevHelper.templates.allowPrerelease` setting installs the alpha (`*-*`) version of the official pack until a stable release ships
+
+### Changed
+
+- **`winapp run`** now accepts an `outputAppxDirectory` option (mirrors `--output`) so the loose-layout package can be redirected when needed by the new debug type
+
 ## [2.9.0] - 2026-05-04
 
 > ⚠️ The preview pane and properties panel features are currently in preview. Please report any bugs or suggestions to our GitHub issues.

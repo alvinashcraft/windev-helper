@@ -6,7 +6,12 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as cp from 'child_process';
 import * as fs from 'fs';
-import { OUTPUT_CHANNELS } from './constants';
+import { CONFIG, OUTPUT_CHANNELS, TEMPLATE_NAMES, TEMPLATE_PACKAGES } from './constants';
+
+/**
+ * Identifies which dotnet template package should provide a given template.
+ */
+type TemplateSource = 'official' | 'community';
 
 /**
  * Manages WinUI project and item templates
@@ -19,27 +24,112 @@ export class TemplateManager {
     }
 
     /**
-     * Installs WinUI templates from the dotnet template package
+     * Resolves which template package the user wants to use.
+     *
+     * Honors the `windevHelper.templates.source` setting. When set to `auto`,
+     * prefers the official Microsoft package if it is installed, otherwise
+     * falls back to the community package (which has been the historical
+     * default for this extension).
+     */
+    private async resolveTemplateSource(): Promise<TemplateSource> {
+        const config = vscode.workspace.getConfiguration(CONFIG.SECTION);
+        const setting = config.get<string>(CONFIG.TEMPLATES_SOURCE, 'auto');
+
+        if (setting === 'official') { return 'official'; }
+        if (setting === 'community') { return 'community'; }
+
+        // auto: prefer official when available, otherwise community
+        if (await this.isPackageInstalled(TEMPLATE_PACKAGES.OFFICIAL)) {
+            return 'official';
+        }
+        return 'community';
+    }
+
+    /**
+     * Returns true when the given template package id is reported as
+     * installed by `dotnet new uninstall` (running it with no arguments
+     * lists the currently installed template packages, which is the
+     * fastest reliable way to detect installation — `dotnet new list`
+     * is much slower and only surfaces individual templates).
+     */
+    private async isPackageInstalled(packageId: string): Promise<boolean> {
+        try {
+            const output = await this.executeCommand('dotnet new uninstall', undefined, true);
+            return output.toLowerCase().includes(packageId.toLowerCase());
+        } catch {
+            return false;
+        }
+    }
+
+    /**
+     * Installs WinUI templates from the dotnet template package. Prompts the
+     * user when the configured source is `auto` and neither package is
+     * installed yet so they can pick between the official Microsoft package
+     * (currently in alpha) and the community package.
      */
     public async installTemplates(): Promise<void> {
+        const source = await this.pickInstallSource();
+        if (!source) { return; }
+
+        const packageId = source === 'official'
+            ? TEMPLATE_PACKAGES.OFFICIAL
+            : TEMPLATE_PACKAGES.COMMUNITY;
+
+        const config = vscode.workspace.getConfiguration(CONFIG.SECTION);
+        const allowPrerelease = config.get<boolean>(CONFIG.TEMPLATES_ALLOW_PRERELEASE, true);
+        const installCommand = source === 'official' && allowPrerelease
+            ? `dotnet new install ${packageId}::*-* --force`
+            : `dotnet new install ${packageId}`;
+
         await vscode.window.withProgress({
             location: vscode.ProgressLocation.Notification,
-            title: 'Installing WinUI templates...',
+            title: `Installing ${packageId}...`,
             cancellable: false
         }, async () => {
             try {
-                await this.executeCommand('dotnet new install VijayAnand.WinUITemplates');
-                vscode.window.showInformationMessage('WinUI templates installed successfully.');
+                await this.executeCommand(installCommand);
+                vscode.window.showInformationMessage(`${packageId} installed successfully.`);
             } catch (error) {
+                const learnMoreUrl = source === 'official'
+                    ? 'https://www.nuget.org/packages/Microsoft.WindowsAppSDK.WinUI.CSharp.Templates'
+                    : 'https://github.com/egvijayanand/winui-templates';
                 const action = await vscode.window.showErrorMessage(
                     `Failed to install templates: ${error}`,
                     'Learn More'
                 );
                 if (action === 'Learn More') {
-                    vscode.env.openExternal(vscode.Uri.parse('https://github.com/egvijayanand/winui-templates'));
+                    vscode.env.openExternal(vscode.Uri.parse(learnMoreUrl));
                 }
             }
         });
+    }
+
+    /**
+     * Resolves which template package to install. Honors the configured
+     * source unless it is `auto`, in which case the user is prompted.
+     */
+    private async pickInstallSource(): Promise<TemplateSource | undefined> {
+        const config = vscode.workspace.getConfiguration(CONFIG.SECTION);
+        const setting = config.get<string>(CONFIG.TEMPLATES_SOURCE, 'auto');
+        if (setting === 'official') { return 'official'; }
+        if (setting === 'community') { return 'community'; }
+
+        const pick = await vscode.window.showQuickPick(
+            [
+                {
+                    label: 'Official (Microsoft.WindowsAppSDK.WinUI.CSharp.Templates)',
+                    description: 'alpha — includes winui, winui-mvvm, winui-navview, winui-lib, winui-unittest',
+                    value: 'official' as const,
+                },
+                {
+                    label: 'Community (VijayAnand.WinUITemplates)',
+                    description: 'Stable — long-standing community pack used by previous releases',
+                    value: 'community' as const,
+                },
+            ],
+            { placeHolder: 'Which WinUI template package would you like to install?' }
+        );
+        return pick?.value;
     }
 
     /**
@@ -61,6 +151,8 @@ export class TemplateManager {
             }
         }
 
+        const source = await this.resolveTemplateSource();
+
         // Get project name
         const projectName = await vscode.window.showInputBox({
             prompt: 'Enter project name',
@@ -80,11 +172,13 @@ export class TemplateManager {
             return;
         }
 
-        // Ask for template options
-        const useMvvm = await vscode.window.showQuickPick(['Yes', 'No'], {
-            placeHolder: 'Use MVVM Toolkit?',
-            title: 'MVVM Support'
-        });
+        // Pick the template variant. The official Microsoft package exposes
+        // dedicated MVVM and NavigationView templates; the community package
+        // uses a single `winui` template with an `-mvvm` switch.
+        const variant = await this.pickProjectTemplate(source);
+        if (!variant) {
+            return;
+        }
 
         // Get target folder
         const folderUri = await vscode.window.showOpenDialog({
@@ -106,9 +200,9 @@ export class TemplateManager {
             cancellable: false
         }, async () => {
             try {
-                let command = `dotnet new winui -n ${projectName}`;
-                if (useMvvm === 'Yes') {
-                    command += ' -mvvm';
+                let command = `dotnet new ${variant.template} -n ${projectName}`;
+                if (variant.extraArgs) {
+                    command += ` ${variant.extraArgs}`;
                 }
 
                 await this.executeCommand(command, targetDir);
@@ -132,6 +226,57 @@ export class TemplateManager {
                 vscode.window.showErrorMessage(`Failed to create project: ${error}`);
             }
         });
+    }
+
+    /**
+     * Builds the quick-pick of available project template variants for the
+     * resolved source. The official Microsoft package exposes dedicated
+     * templates per scenario; the community package layers options onto a
+     * single `winui` template via switches.
+     */
+    private async pickProjectTemplate(
+        source: TemplateSource
+    ): Promise<{ template: string; extraArgs?: string } | undefined> {
+        if (source === 'official') {
+            const pick = await vscode.window.showQuickPick(
+                [
+                    {
+                        label: 'Blank App',
+                        description: 'winui — single-project MSIX-packaged blank app',
+                        value: { template: TEMPLATE_NAMES.OFFICIAL.BLANK },
+                    },
+                    {
+                        label: 'MVVM App',
+                        description: 'winui-mvvm — blank app pre-wired with CommunityToolkit.Mvvm',
+                        value: { template: TEMPLATE_NAMES.OFFICIAL.MVVM },
+                    },
+                    {
+                        label: 'NavigationView App',
+                        description: 'winui-navview — starter shell with NavigationView',
+                        value: { template: TEMPLATE_NAMES.OFFICIAL.NAVIGATION_VIEW },
+                    },
+                    {
+                        label: 'Unit Test Project',
+                        description: 'winui-unittest — packaged MSTest project for WinUI APIs',
+                        value: { template: TEMPLATE_NAMES.OFFICIAL.UNIT_TEST },
+                    },
+                ],
+                { placeHolder: 'Select a project template' }
+            );
+            return pick?.value;
+        }
+
+        // Community pack: ask up-front whether to enable the MVVM toolkit.
+        const useMvvm = await vscode.window.showQuickPick(
+            ['Yes', 'No'],
+            { placeHolder: 'Use MVVM Toolkit?', title: 'MVVM Support' }
+        );
+        if (!useMvvm) { return undefined; }
+
+        return {
+            template: TEMPLATE_NAMES.COMMUNITY.BLANK,
+            ...(useMvvm === 'Yes' ? { extraArgs: '-mvvm' } : {}),
+        };
     }
 
     /**
@@ -189,7 +334,11 @@ export class TemplateManager {
             cancellable: false
         }, async () => {
             try {
-                await this.executeCommand(`dotnet new winuilib -n ${libraryName}`, targetDir);
+                const source = await this.resolveTemplateSource();
+                const template = source === 'official'
+                    ? TEMPLATE_NAMES.OFFICIAL.LIBRARY
+                    : TEMPLATE_NAMES.COMMUNITY.LIBRARY;
+                await this.executeCommand(`dotnet new ${template} -n ${libraryName}`, targetDir);
                 vscode.window.showInformationMessage(`WinUI library '${libraryName}' created successfully.`);
             } catch (error) {
                 vscode.window.showErrorMessage(`Failed to create library: ${error}`);
