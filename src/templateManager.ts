@@ -46,8 +46,11 @@ export class TemplateManager {
     }
 
     /**
-     * Returns true when `dotnet new list` reports any template owned by the
-     * given package id.
+     * Returns true when the given template package id is reported as
+     * installed by `dotnet new uninstall` (running it with no arguments
+     * lists the currently installed template packages, which is the
+     * fastest reliable way to detect installation — `dotnet new list`
+     * is much slower and only surfaces individual templates).
      */
     private async isPackageInstalled(packageId: string): Promise<boolean> {
         try {

@@ -60,14 +60,15 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     // Register the `winapp` debug type — parity with the official Microsoft
     // WinApp VS Code extension. Launches the build output via `winapp run`
     // (package identity) and attaches the requested debugger.
+    //
+    // We register the provider only once. Initial F5 configurations are
+    // contributed statically via the `initialConfigurations` entry in
+    // package.json, so a `Dynamic` registration is unnecessary and would
+    // cause `resolveDebugConfiguration*` to fire twice (launching / attaching
+    // the app twice).
     winAppDebugProvider = new WinAppDebugConfigurationProvider(services.winAppCli);
     context.subscriptions.push(
-        vscode.debug.registerDebugConfigurationProvider(DEBUG_TYPES.WINAPP, winAppDebugProvider),
-        vscode.debug.registerDebugConfigurationProvider(
-            DEBUG_TYPES.WINAPP,
-            winAppDebugProvider,
-            vscode.DebugConfigurationProviderTriggerKind.Dynamic
-        )
+        vscode.debug.registerDebugConfigurationProvider(DEBUG_TYPES.WINAPP, winAppDebugProvider)
     );
 
     // Register all commands
