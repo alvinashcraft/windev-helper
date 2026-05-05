@@ -700,6 +700,8 @@
     "package:prerelease": "npx vsce package --pre-release --allow-star-activation",
     "publish": "npx vsce publish --allow-star-activation",
     "publish:prerelease": "npx vsce publish --pre-release --allow-star-activation",
+    "publish:openvsx": "npx ovsx publish --packagePath",
+    "publish:openvsx:prerelease": "npx ovsx publish --pre-release --packagePath",
     "compile-tests": "tsc -p . --outDir out",
     "watch-tests": "tsc -p . -w --outDir out",
     "pretest": "npm run compile-tests && npm run compile && npm run lint",
@@ -717,6 +719,7 @@
     "esbuild": "^0.27.2",
     "eslint": "^9.39.2",
     "npm-run-all": "^4.1.5",
+    "ovsx": "^0.10.11",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.52.0"
   }

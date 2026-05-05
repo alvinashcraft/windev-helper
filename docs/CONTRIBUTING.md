@@ -305,7 +305,23 @@ Include:
 2. Update CHANGELOG.md
 3. Create a release PR to `main`
 4. After merge, tag the release
-5. Publish to VS Code Marketplace
+5. Publish to the VS Code Marketplace and Open VSX:
+
+   ```powershell
+   # Build the .vsix once
+   npm run package
+
+   # Visual Studio Marketplace (requires VSCE_PAT)
+   npm run publish
+
+   # Open VSX Registry (requires OVSX_PAT for the alvinashcraft namespace)
+   $vsix = Get-ChildItem windev-helper-*.vsix | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+   npm run publish:openvsx -- $vsix.FullName
+   ```
+
+   Use `publish:prerelease` and `publish:openvsx:prerelease` for preview builds.
+
+   See the [Open VSX publishing docs](https://github.com/EclipseFdn/open-vsx.org/wiki/Publishing-Extensions) for setting up the namespace and PAT the first time.
 
 ---
 

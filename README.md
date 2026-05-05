@@ -1,10 +1,13 @@
 # WinDev Helper - A WinUI Extension for VS Code
 
 [![Visual Studio Marketplace Version](https://img.shields.io/visual-studio-marketplace/v/alvinashcraft.windev-helper)](https://marketplace.visualstudio.com/items?itemName=alvinashcraft.windev-helper)
+[![Open VSX Version](https://img.shields.io/open-vsx/v/alvinashcraft/windev-helper)](https://open-vsx.org/extension/alvinashcraft/windev-helper)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Preview](https://img.shields.io/badge/status-preview-orange)](https://marketplace.visualstudio.com/items?itemName=alvinashcraft.windev-helper)
 
-The **WinDev Helper** extension gives you the tools you need to build beautiful, performant, native Windows apps with WinUI 3 and the Windows App SDK. Built on top of the C# and C# Dev Kit extensions, it supercharges your .NET development with powerful IntelliSense, an intuitive Solution Explorer, package management, and more.
+The **WinDev Helper** extension gives you the tools you need to build beautiful, performant, native Windows apps with WinUI 3 and the Windows App SDK. Built on top of the open-source C# extension (with optional [C# Dev Kit](https://aka.ms/vs/csdevkit/license) integration), it streamlines your .NET development with package management, MSIX packaging, debugging, manifest tooling, and more.
+
+The extension is published to both the [Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=alvinashcraft.windev-helper) and the [Open VSX Registry](https://open-vsx.org/extension/alvinashcraft/windev-helper), so it works in VS Code, [VSCodium](https://vscodium.com/), [Cursor](https://cursor.com/), [Windsurf](https://codeium.com/windsurf), and other compatible editors.
 
 This extension leverages **winapp**, the Windows App Development CLI, to provide a seamless development experience for WinUI apps in VS Code.
 
