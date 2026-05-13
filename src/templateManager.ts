@@ -373,27 +373,65 @@ export class TemplateManager {
     }
 
     /**
-     * Adds a new ContentDialog to the project (official template only).
-     * Falls back to the user control template on the community package.
+     * Adds a new ContentDialog to the project.
+     *
+     * Only the official Microsoft template pack ships `winui-dialog`; if the
+     * user has the community pack selected, this command bails out with a
+     * message asking them to install the official pack rather than silently
+     * scaffolding the wrong artifact.
      */
     public async addDialog(uri?: vscode.Uri): Promise<void> {
+        if (!(await this.ensureOfficialPack('Add New Content Dialog', 'winui-dialog'))) { return; }
         await this.addItem(TEMPLATE_NAMES.OFFICIAL.DIALOG, 'Content Dialog', uri, { supportsViewModel: true, isControl: false });
     }
 
     /**
      * Adds a new Templated (custom) Control to the project. Generates a
      * Themes/Generic.xaml entry alongside the C# class via the official
-     * template.
+     * `winui-templatedcontrol` template. Requires the official pack.
      */
     public async addTemplatedControl(uri?: vscode.Uri): Promise<void> {
+        if (!(await this.ensureOfficialPack('Add New Templated Control', 'winui-templatedcontrol'))) { return; }
         await this.addItem(TEMPLATE_NAMES.OFFICIAL.TEMPLATED_CONTROL, 'Templated Control', uri, { supportsViewModel: false, isControl: true });
     }
 
     /**
-     * Adds a new ResourceDictionary XAML file to the project.
+     * Adds a new ResourceDictionary XAML file to the project via the official
+     * `winui-resourcedictionary` template. Requires the official pack.
      */
     public async addResourceDictionary(uri?: vscode.Uri): Promise<void> {
+        if (!(await this.ensureOfficialPack('Add New Resource Dictionary', 'winui-resourcedictionary'))) { return; }
         await this.addItem(TEMPLATE_NAMES.OFFICIAL.RESOURCE_DICTIONARY, 'Resource Dictionary', uri, { supportsViewModel: false, isControl: false });
+    }
+
+    /**
+     * Verifies the resolved template source is `official` before running an
+     * item template that only ships in the Microsoft pack. Returns `true`
+     * when the user can proceed; otherwise surfaces an actionable message
+     * (offering to install the official pack) and returns `false`.
+     */
+    private async ensureOfficialPack(itemLabel: string, templateName: string): Promise<boolean> {
+        const source = await this.resolveTemplateSource();
+        if (source === 'official') { return true; }
+
+        const action = await vscode.window.showWarningMessage(
+            `${itemLabel} requires the official Microsoft template pack (${TEMPLATE_PACKAGES.OFFICIAL}). The '${templateName}' template is not included in the community pack.`,
+            'Install Official Pack',
+            'Cancel'
+        );
+
+        if (action === 'Install Official Pack') {
+            // Temporarily force the official source so installTemplates picks it.
+            const config = vscode.workspace.getConfiguration(CONFIG.SECTION);
+            const previous = config.get<string>(CONFIG.TEMPLATES_SOURCE, 'auto');
+            try {
+                await config.update(CONFIG.TEMPLATES_SOURCE, 'official', vscode.ConfigurationTarget.Workspace);
+                await this.installTemplates();
+            } finally {
+                await config.update(CONFIG.TEMPLATES_SOURCE, previous, vscode.ConfigurationTarget.Workspace);
+            }
+        }
+        return false;
     }
 
     /**
@@ -873,18 +911,34 @@ public partial class ${viewModelName} : BaseViewModel
             return;
         }
 
-        // Launch Copilot CLI in a new terminal
+        // Launch Copilot CLI in a new terminal. Surface the next-step
+        // instructions through the WinUI Templates output channel and a
+        // notification — emitting them via shell builtins (`echo`, `printf`,
+        // `Write-Host`) would either error or render inconsistently across
+        // PowerShell, bash, zsh, and cmd. This way the experience is
+        // identical regardless of the user's default integrated shell.
         await vscode.env.clipboard.writeText(installCommand);
+
+        this.outputChannel.show(true);
+        this.outputChannel.appendLine('');
+        this.outputChannel.appendLine('=== WinUI Copilot Plugin ===');
+        this.outputChannel.appendLine('Starting GitHub Copilot CLI in a new terminal...');
+        this.outputChannel.appendLine('Once the Copilot prompt loads, paste (Ctrl+V) the install command');
+        this.outputChannel.appendLine('that was copied to your clipboard:');
+        this.outputChannel.appendLine(`    ${installCommand}`);
+        this.outputChannel.appendLine('Then run:');
+        this.outputChannel.appendLine(`    ${setupCommand}`);
+        this.outputChannel.appendLine('');
+
         const terminal = vscode.window.createTerminal({ name: 'WinUI Copilot Plugin' });
         terminal.show();
-        // Print instructions to the terminal before starting the Copilot CLI so
-        // the user knows what to do once the prompt loads.
-        terminal.sendText('Write-Host "Starting GitHub Copilot CLI..." -ForegroundColor Cyan');
-        terminal.sendText(`Write-Host "Once the prompt loads, paste (Ctrl+V) the install command which has been copied to your clipboard:" -ForegroundColor Cyan`);
-        terminal.sendText(`Write-Host "  ${installCommand}" -ForegroundColor Yellow`);
-        terminal.sendText(`Write-Host "Then run:" -ForegroundColor Cyan`);
-        terminal.sendText(`Write-Host "  ${setupCommand}" -ForegroundColor Yellow`);
+        // `copilot` resolves on PATH for both PowerShell (Windows) and POSIX
+        // shells (macOS/Linux), so this single sendText is shell-agnostic.
         terminal.sendText('copilot');
+
+        vscode.window.showInformationMessage(
+            `'${installCommand}' copied to clipboard. Paste it once the Copilot CLI prompt loads, then run '${setupCommand}'.`
+        );
     }
 
     /**
