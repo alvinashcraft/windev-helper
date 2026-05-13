@@ -33,6 +33,9 @@ export const COMMANDS = {
     ADD_PAGE: 'windev-helper.addPage',
     ADD_USER_CONTROL: 'windev-helper.addUserControl',
     ADD_WINDOW: 'windev-helper.addWindow',
+    ADD_DIALOG: 'windev-helper.addDialog',
+    ADD_TEMPLATED_CONTROL: 'windev-helper.addTemplatedControl',
+    ADD_RESOURCE_DICTIONARY: 'windev-helper.addResourceDictionary',
     ADD_VIEW_MODEL: 'windev-helper.addViewModel',
     BUILD_PROJECT: 'windev-helper.buildProject',
     REBUILD_PROJECT: 'windev-helper.rebuildProject',
@@ -52,6 +55,7 @@ export const COMMANDS = {
     SELECT_BUILD_CONFIGURATION: 'windev-helper.selectBuildConfiguration',
     SELECT_PLATFORM: 'windev-helper.selectPlatform',
     INSTALL_TEMPLATES: 'windev-helper.installTemplates',
+    INSTALL_COPILOT_PLUGIN: 'windev-helper.installCopilotPlugin',
     CHECK_WINAPP_CLI: 'windev-helper.checkWinAppCli',
     OPEN_XAML_PREVIEW: 'windev-helper.openXamlPreview',
     // Microsoft Store commands (via winapp store subcommand)
@@ -137,10 +141,10 @@ export const DEFAULTS = {
 /**
  * Identifiers for the supported `dotnet new` template packages.
  *
- * - `OFFICIAL`: Microsoft.WindowsAppSDK.WinUI.CSharp.Templates (alpha) ships the
- *   blank-app, MVVM, NavigationView, library, and unit-test templates plus the
- *   common item templates (page, window, user control, templated control,
- *   resource dictionary, RESW, dialog).
+ * - `OFFICIAL`: Microsoft.WindowsAppSDK.WinUI.CSharp.Templates ships the
+ *   blank-app, MVVM, NavigationView, TabView, library, and unit-test templates
+ *   plus the common item templates (page, window, user control, templated
+ *   control, resource dictionary, dialog).
  * - `COMMUNITY`: VijayAnand.WinUITemplates is the long-standing community pack
  *   that this extension has used since launch and remains the default for users
  *   who already rely on its short names (`winuilib`, `-mvvm` flag).
@@ -152,17 +156,25 @@ export const TEMPLATE_PACKAGES = {
 
 /**
  * Project template short names exposed by the supported template packages.
- * The `OFFICIAL` package adds dedicated MVVM, NavigationView, library, and
- * unit-test templates; the `COMMUNITY` package uses a single `winui` template
- * with a `-mvvm` flag and a `winuilib` library template.
+ * The `OFFICIAL` package adds dedicated MVVM, NavigationView, TabView,
+ * library, and unit-test templates; the `COMMUNITY` package uses a single
+ * `winui` template with a `-mvvm` flag and a `winuilib` library template.
  */
 export const TEMPLATE_NAMES = {
     OFFICIAL: {
         BLANK: 'winui',
         MVVM: 'winui-mvvm',
         NAVIGATION_VIEW: 'winui-navview',
+        TAB_VIEW: 'winui-tabview',
         LIBRARY: 'winui-lib',
         UNIT_TEST: 'winui-unittest',
+        // Item templates
+        PAGE: 'winui-page',
+        USER_CONTROL: 'winui-usercontrol',
+        WINDOW: 'winui-window',
+        DIALOG: 'winui-dialog',
+        TEMPLATED_CONTROL: 'winui-templatedcontrol',
+        RESOURCE_DICTIONARY: 'winui-resourcedictionary',
     },
     COMMUNITY: {
         BLANK: 'winui',

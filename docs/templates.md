@@ -4,7 +4,12 @@ This document covers the project and item templates available through the WinDev
 
 ## Overview
 
-The extension uses the [WinUI Templates](https://github.com/egvijayanand/winui-templates) package by Vijay Anand to provide project and item templates. These templates create WinUI 3 projects and items that follow best practices.
+The extension supports two `dotnet new` template packages:
+
+- **Official:** [`Microsoft.WindowsAppSDK.WinUI.CSharp.Templates`](https://www.nuget.org/packages/Microsoft.WindowsAppSDK.WinUI.CSharp.Templates) - the official Microsoft pack introduced in [WindowsAppSDK#6407](https://github.com/microsoft/WindowsAppSDK/pull/6407). Ships Blank, NavigationView, TabView, MVVM, Library, and Unit Test project templates plus item templates for pages, windows, user controls, content dialogs, templated controls, and resource dictionaries. Projects reference `Microsoft.Windows.SDK.BuildTools.WinApp` so `dotnet run` Just Works for packaged apps.
+- **Community:** [`VijayAnand.WinUITemplates`](https://github.com/egvijayanand/winui-templates) - the long-standing community pack (uses a single `winui` template with a `-mvvm` flag and a `winuilib` library template).
+
+Pick a preference via the `windevHelper.templates.source` setting (`auto`, `official`, or `community`). `auto` prefers the official pack when installed and falls back to the community pack.
 
 ## Installing Templates
 
@@ -25,6 +30,10 @@ Using VS Code:
 Using the terminal:
 
 ```bash
+# Official Microsoft pack (recommended)
+dotnet new install Microsoft.WindowsAppSDK.WinUI.CSharp.Templates
+
+# Community pack
 dotnet new install VijayAnand.WinUITemplates
 ```
 
@@ -44,7 +53,7 @@ dotnet new list winui
 
 ## Project Templates
 
-### WinUI 3 Application
+### WinUI 3 Application (Blank)
 
 **Template:** `winui`
 
@@ -61,10 +70,40 @@ dotnet new winui -n MyApp
 | Option | Description | Default |
 |--------|-------------|---------|
 | `-n, --name` | Project name | Required |
-| `-mvvm` | Include MVVM Toolkit | false |
+| `-mvvm` | (community pack only) Include MVVM Toolkit | false |
 | `-o, --output` | Output directory | Current directory |
 
-**With MVVM Toolkit:**
+### WinUI 3 NavigationView App
+
+**Template:** `winui-navview` *(official pack)*
+
+```bash
+dotnet new winui-navview -n MyApp
+```
+
+Starter shell built around `NavigationView` with a modern title bar and basic navigation structure.
+
+### WinUI 3 TabView App
+
+**Template:** `winui-tabview` *(official pack)*
+
+```bash
+dotnet new winui-tabview -n MyApp
+```
+
+Tab-based UI silhouette with add, remove, and drag support out of the box.
+
+### WinUI 3 MVVM App
+
+**Template:** `winui-mvvm` *(official pack)*
+
+```bash
+dotnet new winui-mvvm -n MyApp
+```
+
+Blank app pre-wired with `CommunityToolkit.Mvvm` and a working sample binding.
+
+**With MVVM Toolkit (community pack):**
 
 ```bash
 dotnet new winui -n MyApp -mvvm

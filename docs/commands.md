@@ -13,11 +13,22 @@ Creates a new WinUI 3 application project.
 **Usage:**
 
 1. Opens a dialog to enter the project name
-2. Asks whether to include MVVM Toolkit support
-3. Prompts for the target folder location
-4. Creates the project and offers to open it
+2. With the official Microsoft template pack: pick from **Blank**, **NavigationView**, **TabView**, **MVVM**, or **Unit Test**
+3. With the community pack: choose whether to include MVVM Toolkit support
+4. Prompts for the target folder location
+5. Creates the project and offers to open it
 
-**Equivalent CLI:**
+**Equivalent CLI (official pack):**
+
+```bash
+dotnet new winui          -n ProjectName
+dotnet new winui-navview  -n ProjectName
+dotnet new winui-tabview  -n ProjectName
+dotnet new winui-mvvm     -n ProjectName
+dotnet new winui-unittest -n ProjectName
+```
+
+**Equivalent CLI (community pack):**
 
 ```bash
 dotnet new winui -n ProjectName
@@ -41,6 +52,10 @@ Creates a new WinUI class library project.
 **Equivalent CLI:**
 
 ```bash
+# Official pack
+dotnet new winui-lib -n LibraryName
+
+# Community pack
 dotnet new winuilib -n LibraryName
 ```
 
@@ -110,6 +125,67 @@ Adds a new window to your project.
 ```bash
 dotnet new winui-window -n WindowName
 ```
+
+---
+
+### WinUI: Add New Content Dialog
+
+**Command ID:** `windev-helper.addDialog`
+
+Adds a new `ContentDialog` to your project. Requires the official Microsoft template pack.
+
+**Equivalent CLI:**
+
+```bash
+dotnet new winui-dialog -n DialogName
+```
+
+---
+
+### WinUI: Add New Templated Control
+
+**Command ID:** `windev-helper.addTemplatedControl`
+
+Adds a new templated (custom) control with its `Themes/Generic.xaml` style entry. Requires the official Microsoft template pack.
+
+**Equivalent CLI:**
+
+```bash
+dotnet new winui-templatedcontrol -n ControlName
+```
+
+---
+
+### WinUI: Add New Resource Dictionary
+
+**Command ID:** `windev-helper.addResourceDictionary`
+
+Adds a new `ResourceDictionary` XAML file to your project. Requires the official Microsoft template pack.
+
+**Equivalent CLI:**
+
+```bash
+dotnet new winui-resourcedictionary -n DictionaryName
+```
+
+---
+
+### WinUI: Install WinUI Copilot Plugin
+
+**Command ID:** `windev-helper.installCopilotPlugin`
+
+Helper that sets up the [WinUI agent plugin](https://devblogs.microsoft.com/ifdef-windows/build-native-windows-apps-with-ai-agents-for-winui-and-windows-app-sdk/) for the GitHub Copilot CLI and Claude Code.
+
+**Usage:**
+
+1. Run from the Command Palette
+2. Pick **Launch Copilot CLI** to open a new terminal that starts `copilot` with the install slash-command copied to your clipboard, **Copy Commands** to just copy the install + setup commands, or **Open Docs** to read the announcement post
+3. Inside the Copilot CLI prompt, paste the slash-command:
+
+   ```text
+   /plugin install winui@awesome-copilot
+   /winui-setup
+   ```
 
 ---
 
