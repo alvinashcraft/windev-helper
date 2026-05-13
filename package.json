@@ -2,9 +2,8 @@
   "name": "windev-helper",
   "displayName": "WinDev Helper",
   "description": "Build beautiful, performant WinUI apps with VS Code. Debug, build, package, and deploy Windows apps powered by the Windows App SDK.",
-  "version": "2.10.0",
+  "version": "3.0.0",
   "publisher": "alvinashcraft",
-  "preview": true,
   "icon": "images/icon.png",
   "license": "MIT",
   "repository": {
@@ -71,6 +70,21 @@
       {
         "command": "windev-helper.addWindow",
         "title": "Add New Window",
+        "category": "WinDev"
+      },
+      {
+        "command": "windev-helper.addDialog",
+        "title": "Add New Content Dialog",
+        "category": "WinDev"
+      },
+      {
+        "command": "windev-helper.addTemplatedControl",
+        "title": "Add New Templated Control",
+        "category": "WinDev"
+      },
+      {
+        "command": "windev-helper.addResourceDictionary",
+        "title": "Add New Resource Dictionary",
         "category": "WinDev"
       },
       {
@@ -171,6 +185,11 @@
       {
         "command": "windev-helper.installTemplates",
         "title": "Install WinUI Templates",
+        "category": "WinDev"
+      },
+      {
+        "command": "windev-helper.installCopilotPlugin",
+        "title": "Install WinUI Copilot Plugin",
         "category": "WinDev"
       },
       {
@@ -327,9 +346,24 @@
           "group": "winui@3"
         },
         {
-          "command": "windev-helper.addViewModel",
+          "command": "windev-helper.addDialog",
           "when": "explorerResourceIsFolder && resourceFilename != 'bin' && resourceFilename != 'obj'",
           "group": "winui@4"
+        },
+        {
+          "command": "windev-helper.addTemplatedControl",
+          "when": "explorerResourceIsFolder && resourceFilename != 'bin' && resourceFilename != 'obj'",
+          "group": "winui@5"
+        },
+        {
+          "command": "windev-helper.addResourceDictionary",
+          "when": "explorerResourceIsFolder && resourceFilename != 'bin' && resourceFilename != 'obj'",
+          "group": "winui@6"
+        },
+        {
+          "command": "windev-helper.addViewModel",
+          "when": "explorerResourceIsFolder && resourceFilename != 'bin' && resourceFilename != 'obj'",
+          "group": "winui@7"
         }
       ],
       "view/title": [
@@ -363,9 +397,24 @@
           "group": "winui@3"
         },
         {
-          "command": "windev-helper.addViewModel",
+          "command": "windev-helper.addDialog",
           "when": "csharp.solutionExplorer.itemType == 'folder' || csharp.solutionExplorer.itemType == 'project'",
           "group": "winui@4"
+        },
+        {
+          "command": "windev-helper.addTemplatedControl",
+          "when": "csharp.solutionExplorer.itemType == 'folder' || csharp.solutionExplorer.itemType == 'project'",
+          "group": "winui@5"
+        },
+        {
+          "command": "windev-helper.addResourceDictionary",
+          "when": "csharp.solutionExplorer.itemType == 'folder' || csharp.solutionExplorer.itemType == 'project'",
+          "group": "winui@6"
+        },
+        {
+          "command": "windev-helper.addViewModel",
+          "when": "csharp.solutionExplorer.itemType == 'folder' || csharp.solutionExplorer.itemType == 'project'",
+          "group": "winui@7"
         }
       ],
       "commandPalette": [
@@ -492,7 +541,7 @@
           ],
           "enumDescriptions": [
             "Prefer the official Microsoft templates if installed; otherwise fall back to the community templates.",
-            "Use the official Microsoft.WindowsAppSDK.WinUI.CSharp.Templates package (currently in alpha).",
+            "Use the official Microsoft.WindowsAppSDK.WinUI.CSharp.Templates package.",
             "Use the community VijayAnand.WinUITemplates package."
           ],
           "default": "auto",
@@ -501,7 +550,7 @@
         "windevHelper.templates.allowPrerelease": {
           "type": "boolean",
           "default": true,
-          "description": "Allow installing prerelease versions of the official Microsoft WinUI template package (the alpha is required while the package is still in preview)."
+          "description": "Allow installing prerelease versions of the official Microsoft WinUI template package."
         }
       }
     },

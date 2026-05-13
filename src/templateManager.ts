@@ -65,7 +65,7 @@ export class TemplateManager {
      * Installs WinUI templates from the dotnet template package. Prompts the
      * user when the configured source is `auto` and neither package is
      * installed yet so they can pick between the official Microsoft package
-     * (currently in alpha) and the community package.
+     * and the community package.
      */
     public async installTemplates(): Promise<void> {
         const source = await this.pickInstallSource();
@@ -118,7 +118,7 @@ export class TemplateManager {
             [
                 {
                     label: 'Official (Microsoft.WindowsAppSDK.WinUI.CSharp.Templates)',
-                    description: 'alpha — includes winui, winui-mvvm, winui-navview, winui-lib, winui-unittest',
+                    description: 'Microsoft — winui, winui-navview, winui-tabview, winui-mvvm, winui-lib, winui-unittest',
                     value: 'official' as const,
                 },
                 {
@@ -246,14 +246,19 @@ export class TemplateManager {
                         value: { template: TEMPLATE_NAMES.OFFICIAL.BLANK },
                     },
                     {
-                        label: 'MVVM App',
-                        description: 'winui-mvvm — blank app pre-wired with CommunityToolkit.Mvvm',
-                        value: { template: TEMPLATE_NAMES.OFFICIAL.MVVM },
-                    },
-                    {
                         label: 'NavigationView App',
                         description: 'winui-navview — starter shell with NavigationView',
                         value: { template: TEMPLATE_NAMES.OFFICIAL.NAVIGATION_VIEW },
+                    },
+                    {
+                        label: 'TabView App',
+                        description: 'winui-tabview — tab-based UI with add/remove/drag support',
+                        value: { template: TEMPLATE_NAMES.OFFICIAL.TAB_VIEW },
+                    },
+                    {
+                        label: 'MVVM App',
+                        description: 'winui-mvvm — blank app pre-wired with CommunityToolkit.Mvvm',
+                        value: { template: TEMPLATE_NAMES.OFFICIAL.MVVM },
                     },
                     {
                         label: 'Unit Test Project',
@@ -350,21 +355,45 @@ export class TemplateManager {
      * Adds a new Page to the project
      */
     public async addPage(uri?: vscode.Uri): Promise<void> {
-        await this.addItem('winui-page', 'Page', uri, { supportsViewModel: true, isControl: false });
+        await this.addItem(TEMPLATE_NAMES.OFFICIAL.PAGE, 'Page', uri, { supportsViewModel: true, isControl: false });
     }
 
     /**
      * Adds a new UserControl to the project
      */
     public async addUserControl(uri?: vscode.Uri): Promise<void> {
-        await this.addItem('winui-usercontrol', 'User Control', uri, { supportsViewModel: true, isControl: true });
+        await this.addItem(TEMPLATE_NAMES.OFFICIAL.USER_CONTROL, 'User Control', uri, { supportsViewModel: true, isControl: true });
     }
 
     /**
      * Adds a new Window to the project
      */
     public async addWindow(uri?: vscode.Uri): Promise<void> {
-        await this.addItem('winui-window', 'Window', uri, { supportsViewModel: true, isControl: false });
+        await this.addItem(TEMPLATE_NAMES.OFFICIAL.WINDOW, 'Window', uri, { supportsViewModel: true, isControl: false });
+    }
+
+    /**
+     * Adds a new ContentDialog to the project (official template only).
+     * Falls back to the user control template on the community package.
+     */
+    public async addDialog(uri?: vscode.Uri): Promise<void> {
+        await this.addItem(TEMPLATE_NAMES.OFFICIAL.DIALOG, 'Content Dialog', uri, { supportsViewModel: true, isControl: false });
+    }
+
+    /**
+     * Adds a new Templated (custom) Control to the project. Generates a
+     * Themes/Generic.xaml entry alongside the C# class via the official
+     * template.
+     */
+    public async addTemplatedControl(uri?: vscode.Uri): Promise<void> {
+        await this.addItem(TEMPLATE_NAMES.OFFICIAL.TEMPLATED_CONTROL, 'Templated Control', uri, { supportsViewModel: false, isControl: true });
+    }
+
+    /**
+     * Adds a new ResourceDictionary XAML file to the project.
+     */
+    public async addResourceDictionary(uri?: vscode.Uri): Promise<void> {
+        await this.addItem(TEMPLATE_NAMES.OFFICIAL.RESOURCE_DICTIONARY, 'Resource Dictionary', uri, { supportsViewModel: false, isControl: false });
     }
 
     /**
@@ -805,6 +834,57 @@ public partial class ${viewModelName} : BaseViewModel
     }
 }
 `;
+    }
+
+    /**
+     * Helps users install the official WinUI Copilot plugin for the GitHub
+     * Copilot CLI / Claude Code. The plugin ships the `winui-dev` agent and
+     * the WinUI dev / design / packaging / UI testing skills described at
+     * https://devblogs.microsoft.com/ifdef-windows/build-native-windows-apps-with-ai-agents-for-winui-and-windows-app-sdk/
+     *
+     * The actual install is a slash command inside the Copilot CLI
+     * (`/plugin install winui@awesome-copilot`), so this command opens a
+     * terminal, starts the Copilot CLI, and copies the slash command to the
+     * clipboard so the user can paste it after the prompt loads.
+     */
+    public async installCopilotPlugin(): Promise<void> {
+        const docsUrl = 'https://devblogs.microsoft.com/ifdef-windows/build-native-windows-apps-with-ai-agents-for-winui-and-windows-app-sdk/';
+        const installCommand = '/plugin install winui@awesome-copilot';
+        const setupCommand = '/winui-setup';
+
+        const choice = await vscode.window.showInformationMessage(
+            'Install the WinUI Copilot plugin? This launches the GitHub Copilot CLI in a new terminal and copies the install slash-command to your clipboard so you can paste it at the prompt.',
+            { modal: false },
+            'Launch Copilot CLI',
+            'Copy Commands',
+            'Open Docs',
+        );
+
+        if (!choice) { return; }
+
+        if (choice === 'Open Docs') {
+            await vscode.env.openExternal(vscode.Uri.parse(docsUrl));
+            return;
+        }
+
+        if (choice === 'Copy Commands') {
+            await vscode.env.clipboard.writeText(`${installCommand}\n${setupCommand}`);
+            vscode.window.showInformationMessage('Copilot plugin commands copied to clipboard. Paste them inside the Copilot CLI prompt.');
+            return;
+        }
+
+        // Launch Copilot CLI in a new terminal
+        await vscode.env.clipboard.writeText(installCommand);
+        const terminal = vscode.window.createTerminal({ name: 'WinUI Copilot Plugin' });
+        terminal.show();
+        // Print instructions to the terminal before starting the Copilot CLI so
+        // the user knows what to do once the prompt loads.
+        terminal.sendText('Write-Host "Starting GitHub Copilot CLI..." -ForegroundColor Cyan');
+        terminal.sendText(`Write-Host "Once the prompt loads, paste (Ctrl+V) the install command which has been copied to your clipboard:" -ForegroundColor Cyan`);
+        terminal.sendText(`Write-Host "  ${installCommand}" -ForegroundColor Yellow`);
+        terminal.sendText(`Write-Host "Then run:" -ForegroundColor Cyan`);
+        terminal.sendText(`Write-Host "  ${setupCommand}" -ForegroundColor Yellow`);
+        terminal.sendText('copilot');
     }
 
     /**

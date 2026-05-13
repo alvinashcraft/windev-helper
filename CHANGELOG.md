@@ -5,9 +5,30 @@ All notable changes to the WinDev Helper extension will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [2.10.0] - 2026-05-05
+## [3.0.0] - 2026-05-13
 
-> ⚠️ The preview pane and properties panel features are currently in preview. Please report any bugs or suggestions to our GitHub issues.
+WinDev Helper returns to **production-ready** status with this release. The `preview` flag was originally set on the 2.x line while the experimental Native XAML Preview pane and XAML Properties Pane features were under active development; both have stabilized enough to drop the release-wide preview label. The `preview` flag has been removed from the extension manifest and preview-release callouts have been retired across the docs. The Native XAML Preview pane and XAML Properties Pane remain individually labeled as preview while they continue to mature.
+
+This release also picks up the [new official `dotnet new` templates for WinUI](https://devblogs.microsoft.com/ifdef-windows/introducing-dotnet-new-templates-for-winui/) (PR [microsoft/WindowsAppSDK#6407](https://github.com/microsoft/WindowsAppSDK/pull/6407)) and adds a one-click setup helper for the new [WinUI agent plugin](https://devblogs.microsoft.com/ifdef-windows/build-native-windows-apps-with-ai-agents-for-winui-and-windows-app-sdk/) for the GitHub Copilot CLI and Claude Code.
+
+### Added
+
+- **TabView project template** - The `winui-tabview` template from the official Microsoft pack is now offered alongside Blank, NavigationView, MVVM, and Unit Test variants in **WinDev: Create WinUI Project**
+- **WinDev: Add New Content Dialog** - Scaffolds a `ContentDialog` via the official `winui-dialog` item template
+- **WinDev: Add New Templated Control** - Scaffolds a custom (templated) control with its `Themes/Generic.xaml` entry via the official `winui-templatedcontrol` item template
+- **WinDev: Add New Resource Dictionary** - Scaffolds a `ResourceDictionary` XAML file via the official `winui-resourcedictionary` item template
+- **WinDev: Install WinUI Copilot Plugin** - Helper that opens the GitHub Copilot CLI in a new terminal and copies the `/plugin install winui@awesome-copilot` slash-command to the clipboard so it can be pasted at the prompt. Also offers Copy Commands and Open Docs options
+- New explorer and Solution Explorer context-menu entries for the dialog, templated control, and resource dictionary item templates
+
+### Changed
+
+- **Removed `preview: true` flag from `package.json`** - The extension is no longer marked as a preview release on the Marketplace
+- **Removed preview-release banner** from the main README and from the documentation index
+- **Updated template-package descriptions** to drop "currently in alpha" references now that the official Microsoft pack has stabilized
+- **README/docs guidance** now recommends `dotnet new install Microsoft.WindowsAppSDK.WinUI.CSharp.Templates` (no `::*-*` prerelease suffix required) and showcases the new `winui-navview` / `winui-tabview` / `winui-mvvm` short names
+- All scaffolded projects now reference `Microsoft.Windows.SDK.BuildTools.WinApp` so `dotnet run` Just Works for packaged apps without manual `Add-AppxPackage` steps - documented in the README
+
+## [2.10.0] - 2026-05-05
 
 This release brings WinDev Helper closer to feature parity with the official [Microsoft WinApp VS Code extension](https://marketplace.visualstudio.com/items?itemName=Microsoft-WinAppCLI.winapp) and adds support for the new official Microsoft Windows App SDK templates.
 

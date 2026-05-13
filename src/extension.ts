@@ -141,6 +141,24 @@ function registerCommands(context: vscode.ExtensionContext): void {
     );
 
     context.subscriptions.push(
+        vscode.commands.registerCommand(COMMANDS.ADD_DIALOG, async (uri?: vscode.Uri) => {
+            await services.templateManager.addDialog(uri);
+        })
+    );
+
+    context.subscriptions.push(
+        vscode.commands.registerCommand(COMMANDS.ADD_TEMPLATED_CONTROL, async (uri?: vscode.Uri) => {
+            await services.templateManager.addTemplatedControl(uri);
+        })
+    );
+
+    context.subscriptions.push(
+        vscode.commands.registerCommand(COMMANDS.ADD_RESOURCE_DICTIONARY, async (uri?: vscode.Uri) => {
+            await services.templateManager.addResourceDictionary(uri);
+        })
+    );
+
+    context.subscriptions.push(
         vscode.commands.registerCommand(COMMANDS.ADD_VIEW_MODEL, async (uri?: vscode.Uri) => {
             await services.templateManager.addViewModel(uri);
         })
@@ -278,6 +296,12 @@ function registerCommands(context: vscode.ExtensionContext): void {
     context.subscriptions.push(
         vscode.commands.registerCommand(COMMANDS.INSTALL_TEMPLATES, async () => {
             await services.templateManager.installTemplates();
+        })
+    );
+
+    context.subscriptions.push(
+        vscode.commands.registerCommand(COMMANDS.INSTALL_COPILOT_PLUGIN, async () => {
+            await services.templateManager.installCopilotPlugin();
         })
     );
 

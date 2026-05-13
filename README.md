@@ -3,15 +3,12 @@
 [![Visual Studio Marketplace Version](https://img.shields.io/visual-studio-marketplace/v/alvinashcraft.windev-helper)](https://marketplace.visualstudio.com/items?itemName=alvinashcraft.windev-helper)
 [![Open VSX Version](https://img.shields.io/open-vsx/v/alvinashcraft/windev-helper)](https://open-vsx.org/extension/alvinashcraft/windev-helper)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Preview](https://img.shields.io/badge/status-preview-orange)](https://marketplace.visualstudio.com/items?itemName=alvinashcraft.windev-helper)
 
 The **WinDev Helper** extension gives you the tools you need to build beautiful, performant, native Windows apps with WinUI 3 and the Windows App SDK. Built on top of the open-source C# extension (with optional [C# Dev Kit](https://aka.ms/vs/csdevkit/license) integration), it streamlines your .NET development with package management, MSIX packaging, debugging, manifest tooling, and more.
 
 The extension is published to both the [Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=alvinashcraft.windev-helper) and the [Open VSX Registry](https://open-vsx.org/extension/alvinashcraft/windev-helper), so it works in VS Code, [VSCodium](https://vscodium.com/), [Cursor](https://cursor.com/), [Windsurf](https://codeium.com/windsurf), and other compatible editors.
 
 This extension leverages **winapp**, the Windows App Development CLI, to provide a seamless development experience for WinUI apps in VS Code.
-
-> ⚠️ **Preview Release**: The XAML preview pane and properties panel features in version 2.x are currently in preview. Please report any bugs or suggestions to our GitHub issues.
 
 ![WinDev Helper Extension](images/icon.png)
 
@@ -86,11 +83,17 @@ On non-Windows platforms, the extension provides an HTML-based preview renderer 
 
 ### 📝 Project & Item Templates
 
-- Create new WinUI 3 projects with optional MVVM support
+- Create new WinUI 3 projects: **Blank**, **NavigationView**, **TabView**, **MVVM**, and **Unit Test** variants when using the official Microsoft template pack
 - Create WinUI class libraries
-- Add new Pages, Windows, and User Controls to your project
+- Add new **Pages**, **Windows**, **User Controls**, **Content Dialogs**, **Templated Controls**, and **Resource Dictionaries** to your project
 - **Automatic MVVM setup** - Global usings for CommunityToolkit.Mvvm are automatically added when creating views
-- Supports both the [official Microsoft Windows App SDK templates](https://www.nuget.org/packages/Microsoft.WindowsAppSDK.WinUI.CSharp.Templates) (currently in alpha) and the [community WinUI Templates](https://github.com/egvijayanand/winui-templates); pick a preference via `windevHelper.templates.source`
+- All scaffolded projects support `dotnet run` out of the box for packaged apps via the bundled `Microsoft.Windows.SDK.BuildTools.WinApp` reference
+- Supports both the [official Microsoft Windows App SDK templates](https://www.nuget.org/packages/Microsoft.WindowsAppSDK.WinUI.CSharp.Templates) and the [community WinUI Templates](https://github.com/egvijayanand/winui-templates); pick a preference via `windevHelper.templates.source`
+
+### 🤖 WinUI Copilot Plugin
+
+- **Install WinUI Copilot Plugin** - One-click helper to set up the [WinUI agent plugin](https://devblogs.microsoft.com/ifdef-windows/build-native-windows-apps-with-ai-agents-for-winui-and-windows-app-sdk/) for the GitHub Copilot CLI and Claude Code
+- Pairs naturally with this extension: the agent scaffolds and iterates on your WinUI app while VS Code handles building, debugging, packaging, and signing
 
 ### 🛠️ App Manifest Management
 
@@ -123,7 +126,7 @@ This extension requires the following VS Code extension:
 - **Windows App SDK** - Automatically referenced in WinUI projects
 - **Windows App Development CLI (winapp)** - [Learn more](https://github.com/microsoft/WinAppCli)
 - **WinUI Templates** - Install with `WinUI: Install WinUI Templates`, or directly:
-  - Official (alpha): `dotnet new install Microsoft.WindowsAppSDK.WinUI.CSharp.Templates::*-*`
+  - Official: `dotnet new install Microsoft.WindowsAppSDK.WinUI.CSharp.Templates`
   - Community: `dotnet new install VijayAnand.WinUITemplates`
 
 ### System Requirements
@@ -141,7 +144,7 @@ This extension requires the following VS Code extension:
 winget install Microsoft.DotNet.SDK.8
 
 # Install WinUI Templates (pick one)
-dotnet new install Microsoft.WindowsAppSDK.WinUI.CSharp.Templates::*-*
+dotnet new install Microsoft.WindowsAppSDK.WinUI.CSharp.Templates
 # or the community pack
 dotnet new install VijayAnand.WinUITemplates
 
@@ -163,11 +166,17 @@ Or use the command line:
 # Create a basic WinUI app
 dotnet new winui -n MyApp
 
+# Create a NavigationView app
+dotnet new winui-navview -n MyApp
+
+# Create a TabView app
+dotnet new winui-tabview -n MyApp
+
 # Create a WinUI app with MVVM
-dotnet new winui -n MyApp -mvvm
+dotnet new winui-mvvm -n MyApp
 
 # Create a WinUI library
-dotnet new winuilib -n MyLib
+dotnet new winui-lib -n MyLib
 ```
 
 ### 3. Open and Build
@@ -185,6 +194,9 @@ dotnet new winuilib -n MyLib
 | `WinUI: Add New Page` | Add a new XAML page to your project |
 | `WinUI: Add New User Control` | Add a new user control |
 | `WinUI: Add New Window` | Add a new window |
+| `WinUI: Add New Content Dialog` | Add a new ContentDialog |
+| `WinUI: Add New Templated Control` | Add a new templated (custom) control |
+| `WinUI: Add New Resource Dictionary` | Add a new ResourceDictionary XAML file |
 | `WinUI: Open XAML Preview` | Open native XAML preview panel (Preview) |
 | `WinDev: Refresh Properties` | Refresh the XAML Properties pane |
 | `WinDev: Toggle Property Grouping` | Switch between grouped and flat property view |
@@ -207,6 +219,7 @@ dotnet new winuilib -n MyLib
 | `WinUI: Select Build Configuration` | Switch Debug/Release |
 | `WinUI: Select Target Platform` | Switch x86/x64/ARM64 |
 | `WinUI: Install WinUI Templates` | Install dotnet templates |
+| `WinUI: Install WinUI Copilot Plugin` | Install the WinUI plugin for the GitHub Copilot CLI |
 | `WinUI: Check WinApp CLI Installation` | Verify CLI is installed |
 | `WinDev: Run as Packaged App` | Launch app as a packaged app |
 | `WinDev: Unregister Dev Package` | Remove a sideloaded dev package |
@@ -237,7 +250,7 @@ This extension contributes the following settings:
 | `windevHelper.preview.height` | number | `600` | Default preview height |
 | `windevHelper.preview.updateDelay` | number | `300` | Delay (ms) before updating preview after edits |
 | `windevHelper.templates.source` | string | `auto` | Template package preference: `auto`, `official`, or `community` |
-| `windevHelper.templates.allowPrerelease` | boolean | `true` | Install prerelease versions of the official Microsoft template pack while it remains in alpha |
+| `windevHelper.templates.allowPrerelease` | boolean | `true` | Install prerelease versions of the official Microsoft template pack |
 
 ## Keyboard Shortcuts
 
@@ -312,7 +325,7 @@ MyApp/
 
 - **MSIX Packaged Apps**: Debugger attachment is not yet supported for packaged apps. They launch without a debugger; set `<WindowsPackageType>None</WindowsPackageType>` in your .csproj for full F5 debug support
 - **XAML Preview (Preview)**: Third-party controls (e.g., CommunityToolkit) are replaced with placeholder grids in the preview
-- **Properties Pane**: Metadata covers ~85 WinUI control types; third-party controls may have limited property defaults
+- **Properties Pane (Preview)**: Metadata covers ~85 WinUI control types; third-party controls may have limited property defaults
 - XAML IntelliSense and Hot Reload are planned for future releases
 - Some advanced debugging scenarios may require Visual Studio
 - XAML Preview requires Windows (the native renderer uses WinUI 3)
