@@ -1,4 +1,4 @@
-# WinDev Helper - A WinUI Extension for VS Code
+# WinDev Helper - A WinUI editor extension
 
 [![Visual Studio Marketplace Version](https://img.shields.io/visual-studio-marketplace/v/alvinashcraft.windev-helper)](https://marketplace.visualstudio.com/items?itemName=alvinashcraft.windev-helper)
 [![Open VSX Version](https://img.shields.io/open-vsx/v/alvinashcraft/windev-helper)](https://open-vsx.org/extension/alvinashcraft/windev-helper)
