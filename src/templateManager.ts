@@ -13,6 +13,8 @@ import { CONFIG, OUTPUT_CHANNELS, TEMPLATE_NAMES, TEMPLATE_PACKAGES } from './co
  */
 type TemplateSource = 'official' | 'community';
 
+type ItemCategory = 'page' | 'window' | 'dialog' | 'control' | 'resourceDictionary';
+
 /**
  * Manages WinUI project and item templates
  */
@@ -355,21 +357,21 @@ export class TemplateManager {
      * Adds a new Page to the project
      */
     public async addPage(uri?: vscode.Uri): Promise<void> {
-        await this.addItem(TEMPLATE_NAMES.OFFICIAL.PAGE, 'Page', uri, { supportsViewModel: true, isControl: false });
+        await this.addItem(TEMPLATE_NAMES.OFFICIAL.PAGE, 'Page', uri, { supportsViewModel: true, isControl: false, itemCategory: 'page' });
     }
 
     /**
      * Adds a new UserControl to the project
      */
     public async addUserControl(uri?: vscode.Uri): Promise<void> {
-        await this.addItem(TEMPLATE_NAMES.OFFICIAL.USER_CONTROL, 'User Control', uri, { supportsViewModel: true, isControl: true });
+        await this.addItem(TEMPLATE_NAMES.OFFICIAL.USER_CONTROL, 'User Control', uri, { supportsViewModel: true, isControl: true, itemCategory: 'control' });
     }
 
     /**
      * Adds a new Window to the project
      */
     public async addWindow(uri?: vscode.Uri): Promise<void> {
-        await this.addItem(TEMPLATE_NAMES.OFFICIAL.WINDOW, 'Window', uri, { supportsViewModel: true, isControl: false });
+        await this.addItem(TEMPLATE_NAMES.OFFICIAL.WINDOW, 'Window', uri, { supportsViewModel: true, isControl: false, itemCategory: 'window' });
     }
 
     /**
@@ -382,7 +384,7 @@ export class TemplateManager {
      */
     public async addDialog(uri?: vscode.Uri): Promise<void> {
         if (!(await this.ensureOfficialPack('Add New Content Dialog', 'winui-dialog'))) { return; }
-        await this.addItem(TEMPLATE_NAMES.OFFICIAL.DIALOG, 'Content Dialog', uri, { supportsViewModel: true, isControl: false });
+        await this.addItem(TEMPLATE_NAMES.OFFICIAL.DIALOG, 'Content Dialog', uri, { supportsViewModel: true, isControl: false, itemCategory: 'dialog' });
     }
 
     /**
@@ -392,7 +394,7 @@ export class TemplateManager {
      */
     public async addTemplatedControl(uri?: vscode.Uri): Promise<void> {
         if (!(await this.ensureOfficialPack('Add New Templated Control', 'winui-templatedcontrol'))) { return; }
-        await this.addItem(TEMPLATE_NAMES.OFFICIAL.TEMPLATED_CONTROL, 'Templated Control', uri, { supportsViewModel: false, isControl: true });
+        await this.addItem(TEMPLATE_NAMES.OFFICIAL.TEMPLATED_CONTROL, 'Templated Control', uri, { supportsViewModel: false, isControl: true, itemCategory: 'control' });
     }
 
     /**
@@ -401,7 +403,7 @@ export class TemplateManager {
      */
     public async addResourceDictionary(uri?: vscode.Uri): Promise<void> {
         if (!(await this.ensureOfficialPack('Add New Resource Dictionary', 'winui-resourcedictionary'))) { return; }
-        await this.addItem(TEMPLATE_NAMES.OFFICIAL.RESOURCE_DICTIONARY, 'Resource Dictionary', uri, { supportsViewModel: false, isControl: false });
+        await this.addItem(TEMPLATE_NAMES.OFFICIAL.RESOURCE_DICTIONARY, 'Resource Dictionary', uri, { supportsViewModel: false, isControl: false, itemCategory: 'resourceDictionary' });
     }
 
     /**
@@ -434,6 +436,55 @@ export class TemplateManager {
         return false;
     }
 
+    private resolveCurrentFolder(uri?: vscode.Uri): string | undefined {
+        if (uri) { return uri.fsPath; }
+        const activeEditor = vscode.window.activeTextEditor;
+        if (activeEditor) { return path.dirname(activeEditor.document.uri.fsPath); }
+        return undefined;
+    }
+
+    private async pickTargetFolder(
+        projectDir: string,
+        itemCategory: ItemCategory,
+        uri?: vscode.Uri,
+    ): Promise<string | undefined> {
+        const categoryDefaults: Record<ItemCategory, { label: string; relativePath: string }> = {
+            page:               { label: 'Views Folder',              relativePath: 'Views' },
+            window:             { label: 'Views Folder',              relativePath: 'Views' },
+            dialog:             { label: 'Views Folder',              relativePath: 'Views' },
+            control:            { label: 'Views/Controls Folder',     relativePath: path.join('Views', 'Controls') },
+            resourceDictionary: { label: 'Resources Folder',          relativePath: 'Resources' },
+        };
+
+        const categoryDefault = categoryDefaults[itemCategory];
+        const items: vscode.QuickPickItem[] = [];
+
+        const currentFolder = this.resolveCurrentFolder(uri);
+        if (currentFolder) {
+            items.push({
+                label: 'Current Folder',
+                description: currentFolder,
+            });
+        }
+
+        items.push({
+            label: 'Project Folder',
+            description: projectDir,
+        });
+
+        items.push({
+            label: categoryDefault.label,
+            description: path.join(projectDir, categoryDefault.relativePath),
+        });
+
+        const pick = await vscode.window.showQuickPick(items, {
+            placeHolder: 'Where should the item be created?',
+            title: 'Target Folder',
+        });
+
+        return pick?.description;
+    }
+
     /**
      * Adds a new item using the specified template
      */
@@ -441,7 +492,7 @@ export class TemplateManager {
         template: string, 
         itemType: string, 
         uri?: vscode.Uri,
-        options: { supportsViewModel: boolean; isControl: boolean } = { supportsViewModel: false, isControl: false }
+        options: { supportsViewModel: boolean; isControl: boolean; itemCategory: ItemCategory } = { supportsViewModel: false, isControl: false, itemCategory: 'page' }
     ): Promise<void> {
         const itemName = await vscode.window.showInputBox({
             prompt: `Enter ${itemType} name`,
@@ -461,7 +512,6 @@ export class TemplateManager {
             return;
         }
 
-        // Ask if user wants to create a corresponding ViewModel
         let createViewModel = false;
         if (options.supportsViewModel) {
             const viewModelChoice = await vscode.window.showQuickPick(['Yes', 'No'], {
@@ -471,29 +521,21 @@ export class TemplateManager {
             createViewModel = viewModelChoice === 'Yes';
         }
 
-        // Determine workspace and target directories
         const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
         if (!workspaceFolder) {
             vscode.window.showErrorMessage('No workspace folder open.');
             return;
         }
 
-        const workspaceRoot = workspaceFolder.uri.fsPath;
-        
-        // Determine target directory for the view
-        let viewTargetDir: string;
-        if (uri) {
-            viewTargetDir = uri.fsPath;
-        } else {
-            // Default to Views folder, or Views/Controls for user controls
-            if (options.isControl) {
-                viewTargetDir = path.join(workspaceRoot, 'Views', 'Controls');
-            } else {
-                viewTargetDir = path.join(workspaceRoot, 'Views');
-            }
+        const projectDir = uri
+            ? (await this.findProjectDirectory(uri.fsPath)) ?? workspaceFolder.uri.fsPath
+            : workspaceFolder.uri.fsPath;
+
+        const viewTargetDir = await this.pickTargetFolder(projectDir, options.itemCategory, uri);
+        if (!viewTargetDir) {
+            return;
         }
 
-        // Ensure target directory exists
         await fs.promises.mkdir(viewTargetDir, { recursive: true });
 
         await vscode.window.withProgress({
@@ -502,20 +544,18 @@ export class TemplateManager {
             cancellable: false
         }, async () => {
             try {
-                // Always ensure global usings are configured for MVVM support
-                // This ensures Pages, Controls, and Windows have access to common namespaces
-                await this.ensureGlobalUsings(workspaceRoot);
+                await this.ensureGlobalUsings(projectDir);
 
-                await this.executeCommand(`dotnet new ${template} -n ${itemName}`, viewTargetDir);
+                const relativeOutput = path.relative(projectDir, viewTargetDir);
+                const outputArg = relativeOutput ? ` -o "${relativeOutput}"` : '';
+                await this.executeCommand(`dotnet new ${template} -n ${itemName}${outputArg}`, projectDir);
                 
-                // Open the created XAML file
                 const xamlFile = path.join(viewTargetDir, `${itemName}.xaml`);
                 const doc = await vscode.workspace.openTextDocument(xamlFile);
                 await vscode.window.showTextDocument(doc);
 
-                // Create ViewModel if requested
                 if (createViewModel) {
-                    await this.createViewModel(itemName, workspaceRoot, options.isControl);
+                    await this.createViewModel(itemName, projectDir, options.isControl);
                 }
                 
                 vscode.window.showInformationMessage(`${itemType} '${itemName}' added successfully.`);
@@ -528,7 +568,7 @@ export class TemplateManager {
     /**
      * Adds a new ViewModel to the project (standalone, without a view)
      */
-    public async addViewModel(_uri?: vscode.Uri): Promise<void> {
+    public async addViewModel(uri?: vscode.Uri): Promise<void> {
         const viewModelName = await vscode.window.showInputBox({
             prompt: 'Enter ViewModel name',
             placeHolder: 'MyViewModel',
@@ -547,23 +587,7 @@ export class TemplateManager {
             return;
         }
 
-        // Ensure name ends with ViewModel
         const finalName = viewModelName.endsWith('ViewModel') ? viewModelName : `${viewModelName}ViewModel`;
-
-        // Ask if this is for a control
-        const locationChoice = await vscode.window.showQuickPick(
-            ['ViewModels folder', 'ViewModels/Controls folder'],
-            {
-                placeHolder: 'Where should the ViewModel be created?',
-                title: 'ViewModel Location'
-            }
-        );
-
-        if (!locationChoice) {
-            return;
-        }
-
-        const isControl = locationChoice === 'ViewModels/Controls folder';
 
         const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
         if (!workspaceFolder) {
@@ -571,13 +595,37 @@ export class TemplateManager {
             return;
         }
 
+        const projectDir = uri
+            ? (await this.findProjectDirectory(uri.fsPath)) ?? workspaceFolder.uri.fsPath
+            : workspaceFolder.uri.fsPath;
+
+        const currentFolder = this.resolveCurrentFolder(uri);
+        const isControl = currentFolder?.includes(path.join('Views', 'Controls')) ?? false;
+        const viewModelDir = isControl
+            ? path.join(projectDir, 'ViewModels', 'Controls')
+            : path.join(projectDir, 'ViewModels');
+
         await vscode.window.withProgress({
             location: vscode.ProgressLocation.Notification,
             title: `Adding ViewModel: ${finalName}...`,
             cancellable: false
         }, async () => {
             try {
-                await this.createViewModel(finalName, workspaceFolder.uri.fsPath, isControl, true);
+                await fs.promises.mkdir(viewModelDir, { recursive: true });
+                await this.ensureMvvmInfrastructure(projectDir);
+                
+                const namespace = await this.detectNamespace(projectDir);
+                const viewModelNamespace = isControl ? `${namespace}.ViewModels.Controls` : `${namespace}.ViewModels`;
+                const content = this.generateViewModelContent(finalName, viewModelNamespace);
+                
+                const viewModelPath = path.join(viewModelDir, `${finalName}.cs`);
+                await fs.promises.writeFile(viewModelPath, content, 'utf8');
+                
+                this.outputChannel.appendLine(`Created ViewModel: ${viewModelPath}`);
+                
+                const doc = await vscode.workspace.openTextDocument(viewModelPath);
+                await vscode.window.showTextDocument(doc, { preview: false, viewColumn: vscode.ViewColumn.Beside });
+                
                 vscode.window.showInformationMessage(`ViewModel '${finalName}' added successfully.`);
             } catch (error) {
                 vscode.window.showErrorMessage(`Failed to add ViewModel: ${error}`);
@@ -594,31 +642,26 @@ export class TemplateManager {
      */
     private async createViewModel(
         viewName: string, 
-        workspaceRoot: string, 
+        projectDir: string, 
         isControl: boolean,
         isStandalone: boolean = false
     ): Promise<void> {
-        // Derive ViewModel name from view name (or use as-is if standalone)
         const viewModelName = isStandalone 
             ? viewName 
             : viewName.replace(/(Page|Window|Control|UserControl)$/, '') + 'ViewModel';
         
-        // Ensure MVVM Toolkit is installed and BaseViewModel exists
-        await this.ensureMvvmInfrastructure(workspaceRoot);
+        await this.ensureMvvmInfrastructure(projectDir);
 
-        // Determine target directory for ViewModel
         let viewModelDir: string;
         if (isControl) {
-            viewModelDir = path.join(workspaceRoot, 'ViewModels', 'Controls');
+            viewModelDir = path.join(projectDir, 'ViewModels', 'Controls');
         } else {
-            viewModelDir = path.join(workspaceRoot, 'ViewModels');
+            viewModelDir = path.join(projectDir, 'ViewModels');
         }
 
-        // Ensure directory exists
         await fs.promises.mkdir(viewModelDir, { recursive: true });
 
-        // Detect namespace from project
-        const namespace = await this.detectNamespace(workspaceRoot);
+        const namespace = await this.detectNamespace(projectDir);
         const viewModelNamespace = isControl ? `${namespace}.ViewModels.Controls` : `${namespace}.ViewModels`;
 
         // Generate ViewModel content
@@ -637,51 +680,46 @@ export class TemplateManager {
 
     /**
      * Ensures MVVM Toolkit is installed and global usings are configured
-     * @param workspaceRoot - The workspace root path
+     * @param projectDir - The project directory path (containing .csproj)
      */
-    private async ensureMvvmInfrastructure(workspaceRoot: string): Promise<void> {
-        // Check if CommunityToolkit.Mvvm is referenced
-        const hasMvvmToolkit = await this.checkMvvmToolkitInstalled(workspaceRoot);
+    private async ensureMvvmInfrastructure(projectDir: string): Promise<void> {
+        const hasMvvmToolkit = await this.checkMvvmToolkitInstalled(projectDir);
         if (!hasMvvmToolkit) {
             this.outputChannel.appendLine('Installing CommunityToolkit.Mvvm package...');
             try {
-                await this.executeCommand('dotnet add package CommunityToolkit.Mvvm', workspaceRoot);
+                await this.executeCommand('dotnet add package CommunityToolkit.Mvvm', projectDir);
                 this.outputChannel.appendLine('CommunityToolkit.Mvvm installed successfully.');
             } catch (error) {
                 this.outputChannel.appendLine(`Warning: Failed to install CommunityToolkit.Mvvm: ${error}`);
             }
         }
 
-        // Ensure global usings are configured
-        await this.ensureGlobalUsings(workspaceRoot);
+        await this.ensureGlobalUsings(projectDir);
 
-        // Check if BaseViewModel exists
-        const baseViewModelPath = path.join(workspaceRoot, 'ViewModels', 'BaseViewModel.cs');
+        const baseViewModelPath = path.join(projectDir, 'ViewModels', 'BaseViewModel.cs');
         const baseViewModelExists = await this.fileExists(baseViewModelPath);
         
         if (!baseViewModelExists) {
-            await this.createBaseViewModel(workspaceRoot);
+            await this.createBaseViewModel(projectDir);
         }
     }
 
     /**
      * Ensures global usings file exists with required MVVM imports
-     * @param workspaceRoot - The workspace root path
+     * @param projectDir - The project directory path (containing .csproj)
      */
-    private async ensureGlobalUsings(workspaceRoot: string): Promise<void> {
-        const namespace = await this.detectNamespace(workspaceRoot);
+    private async ensureGlobalUsings(projectDir: string): Promise<void> {
+        const namespace = await this.detectNamespace(projectDir);
         
-        // Common locations for global usings file
         const possiblePaths = [
-            path.join(workspaceRoot, 'Imports.cs'),
-            path.join(workspaceRoot, 'GlobalUsings.cs'),
-            path.join(workspaceRoot, 'Usings.cs')
+            path.join(projectDir, 'Imports.cs'),
+            path.join(projectDir, 'GlobalUsings.cs'),
+            path.join(projectDir, 'Usings.cs')
         ];
 
         let globalUsingsPath: string | undefined;
         let existingContent = '';
 
-        // Check if any global usings file exists
         for (const filePath of possiblePaths) {
             if (await this.fileExists(filePath)) {
                 globalUsingsPath = filePath;
@@ -694,27 +732,22 @@ export class TemplateManager {
             }
         }
 
-        // Required global usings for MVVM and Views
         const requiredUsings = [
             'global using CommunityToolkit.Mvvm.ComponentModel;',
             'global using CommunityToolkit.Mvvm.Input;',
             `global using ${namespace}.ViewModels;`,
-            `global using ${namespace}.Views;`
         ];
 
-        // If no file exists, create Imports.cs
         if (!globalUsingsPath) {
-            globalUsingsPath = path.join(workspaceRoot, 'Imports.cs');
+            globalUsingsPath = path.join(projectDir, 'Imports.cs');
             const content = this.generateGlobalUsingsContent(namespace);
             await fs.promises.writeFile(globalUsingsPath, content, 'utf8');
             this.outputChannel.appendLine(`Created global usings file: ${globalUsingsPath}`);
             return;
         }
 
-        // Check if required usings are present and add missing ones
         const missingUsings: string[] = [];
         for (const usingStatement of requiredUsings) {
-            // Check if the using (or a variation) is already present
             const usingPattern = usingStatement.replace('global using ', '').replace(';', '');
             if (!existingContent.includes(usingPattern)) {
                 missingUsings.push(usingStatement);
@@ -722,7 +755,6 @@ export class TemplateManager {
         }
 
         if (missingUsings.length > 0) {
-            // Append missing usings to the file
             const additionalContent = '\n' + missingUsings.join('\n') + '\n';
             await fs.promises.appendFile(globalUsingsPath, additionalContent, 'utf8');
             this.outputChannel.appendLine(`Added missing global usings to: ${globalUsingsPath}`);
@@ -735,6 +767,9 @@ export class TemplateManager {
      * @returns The file content
      */
     private generateGlobalUsingsContent(namespace: string): string {
+        // J.Magnet
+        // Removed:
+        // global using ${namespace}.Views;
         return `// Global using directives for ${namespace}
 // This file contains global using statements that are available throughout the project.
 
@@ -743,7 +778,6 @@ global using CommunityToolkit.Mvvm.Input;
 global using CommunityToolkit.Mvvm.Messaging;
 
 global using ${namespace}.ViewModels;
-global using ${namespace}.Views;
 
 global using Microsoft.UI.Xaml;
 global using Microsoft.UI.Xaml.Controls;
@@ -752,16 +786,17 @@ global using Microsoft.UI.Xaml.Controls;
 
     /**
      * Checks if CommunityToolkit.Mvvm is referenced in the project
+     * @param projectDir - The project directory path (containing .csproj)
      */
-    private async checkMvvmToolkitInstalled(_workspaceRoot: string): Promise<boolean> {
+    private async checkMvvmToolkitInstalled(projectDir: string): Promise<boolean> {
         try {
-            const csprojFiles = await vscode.workspace.findFiles('**/*.csproj', '**/bin/**', 1);
-            if (csprojFiles.length > 0) {
-                const content = await fs.promises.readFile(csprojFiles[0].fsPath, 'utf8');
+            const entries = await fs.promises.readdir(projectDir);
+            const csproj = entries.find(e => e.endsWith('.csproj'));
+            if (csproj) {
+                const content = await fs.promises.readFile(path.join(projectDir, csproj), 'utf8');
                 return content.includes('CommunityToolkit.Mvvm');
             }
         } catch {
-            // Ignore errors
         }
         return false;
     }
@@ -780,13 +815,13 @@ global using Microsoft.UI.Xaml.Controls;
 
     /**
      * Creates the BaseViewModel class
-     * @param workspaceRoot - The workspace root path
+     * @param projectDir - The project directory path (containing .csproj)
      */
-    private async createBaseViewModel(workspaceRoot: string): Promise<void> {
-        const viewModelsDir = path.join(workspaceRoot, 'ViewModels');
+    private async createBaseViewModel(projectDir: string): Promise<void> {
+        const viewModelsDir = path.join(projectDir, 'ViewModels');
         await fs.promises.mkdir(viewModelsDir, { recursive: true });
 
-        const namespace = await this.detectNamespace(workspaceRoot);
+        const namespace = await this.detectNamespace(projectDir);
         
         // Note: Using statements are provided via global usings in Imports.cs
         const baseViewModelContent = `namespace ${namespace}.ViewModels;
@@ -818,31 +853,87 @@ public partial class BaseViewModel : ObservableObject
     }
 
     /**
-     * Detects the root namespace from the project file
+     * Finds the project directory containing a `.csproj` file.
+     * First checks the given directory, then immediate subdirectories (forward search).
+     * If multiple projects are found, prompts the user to select one.
+     * Falls back to walking up the directory tree (backward search).
+     * Returns `undefined` if no project file is found.
      */
-    private async detectNamespace(workspaceRoot: string): Promise<string> {
+    private async findProjectDirectory(filePath: string): Promise<string | undefined> {
+        let dir: string;
         try {
-            // Find .csproj file
-            const csprojFiles = await vscode.workspace.findFiles('**/*.csproj', '**/bin/**', 1);
-            if (csprojFiles.length > 0) {
-                const content = await fs.promises.readFile(csprojFiles[0].fsPath, 'utf8');
+            dir = fs.statSync(filePath).isDirectory() ? filePath : path.dirname(filePath);
+        } catch {
+            return undefined;
+        }
+
+        const entries = await fs.promises.readdir(dir);
+        if (entries.some((e: string) => e.endsWith('.csproj'))) {
+            return dir;
+        }
+
+        const projectDirs: string[] = [];
+        for (const entry of entries) {
+            const subDir = path.join(dir, entry);
+            try {
+                const stat = await fs.promises.stat(subDir);
+                if (stat.isDirectory()) {
+                    const subEntries = await fs.promises.readdir(subDir);
+                    if (subEntries.some((e: string) => e.endsWith('.csproj'))) {
+                        projectDirs.push(subDir);
+                    }
+                }
+            } catch { /* ignore inaccessible directories */ }
+        }
+
+        if (projectDirs.length === 1) {
+            return projectDirs[0];
+        }
+
+        if (projectDirs.length > 1) {
+            const pick = await vscode.window.showQuickPick(
+                projectDirs.map(d => ({ label: path.basename(d), description: d })),
+                { placeHolder: 'Multiple projects found. Select one:' }
+            );
+            return pick?.description;
+        }
+
+        const root = path.parse(dir).root;
+        while (dir !== root) {
+            const parent = path.dirname(dir);
+            if (parent === dir) { break; }
+            dir = parent;
+            const parentEntries = await fs.promises.readdir(dir);
+            if (parentEntries.some((e: string) => e.endsWith('.csproj'))) {
+                return dir;
+            }
+        }
+
+        return undefined;
+    }
+
+    /**
+     * Detects the root namespace from the project file
+     * @param projectDir - The project directory path (containing .csproj)
+     */
+    private async detectNamespace(projectDir: string): Promise<string> {
+        try {
+            const entries = await fs.promises.readdir(projectDir);
+            const csproj = entries.find(e => e.endsWith('.csproj'));
+            if (csproj) {
+                const content = await fs.promises.readFile(path.join(projectDir, csproj), 'utf8');
                 
-                // Try to find RootNamespace
                 const rootNsMatch = content.match(/<RootNamespace>(.*?)<\/RootNamespace>/);
                 if (rootNsMatch) {
                     return rootNsMatch[1];
                 }
 
-                // Fall back to project name
-                const projectName = path.basename(csprojFiles[0].fsPath, '.csproj');
-                return projectName;
+                return path.basename(csproj, '.csproj');
             }
         } catch {
-            // Ignore errors
         }
 
-        // Default to folder name
-        return path.basename(workspaceRoot);
+        return path.basename(projectDir);
     }
 
     /**
@@ -956,9 +1047,12 @@ public partial class ${viewModelName} : BaseViewModel
     /**
      * Executes a command in the terminal
      */
-    private executeCommand(command: string, cwd?: string, silent: boolean = false): Promise<string> {
+    private async executeCommand(command: string, cwd?: string, silent: boolean = false): Promise<string> {
+        const workingDir = cwd
+            ?? (await this.findProjectDirectory(vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? ''))
+            ?? vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+
         return new Promise((resolve, reject) => {
-            const workingDir = cwd || vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
             
             if (!silent) {
                 this.outputChannel.appendLine(`> ${command}`);
