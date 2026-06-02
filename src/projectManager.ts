@@ -15,6 +15,7 @@ export class WinUIProjectManager {
     private context: vscode.ExtensionContext;
     private winAppCli: WinAppCli;
     private _isWinUIProject: boolean = false;
+    private _isReactorProject: boolean = false;
     private _currentProject: vscode.Uri | undefined;
     private fileWatcher: vscode.FileSystemWatcher | undefined;
 
@@ -29,6 +30,13 @@ export class WinUIProjectManager {
      */
     public get isWinUIProject(): boolean {
         return this._isWinUIProject;
+    }
+
+    /**
+     * Gets whether the current workspace contains a Microsoft.UI.Reactor project
+     */
+    public get isReactorProject(): boolean {
+        return this._isReactorProject;
     }
 
     /**
@@ -52,36 +60,35 @@ export class WinUIProjectManager {
         // Look for .csproj files
         const csprojFiles = await vscode.workspace.findFiles(FILE_PATTERNS.CSPROJ, '**/bin/**');
         
+        let reactorDetected = false;
+        let winUIDetected = false;
         for (const csprojFile of csprojFiles) {
-            if (await this.isWinUIProjectFile(csprojFile)) {
+            const content = await this.readProjectFile(csprojFile);
+            if (content === undefined) {
+                continue;
+            }
+            if (!reactorDetected && content.includes(PROJECT_INDICATORS.REACTOR_REFERENCE)) {
+                reactorDetected = true;
+            }
+            if (!winUIDetected && this.matchesWinUIIndicators(content)) {
                 this._currentProject = csprojFile;
-                this.setIsWinUIProject(true);
-                return true;
+                winUIDetected = true;
             }
         }
 
-        this.setIsWinUIProject(false);
-        return false;
+        this.setIsReactorProject(reactorDetected);
+        this.setIsWinUIProject(winUIDetected);
+        return winUIDetected;
     }
 
     /**
-     * Checks if a .csproj file is a WinUI project
-     * @param csprojUri - URI to the .csproj file
-     * @returns Promise<boolean> - True if this is a WinUI project
+     * Reads a project file, returning its contents or `undefined` if it could
+     * not be read (the specific failure is logged for diagnostics).
      */
-    private async isWinUIProjectFile(csprojUri: vscode.Uri): Promise<boolean> {
+    private async readProjectFile(csprojUri: vscode.Uri): Promise<string | undefined> {
         try {
-            const content = await fs.promises.readFile(csprojUri.fsPath, 'utf8');
-            
-            // Check for WinUI indicators
-            const hasUseWinUI = content.includes(PROJECT_INDICATORS.USE_WINUI);
-            const hasWindowsAppSdk = content.includes(PROJECT_INDICATORS.WINDOWS_APP_SDK);
-            const hasWinUIReference = content.includes(PROJECT_INDICATORS.WINUI_REFERENCE);
-            const hasWindowsTarget = PROJECT_INDICATORS.WINDOWS_TARGET_REGEX.test(content);
-
-            return hasUseWinUI || hasWindowsAppSdk || hasWinUIReference || hasWindowsTarget;
+            return await fs.promises.readFile(csprojUri.fsPath, 'utf8');
         } catch (error) {
-            // Log specific error types for debugging
             if (error instanceof Error) {
                 if ('code' in error) {
                     const nodeError = error as NodeJS.ErrnoException;
@@ -96,8 +103,29 @@ export class WinUIProjectManager {
                     console.error(`Error reading project file ${csprojUri.fsPath}: ${error.message}`);
                 }
             }
-            return false;
+            return undefined;
         }
+    }
+
+    /**
+     * Returns true when the given .csproj content carries any WinUI indicator.
+     */
+    private matchesWinUIIndicators(content: string): boolean {
+        const hasUseWinUI = content.includes(PROJECT_INDICATORS.USE_WINUI);
+        const hasWindowsAppSdk = content.includes(PROJECT_INDICATORS.WINDOWS_APP_SDK);
+        const hasWinUIReference = content.includes(PROJECT_INDICATORS.WINUI_REFERENCE);
+        const hasWindowsTarget = PROJECT_INDICATORS.WINDOWS_TARGET_REGEX.test(content);
+        return hasUseWinUI || hasWindowsAppSdk || hasWinUIReference || hasWindowsTarget;
+    }
+
+    /**
+     * Checks if a .csproj file is a WinUI project
+     * @param csprojUri - URI to the .csproj file
+     * @returns Promise<boolean> - True if this is a WinUI project
+     */
+    private async isWinUIProjectFile(csprojUri: vscode.Uri): Promise<boolean> {
+        const content = await this.readProjectFile(csprojUri);
+        return content !== undefined && this.matchesWinUIIndicators(content);
     }
 
     /**
@@ -120,6 +148,15 @@ export class WinUIProjectManager {
     private setIsWinUIProject(value: boolean): void {
         this._isWinUIProject = value;
         vscode.commands.executeCommand('setContext', CONTEXT_KEYS.IS_WINUI_PROJECT, value);
+    }
+
+    /**
+     * Sets the Reactor project context
+     * @param value - Whether a Microsoft.UI.Reactor project is detected
+     */
+    private setIsReactorProject(value: boolean): void {
+        this._isReactorProject = value;
+        vscode.commands.executeCommand('setContext', CONTEXT_KEYS.IS_REACTOR_PROJECT, value);
     }
 
     /**

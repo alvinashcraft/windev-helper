@@ -8,6 +8,7 @@ import { WinUIProjectManager } from './projectManager';
 import { BuildManager } from './buildManager';
 import { PackageManager } from './packageManager';
 import { TemplateManager } from './templateManager';
+import { ReactorManager } from './reactorManager';
 import { StatusBarManager } from './statusBarManager';
 
 /**
@@ -27,6 +28,7 @@ export class ServiceLocator {
     // Lazy services (initialized on demand)
     private _packageManager: PackageManager | undefined;
     private _templateManager: TemplateManager | undefined;
+    private _reactorManager: ReactorManager | undefined;
 
     private constructor(context: vscode.ExtensionContext) {
         this._context = context;
@@ -132,6 +134,16 @@ export class ServiceLocator {
     }
 
     /**
+     * Gets the ReactorManager service (lazy-loaded).
+     */
+    public get reactorManager(): ReactorManager {
+        if (!this._reactorManager) {
+            this._reactorManager = new ReactorManager();
+        }
+        return this._reactorManager;
+    }
+
+    /**
      * Disposes all services and clears the singleton instance.
      */
     public dispose(): void {
@@ -139,6 +151,7 @@ export class ServiceLocator {
         this._buildManager?.dispose();
         this._packageManager?.dispose();
         this._templateManager?.dispose();
+        this._reactorManager?.dispose();
         this._winAppCli?.dispose();
 
         // Clear references
@@ -148,6 +161,7 @@ export class ServiceLocator {
         this._statusBarManager = undefined;
         this._packageManager = undefined;
         this._templateManager = undefined;
+        this._reactorManager = undefined;
 
         ServiceLocator._instance = undefined;
     }

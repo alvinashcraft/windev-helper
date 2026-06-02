@@ -305,6 +305,43 @@ function registerCommands(context: vscode.ExtensionContext): void {
         })
     );
 
+    context.subscriptions.push(
+        vscode.commands.registerCommand(COMMANDS.OPEN_SKILLS_REPO, async () => {
+            await services.templateManager.openSkillsRepo();
+        })
+    );
+
+    context.subscriptions.push(
+        vscode.commands.registerCommand(COMMANDS.CHECK_DEV_ENVIRONMENT, async () => {
+            await services.templateManager.checkDevEnvironment();
+        })
+    );
+
+    // Microsoft.UI.Reactor commands (v3.1.0+)
+    context.subscriptions.push(
+        vscode.commands.registerCommand(COMMANDS.CREATE_REACTOR_APP, async () => {
+            await services.reactorManager.createReactorApp();
+        })
+    );
+
+    context.subscriptions.push(
+        vscode.commands.registerCommand(COMMANDS.RUN_REACTOR_BOOTSTRAP, async () => {
+            await services.reactorManager.runBootstrap();
+        })
+    );
+
+    context.subscriptions.push(
+        vscode.commands.registerCommand(COMMANDS.OPEN_REACTOR_DOCS, async () => {
+            await services.reactorManager.openDocs();
+        })
+    );
+
+    context.subscriptions.push(
+        vscode.commands.registerCommand(COMMANDS.INSTALL_REACTOR_PLUGIN, async () => {
+            await services.reactorManager.installReactorPlugin();
+        })
+    );
+
     // CLI commands
     context.subscriptions.push(
         vscode.commands.registerCommand(COMMANDS.CHECK_WINAPP_CLI, async () => {

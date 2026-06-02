@@ -90,10 +90,21 @@ On non-Windows platforms, the extension provides an HTML-based preview renderer 
 - All scaffolded projects support `dotnet run` out of the box for packaged apps via the bundled `Microsoft.Windows.SDK.BuildTools.WinApp` reference
 - Supports both the [official Microsoft Windows App SDK templates](https://www.nuget.org/packages/Microsoft.WindowsAppSDK.WinUI.CSharp.Templates) and the [community WinUI Templates](https://github.com/egvijayanand/winui-templates); pick a preference via `windevHelper.templates.source`
 
-### 🤖 WinUI Copilot Plugin
+### 🤖 WinUI Agent Skills
 
-- **Install WinUI Copilot Plugin** - One-click helper to set up the [WinUI agent plugin](https://devblogs.microsoft.com/ifdef-windows/build-native-windows-apps-with-ai-agents-for-winui-and-windows-app-sdk/) for the GitHub Copilot CLI and Claude Code
+- **Install WinUI Agent + Skills Plugin** - One-click helper to set up the [WinUI agent plugin](https://devblogs.microsoft.com/ifdef-windows/build-native-windows-apps-with-ai-agents-for-winui-and-windows-app-sdk/) from the [microsoft/win-dev-skills](https://github.com/microsoft/win-dev-skills) marketplace for the GitHub Copilot CLI and Claude Code
+- **Open WinUI Agent Skills Repository** - Jump to the win-dev-skills repo to browse the available agents and skills
+- **Check Windows Dev Environment** - Diagnose your local toolchain (.NET SDK, WinApp CLI, WinUI templates, Developer Mode) with fix-up commands
 - Pairs naturally with this extension: the agent scaffolds and iterates on your WinUI app while VS Code handles building, debugging, packaging, and signing
+
+### ⚛️ Microsoft.UI.Reactor (Experimental)
+
+- Light-touch support for the [Microsoft.UI.Reactor](https://microsoft.github.io/microsoft-ui-reactor/) declarative pure-C# UI framework for WinUI
+- **Create Reactor App** - Scaffold a new app via `dotnet new reactorapp`
+- **Reactor: Run Bootstrap** - Build the framework, `mur` CLI, and template from a local clone
+- **Reactor: Open Documentation** and **Reactor: Install Agent Plugin** helpers
+- Reactor projects (those referencing `Microsoft.UI.Reactor`) are detected automatically
+- For live preview, use Microsoft's official [vscode-reactor](https://github.com/microsoft/microsoft-ui-reactor) extension
 
 ### 🛠️ App Manifest Management
 
@@ -219,7 +230,13 @@ dotnet new winui-lib -n MyLib
 | `WinUI: Select Build Configuration` | Switch Debug/Release |
 | `WinUI: Select Target Platform` | Switch x86/x64/ARM64 |
 | `WinUI: Install WinUI Templates` | Install dotnet templates |
-| `WinUI: Install WinUI Copilot Plugin` | Install the WinUI plugin for the GitHub Copilot CLI |
+| `WinUI: Install WinUI Agent + Skills Plugin` | Install the WinUI agent plugin (win-dev-skills) for the GitHub Copilot CLI |
+| `WinUI: Open WinUI Agent Skills Repository` | Open the microsoft/win-dev-skills repo |
+| `WinUI: Check Windows Dev Environment` | Diagnose the local WinUI toolchain |
+| `WinUI: Create Reactor App` | Scaffold a Microsoft.UI.Reactor app |
+| `WinUI: Reactor: Run Bootstrap` | Build the Reactor framework and template from a local clone |
+| `WinUI: Reactor: Open Documentation` | Open the Reactor docs |
+| `WinUI: Reactor: Install Agent Plugin` | Install the Reactor agent plugin |
 | `WinUI: Check WinApp CLI Installation` | Verify CLI is installed |
 | `WinDev: Run as Packaged App` | Launch app as a packaged app |
 | `WinDev: Unregister Dev Package` | Remove a sideloaded dev package |

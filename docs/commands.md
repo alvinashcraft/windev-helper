@@ -170,22 +170,93 @@ dotnet new winui-resourcedictionary -n DictionaryName
 
 ---
 
-### WinUI: Install WinUI Copilot Plugin
+### WinUI: Install WinUI Agent + Skills Plugin
 
 **Command ID:** `windev-helper.installCopilotPlugin`
 
-Helper that sets up the [WinUI agent plugin](https://devblogs.microsoft.com/ifdef-windows/build-native-windows-apps-with-ai-agents-for-winui-and-windows-app-sdk/) for the GitHub Copilot CLI and Claude Code.
+Helper that sets up the [WinUI agent plugin](https://devblogs.microsoft.com/ifdef-windows/build-native-windows-apps-with-ai-agents-for-winui-and-windows-app-sdk/) from the [microsoft/win-dev-skills](https://github.com/microsoft/win-dev-skills) marketplace for the GitHub Copilot CLI and Claude Code.
 
 **Usage:**
 
 1. Run from the Command Palette
-2. Pick **Launch Copilot CLI** to open a new terminal that starts `copilot` with the install slash-command copied to your clipboard, **Copy Commands** to just copy the install + setup commands, or **Open Docs** to read the announcement post
-3. Inside the Copilot CLI prompt, paste the slash-command:
+2. Pick **Install in Terminal** to open a new terminal that runs the marketplace add + install commands, **Copy Commands** to just copy them, or **Open Docs** to read the win-dev-skills repository
+3. The commands that run are:
 
    ```text
-   /plugin install winui@awesome-copilot
-   /winui-setup
+   copilot plugin marketplace add microsoft/win-dev-skills
+   copilot plugin install winui@win-dev-skills
    ```
+
+4. Start a new Copilot session and run `/winui-setup` to configure your environment
+
+---
+
+### WinUI: Open WinUI Agent Skills Repository
+
+**Command ID:** `windev-helper.openSkillsRepo`
+
+Opens the [microsoft/win-dev-skills](https://github.com/microsoft/win-dev-skills) repository in your browser.
+
+---
+
+### WinUI: Check Windows Dev Environment
+
+**Command ID:** `windev-helper.checkDevEnvironment`
+
+Runs a diagnostic check of your local Windows development toolchain and reports the results in the **WinDev Environment** output channel.
+
+**Checks:**
+
+- **.NET SDK** — verifies a version ≥ 8 is installed (target 10)
+- **WinApp CLI** — verifies version ≥ 0.3
+- **WinUI templates** — verifies the `Microsoft.WindowsAppSDK.WinUI.CSharp.Templates` package is installed
+- **Developer Mode** — verifies Windows Developer Mode is enabled (Windows only)
+
+Each failed check includes the command needed to fix it.
+
+---
+
+## Reactor Commands
+
+> Microsoft.UI.Reactor is an experimental declarative pure-C# UI framework for WinUI. See the [documentation](https://microsoft.github.io/microsoft-ui-reactor/) and [repository](https://github.com/microsoft/microsoft-ui-reactor).
+
+### WinUI: Create Reactor App
+
+**Command ID:** `windev-helper.createReactorApp`
+
+Scaffolds a new Reactor app via the `dotnet new reactorapp` template (registered by the Reactor bootstrap).
+
+**Equivalent CLI:**
+
+```bash
+dotnet new reactorapp -n AppName
+```
+
+---
+
+### WinUI: Reactor: Run Bootstrap
+
+**Command ID:** `windev-helper.runReactorBootstrap`
+
+Builds the Reactor framework, packs the `mur` CLI global tool, and registers the `dotnet new reactorapp` template from a local clone of `microsoft/microsoft-ui-reactor` via `bootstrap.ps1`.
+
+Set `windevHelper.reactor.repoPath` to point at your clone, or you will be prompted to select it.
+
+---
+
+### WinUI: Reactor: Open Documentation
+
+**Command ID:** `windev-helper.openReactorDocs`
+
+Opens the [Microsoft.UI.Reactor documentation](https://microsoft.github.io/microsoft-ui-reactor/) in your browser.
+
+---
+
+### WinUI: Reactor: Install Agent Plugin
+
+**Command ID:** `windev-helper.installReactorPlugin`
+
+Installs the Reactor agent plugin for the GitHub Copilot CLI from the `microsoft/microsoft-ui-reactor` marketplace.
 
 ---
 

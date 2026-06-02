@@ -7,6 +7,7 @@
  */
 export const CONTEXT_KEYS = {
     IS_WINUI_PROJECT: 'windevHelper.isWinUIProject',
+    IS_REACTOR_PROJECT: 'windevHelper.isReactorProject',
 } as const;
 
 /**
@@ -22,6 +23,7 @@ export const CONFIG = {
     CERTIFICATE_PATH: 'certificatePath',
     TEMPLATES_SOURCE: 'templates.source',
     TEMPLATES_ALLOW_PRERELEASE: 'templates.allowPrerelease',
+    REACTOR_REPO_PATH: 'reactor.repoPath',
 } as const;
 
 /**
@@ -56,8 +58,15 @@ export const COMMANDS = {
     SELECT_PLATFORM: 'windev-helper.selectPlatform',
     INSTALL_TEMPLATES: 'windev-helper.installTemplates',
     INSTALL_COPILOT_PLUGIN: 'windev-helper.installCopilotPlugin',
+    CHECK_DEV_ENVIRONMENT: 'windev-helper.checkDevEnvironment',
+    OPEN_SKILLS_REPO: 'windev-helper.openSkillsRepo',
     CHECK_WINAPP_CLI: 'windev-helper.checkWinAppCli',
     OPEN_XAML_PREVIEW: 'windev-helper.openXamlPreview',
+    // Microsoft.UI.Reactor commands (v3.1.0+)
+    CREATE_REACTOR_APP: 'windev-helper.createReactorApp',
+    RUN_REACTOR_BOOTSTRAP: 'windev-helper.runReactorBootstrap',
+    OPEN_REACTOR_DOCS: 'windev-helper.openReactorDocs',
+    INSTALL_REACTOR_PLUGIN: 'windev-helper.installReactorPlugin',
     // Microsoft Store commands (via winapp store subcommand)
     STORE_LIST_APPS: 'windev-helper.storeListApps',
     STORE_PUBLISH: 'windev-helper.storePublish',
@@ -91,6 +100,8 @@ export const OUTPUT_CHANNELS = {
     TEMPLATES: 'WinUI Templates',
     WINAPP_CLI: 'WinApp CLI',
     WINAPP_DEBUG: 'WinApp Debug',
+    REACTOR: 'WinUI Reactor',
+    DEV_ENVIRONMENT: 'WinDev Environment',
 } as const;
 
 /**
@@ -126,6 +137,8 @@ export const PROJECT_INDICATORS = {
     WINDOWS_APP_SDK: 'Microsoft.WindowsAppSDK',
     WINUI_REFERENCE: 'Microsoft.WinUI',
     WINDOWS_TARGET_REGEX: /<TargetFramework>.*windows.*<\/TargetFramework>/i,
+    /** Microsoft.UI.Reactor package reference marks a Reactor app project. */
+    REACTOR_REFERENCE: 'Microsoft.UI.Reactor',
 } as const;
 
 /**
@@ -136,6 +149,18 @@ export const DEFAULTS = {
     PLATFORM: 'x64' as const,
     TARGET_FRAMEWORK: 'net8.0-windows10.0.19041.0',
     TIMESTAMP_URL: 'http://timestamp.digicert.com',
+} as const;
+
+/**
+ * External resource URLs surfaced through extension commands.
+ */
+export const EXTERNAL_URLS = {
+    /** Microsoft WinUI agent + skills repository for AI coding hosts. */
+    WIN_DEV_SKILLS_REPO: 'https://github.com/microsoft/win-dev-skills',
+    /** Microsoft.UI.Reactor documentation site. */
+    REACTOR_DOCS: 'https://microsoft.github.io/microsoft-ui-reactor/',
+    /** Microsoft.UI.Reactor source repository. */
+    REACTOR_REPO: 'https://github.com/microsoft/microsoft-ui-reactor',
 } as const;
 
 /**
