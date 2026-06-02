@@ -437,7 +437,19 @@ export class TemplateManager {
     }
 
     private resolveCurrentFolder(uri?: vscode.Uri): string | undefined {
-        if (uri) { return uri.fsPath; }
+        if (uri) {
+            try {
+                const stat = fs.statSync(uri.fsPath);
+                if (stat.isDirectory()) {
+                    return uri.fsPath;
+                }
+                // It's a file — return its parent directory
+                return path.dirname(uri.fsPath);
+            } catch {
+                // If stat fails (e.g., file doesn't exist), assume it's a file and use parent
+                return path.dirname(uri.fsPath);
+            }
+        }
         const activeEditor = vscode.window.activeTextEditor;
         if (activeEditor) { return path.dirname(activeEditor.document.uri.fsPath); }
         return undefined;
@@ -457,24 +469,24 @@ export class TemplateManager {
         };
 
         const categoryDefault = categoryDefaults[itemCategory];
-        const items: vscode.QuickPickItem[] = [];
+        const items: (vscode.QuickPickItem & { targetDir: string })[] = [];
 
         const currentFolder = this.resolveCurrentFolder(uri);
         if (currentFolder) {
             items.push({
                 label: 'Current Folder',
-                description: currentFolder,
+                targetDir: currentFolder,
             });
         }
 
         items.push({
             label: 'Project Folder',
-            description: projectDir,
+            targetDir: projectDir,
         });
 
         items.push({
             label: categoryDefault.label,
-            description: path.join(projectDir, categoryDefault.relativePath),
+            targetDir: path.join(projectDir, categoryDefault.relativePath),
         });
 
         const pick = await vscode.window.showQuickPick(items, {
@@ -482,7 +494,7 @@ export class TemplateManager {
             title: 'Target Folder',
         });
 
-        return pick?.description;
+        return pick?.targetDir;
     }
 
     /**
@@ -527,9 +539,7 @@ export class TemplateManager {
             return;
         }
 
-        const projectDir = uri
-            ? (await this.findProjectDirectory(uri.fsPath)) ?? workspaceFolder.uri.fsPath
-            : workspaceFolder.uri.fsPath;
+        const projectDir = await this.findProjectDirectory(uri?.fsPath ?? workspaceFolder.uri.fsPath) ?? workspaceFolder.uri.fsPath;
 
         const viewTargetDir = await this.pickTargetFolder(projectDir, options.itemCategory, uri);
         if (!viewTargetDir) {
@@ -546,9 +556,20 @@ export class TemplateManager {
             try {
                 await this.ensureGlobalUsings(projectDir);
 
-                const relativeOutput = path.relative(projectDir, viewTargetDir);
-                const outputArg = relativeOutput ? ` -o "${relativeOutput}"` : '';
-                await this.executeCommand(`dotnet new ${template} -n ${itemName}${outputArg}`, projectDir);
+                // Ensure we don't write outside the project when using -o; if target is outside,
+                // run dotnet new directly in the target directory (no -o).
+                const projectDirResolved = path.resolve(projectDir);
+                const viewTargetDirResolved = path.resolve(viewTargetDir);
+                if (viewTargetDirResolved === projectDirResolved ||
+                    viewTargetDirResolved.startsWith(projectDirResolved + path.sep)) {
+                    // Inside or equal to projectDir: use -o with relative path
+                    const relativeOutput = path.relative(projectDirResolved, viewTargetDirResolved);
+                    const outputArg = relativeOutput ? ` -o "${relativeOutput}"` : '';
+                    await this.executeCommand(`dotnet new ${template} -n ${itemName}${outputArg}`, projectDirResolved);
+                } else {
+                    // Outside project: run dotnet new directly in the target directory
+                    await this.executeCommand(`dotnet new ${template} -n ${itemName}`, viewTargetDirResolved);
+                }
                 
                 const xamlFile = path.join(viewTargetDir, `${itemName}.xaml`);
                 const doc = await vscode.workspace.openTextDocument(xamlFile);
@@ -600,7 +621,13 @@ export class TemplateManager {
             : workspaceFolder.uri.fsPath;
 
         const currentFolder = this.resolveCurrentFolder(uri);
-        const isControl = currentFolder?.includes(path.join('Views', 'Controls')) ?? false;
+        let isControl = false;
+        if (currentFolder) {
+            const relativePath = path.relative(projectDir, currentFolder);
+            // Normalize path separators and make case-insensitive for comparison
+            const normalizedRelative = relativePath.replace(/\\/g, '/').toLowerCase();
+            isControl = normalizedRelative === 'views/controls' || normalizedRelative.endsWith('/views/controls');
+        }
         const viewModelDir = isControl
             ? path.join(projectDir, 'ViewModels', 'Controls')
             : path.join(projectDir, 'ViewModels');
@@ -862,7 +889,8 @@ public partial class BaseViewModel : ObservableObject
     private async findProjectDirectory(filePath: string): Promise<string | undefined> {
         let dir: string;
         try {
-            dir = fs.statSync(filePath).isDirectory() ? filePath : path.dirname(filePath);
+            const stat = await fs.promises.stat(filePath);
+            dir = stat.isDirectory() ? filePath : path.dirname(filePath);
         } catch {
             return undefined;
         }
@@ -903,9 +931,13 @@ public partial class BaseViewModel : ObservableObject
             const parent = path.dirname(dir);
             if (parent === dir) { break; }
             dir = parent;
-            const parentEntries = await fs.promises.readdir(dir);
-            if (parentEntries.some((e: string) => e.endsWith('.csproj'))) {
-                return dir;
+            try {
+                const parentEntries = await fs.promises.readdir(dir);
+                if (parentEntries.some((e: string) => e.endsWith('.csproj'))) {
+                    return dir;
+                }
+            } catch {
+                // Inaccessible directory while walking up; continue to parent
             }
         }
 
