@@ -5,6 +5,25 @@ All notable changes to the WinDev Helper extension will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.1.0] - 2026-05-20
+
+This release modernizes the WinUI agent plugin setup to use the new [microsoft/win-dev-skills](https://github.com/microsoft/win-dev-skills) marketplace, adds a Windows development environment checker, and introduces light-touch support for the experimental [Microsoft.UI.Reactor](https://microsoft.github.io/microsoft-ui-reactor/) declarative C# UI framework.
+
+### Added
+
+- **WinDev: Check Windows Dev Environment** - Runs a diagnostic check of the local toolchain (.NET SDK ≥ 8, WinApp CLI ≥ 0.3, WinUI templates, and Developer Mode) and reports results with fix commands in a dedicated output channel
+- **WinDev: Open WinUI Agent Skills Repository** - Opens the [microsoft/win-dev-skills](https://github.com/microsoft/win-dev-skills) repository in the browser
+- **WinDev: Create Reactor App** - Scaffolds a new [Microsoft.UI.Reactor](https://github.com/microsoft/microsoft-ui-reactor) app via the `dotnet new reactorapp` template
+- **WinDev: Reactor: Run Bootstrap** - Builds the Reactor framework, the `mur` CLI tool, and registers the `dotnet new reactorapp` template from a local clone via `bootstrap.ps1`
+- **WinDev: Reactor: Open Documentation** - Opens the [Microsoft.UI.Reactor documentation](https://microsoft.github.io/microsoft-ui-reactor/)
+- **WinDev: Reactor: Install Agent Plugin** - Installs the Reactor agent plugin for the GitHub Copilot CLI
+- **Reactor project detection** - Projects referencing `Microsoft.UI.Reactor` are now detected and surfaced via the `windevHelper.isReactorProject` context key
+- **`windevHelper.reactor.repoPath` setting** - Points the Reactor bootstrap command at a local clone of `microsoft/microsoft-ui-reactor`
+
+### Changed
+
+- **WinDev: Install WinUI Copilot Plugin** is now **WinDev: Install WinUI Agent + Skills Plugin** - Updated to use the new `microsoft/win-dev-skills` marketplace flow (`copilot plugin marketplace add microsoft/win-dev-skills` + `copilot plugin install winui@win-dev-skills`) instead of the previous `awesome-copilot` source
+
 ## [3.0.0] - 2026-05-13
 
 WinDev Helper returns to **production-ready** status with this release. The `preview` flag was originally set on the 2.x line while the experimental Native XAML Preview pane and XAML Properties Pane features were under active development; both have stabilized enough to drop the release-wide preview label. The `preview` flag has been removed from the extension manifest and preview-release callouts have been retired across the docs. The Native XAML Preview pane and XAML Properties Pane remain individually labeled as preview while they continue to mature.

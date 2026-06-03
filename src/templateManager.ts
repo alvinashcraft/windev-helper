@@ -6,7 +6,7 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as cp from 'child_process';
 import * as fs from 'fs';
-import { CONFIG, OUTPUT_CHANNELS, TEMPLATE_NAMES, TEMPLATE_PACKAGES } from './constants';
+import { CONFIG, EXTERNAL_URLS, OUTPUT_CHANNELS, TEMPLATE_NAMES, TEMPLATE_PACKAGES } from './constants';
 
 /**
  * Identifies which dotnet template package should provide a given template.
@@ -998,25 +998,28 @@ public partial class ${viewModelName} : BaseViewModel
     }
 
     /**
-     * Helps users install the official WinUI Copilot plugin for the GitHub
-     * Copilot CLI / Claude Code. The plugin ships the `winui-dev` agent and
-     * the WinUI dev / design / packaging / UI testing skills described at
-     * https://devblogs.microsoft.com/ifdef-windows/build-native-windows-apps-with-ai-agents-for-winui-and-windows-app-sdk/
+     * Helps users install the WinUI agent + skills plugin from the Microsoft
+     * `win-dev-skills` repository (https://github.com/microsoft/win-dev-skills).
+     * The plugin ships the `winui-dev` agent plus the WinUI dev-workflow,
+     * design, packaging, UI-testing, code-review, and WPF-migration skills for
+     * GitHub Copilot CLI, Claude Code, and OpenAI Codex.
      *
-     * The actual install is a slash command inside the Copilot CLI
-     * (`/plugin install winui@awesome-copilot`), so this command opens a
-     * terminal, starts the Copilot CLI, and copies the slash command to the
-     * clipboard so the user can paste it after the prompt loads.
+     * Installation is two `copilot plugin` shell subcommands (add the
+     * marketplace, then install the plugin), after which the user starts a new
+     * Copilot session and runs the `/winui-setup` skill. This command opens a
+     * terminal and runs the two install commands directly, then surfaces the
+     * `/winui-setup` next step through the output channel and a notification.
      */
     public async installCopilotPlugin(): Promise<void> {
-        const docsUrl = 'https://devblogs.microsoft.com/ifdef-windows/build-native-windows-apps-with-ai-agents-for-winui-and-windows-app-sdk/';
-        const installCommand = '/plugin install winui@awesome-copilot';
+        const docsUrl = EXTERNAL_URLS.WIN_DEV_SKILLS_REPO;
+        const marketplaceCommand = 'copilot plugin marketplace add microsoft/win-dev-skills';
+        const installCommand = 'copilot plugin install winui@win-dev-skills';
         const setupCommand = '/winui-setup';
 
         const choice = await vscode.window.showInformationMessage(
-            'Install the WinUI Copilot plugin? This launches the GitHub Copilot CLI in a new terminal and copies the install slash-command to your clipboard so you can paste it at the prompt.',
+            'Install the WinUI agent + skills plugin from microsoft/win-dev-skills? This opens a terminal and runs the GitHub Copilot CLI plugin install commands.',
             { modal: false },
-            'Launch Copilot CLI',
+            'Install in Terminal',
             'Copy Commands',
             'Open Docs',
         );
@@ -1029,39 +1032,192 @@ public partial class ${viewModelName} : BaseViewModel
         }
 
         if (choice === 'Copy Commands') {
-            await vscode.env.clipboard.writeText(`${installCommand}\n${setupCommand}`);
-            vscode.window.showInformationMessage('Copilot plugin commands copied to clipboard. Paste them inside the Copilot CLI prompt.');
+            await vscode.env.clipboard.writeText(`${marketplaceCommand}\n${installCommand}`);
+            vscode.window.showInformationMessage(
+                `Plugin install commands copied to clipboard. Run them in a shell with the Copilot CLI on PATH, then start a new Copilot session and run '${setupCommand}'.`
+            );
             return;
         }
 
-        // Launch Copilot CLI in a new terminal. Surface the next-step
-        // instructions through the WinUI Templates output channel and a
-        // notification — emitting them via shell builtins (`echo`, `printf`,
-        // `Write-Host`) would either error or render inconsistently across
-        // PowerShell, bash, zsh, and cmd. This way the experience is
-        // identical regardless of the user's default integrated shell.
-        await vscode.env.clipboard.writeText(installCommand);
-
+        // Run the two install commands directly in a terminal. Unlike the
+        // older `/plugin install` slash-command flow, `copilot plugin
+        // marketplace add` and `copilot plugin install` are real shell
+        // subcommands, so they can be sent straight to the terminal and run
+        // identically across PowerShell, bash, and zsh (the `copilot`
+        // executable resolves on PATH for each).
         this.outputChannel.show(true);
         this.outputChannel.appendLine('');
-        this.outputChannel.appendLine('=== WinUI Copilot Plugin ===');
-        this.outputChannel.appendLine('Starting GitHub Copilot CLI in a new terminal...');
-        this.outputChannel.appendLine('Once the Copilot prompt loads, paste (Ctrl+V) the install command');
-        this.outputChannel.appendLine('that was copied to your clipboard:');
+        this.outputChannel.appendLine('=== WinUI Agent + Skills Plugin (microsoft/win-dev-skills) ===');
+        this.outputChannel.appendLine('Running the Copilot CLI plugin install commands in a new terminal:');
+        this.outputChannel.appendLine(`    ${marketplaceCommand}`);
         this.outputChannel.appendLine(`    ${installCommand}`);
-        this.outputChannel.appendLine('Then run:');
+        this.outputChannel.appendLine('When they finish, start a NEW Copilot session and run the setup skill:');
         this.outputChannel.appendLine(`    ${setupCommand}`);
         this.outputChannel.appendLine('');
 
-        const terminal = vscode.window.createTerminal({ name: 'WinUI Copilot Plugin' });
+        const terminal = vscode.window.createTerminal({ name: 'WinUI Skills Plugin' });
         terminal.show();
-        // `copilot` resolves on PATH for both PowerShell (Windows) and POSIX
-        // shells (macOS/Linux), so this single sendText is shell-agnostic.
-        terminal.sendText('copilot');
+        terminal.sendText(marketplaceCommand);
+        terminal.sendText(installCommand);
 
         vscode.window.showInformationMessage(
-            `'${installCommand}' copied to clipboard. Paste it once the Copilot CLI prompt loads, then run '${setupCommand}'.`
+            `Installing the winui plugin from microsoft/win-dev-skills. Once it finishes, start a new Copilot session and run '${setupCommand}'.`
         );
+    }
+
+    /**
+     * Opens the Microsoft `win-dev-skills` repository in the default browser.
+     */
+    public async openSkillsRepo(): Promise<void> {
+        await vscode.env.openExternal(vscode.Uri.parse(EXTERNAL_URLS.WIN_DEV_SKILLS_REPO));
+    }
+
+    /**
+     * Verifies the Windows app development prerequisites that the
+     * `win-dev-skills` `winui-setup` skill installs: the .NET SDK (>= 8),
+     * the WinApp CLI (>= 0.3), the official WinUI 3 `dotnet new` templates,
+     * and Windows Developer Mode. All checks are read-only — nothing is
+     * installed or modified. Results, with the exact remediation command for
+     * anything missing, are written to a dedicated output channel and a
+     * summary is shown as a notification.
+     */
+    public async checkDevEnvironment(): Promise<void> {
+        const channel = vscode.window.createOutputChannel(OUTPUT_CHANNELS.DEV_ENVIRONMENT);
+        channel.show(true);
+        channel.appendLine('=== WinDev Environment Check ===');
+
+        // WinUI 3 development requires Windows. On other platforms the toolchain
+        // (and the remediation commands below, e.g. winget / reg) do not apply,
+        // so short-circuit with a clear message rather than emitting misleading
+        // Windows-only guidance.
+        if (process.platform !== 'win32') {
+            channel.appendLine('');
+            channel.appendLine('This check is for Windows only. WinUI 3 apps build and run on Windows,');
+            channel.appendLine('and the remediation commands (winget, reg) are Windows-specific.');
+            channel.appendLine(`Detected platform: ${process.platform}.`);
+            vscode.window.showInformationMessage(
+                'WinDev environment check is only applicable on Windows. See the output channel for details.',
+            );
+            return;
+        }
+
+        channel.appendLine('Read-only verification of WinUI 3 development prerequisites.');
+        channel.appendLine('');
+
+        const results: { ok: boolean; label: string }[] = [];
+
+        // .NET SDK >= 8
+        const dotnet = await this.checkDotnetSdk();
+        results.push({ ok: dotnet.ok, label: '.NET SDK' });
+        channel.appendLine(`${dotnet.ok ? '[ OK ]' : '[MISS]'} .NET SDK (>= 8.0): ${dotnet.detail}`);
+        if (!dotnet.ok) {
+            channel.appendLine('       Fix: winget install --id Microsoft.DotNet.SDK.10 --exact');
+        }
+
+        // WinApp CLI >= 0.3
+        const winapp = await this.checkWinAppCliVersion();
+        results.push({ ok: winapp.ok, label: 'WinApp CLI' });
+        channel.appendLine(`${winapp.ok ? '[ OK ]' : '[MISS]'} WinApp CLI (>= 0.3): ${winapp.detail}`);
+        if (!winapp.ok) {
+            channel.appendLine('       Fix: winget install --id Microsoft.WinAppCLI');
+        }
+
+        // WinUI 3 templates
+        const templates = await this.isPackageInstalled(TEMPLATE_PACKAGES.OFFICIAL);
+        results.push({ ok: templates, label: 'WinUI templates' });
+        channel.appendLine(`${templates ? '[ OK ]' : '[MISS]'} WinUI 3 templates (${TEMPLATE_PACKAGES.OFFICIAL}): ${templates ? 'installed' : 'not installed'}`);
+        if (!templates) {
+            channel.appendLine(`       Fix: dotnet new install ${TEMPLATE_PACKAGES.OFFICIAL}`);
+        }
+
+        // Developer Mode (Windows only)
+        const devMode = await this.checkDeveloperMode();
+        results.push({ ok: devMode.ok, label: 'Developer Mode' });
+        channel.appendLine(`${devMode.ok ? '[ OK ]' : '[MISS]'} Windows Developer Mode: ${devMode.detail}`);
+        if (!devMode.ok && devMode.fixable) {
+            channel.appendLine('       Fix (run elevated): reg add "HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\AppModelUnlock" /t REG_DWORD /f /v AllowDevelopmentWithoutDevLicense /d 1');
+        }
+
+        channel.appendLine('');
+        const missing = results.filter(r => !r.ok).map(r => r.label);
+        if (missing.length === 0) {
+            channel.appendLine('All prerequisites satisfied. You are ready for WinUI 3 development.');
+            vscode.window.showInformationMessage('WinDev environment check passed — all prerequisites are satisfied.');
+        } else {
+            channel.appendLine(`Missing or outdated: ${missing.join(', ')}. See the fixes above.`);
+            const action = await vscode.window.showWarningMessage(
+                `WinDev environment check: ${missing.join(', ')} need attention. See the output channel for fixes.`,
+                'Show Output',
+                'Install Skills Plugin',
+            );
+            if (action === 'Show Output') {
+                channel.show(true);
+            } else if (action === 'Install Skills Plugin') {
+                await this.installCopilotPlugin();
+            }
+        }
+    }
+
+    /**
+     * Checks for a .NET SDK of major version 8 or newer via `dotnet --list-sdks`.
+     */
+    private async checkDotnetSdk(): Promise<{ ok: boolean; detail: string }> {
+        try {
+            const output = await this.executeCommand('dotnet --list-sdks', undefined, true);
+            const versions = output
+                .split(/\r?\n/)
+                .map(line => /^(\d+)\.\d+\.\d+/.exec(line.trim()))
+                .filter((m): m is RegExpExecArray => m !== null)
+                .map(m => parseInt(m[1], 10));
+            if (versions.length === 0) {
+                return { ok: false, detail: 'no SDKs reported by `dotnet --list-sdks`' };
+            }
+            const max = Math.max(...versions);
+            return { ok: max >= 8, detail: `highest installed major version ${max}` };
+        } catch {
+            return { ok: false, detail: '`dotnet` not found on PATH' };
+        }
+    }
+
+    /**
+     * Checks for the WinApp CLI at version 0.3 or newer via `winapp --version`.
+     */
+    private async checkWinAppCliVersion(): Promise<{ ok: boolean; detail: string }> {
+        try {
+            const output = await this.executeCommand('winapp --version', undefined, true);
+            const match = /(\d+)\.(\d+)(?:\.(\d+))?/.exec(output);
+            if (!match) {
+                return { ok: false, detail: 'could not parse `winapp --version` output' };
+            }
+            const major = parseInt(match[1], 10);
+            const minor = parseInt(match[2], 10);
+            const ok = major > 0 || (major === 0 && minor >= 3);
+            return { ok, detail: `version ${match[0]}` };
+        } catch {
+            return { ok: false, detail: '`winapp` not found on PATH' };
+        }
+    }
+
+    /**
+     * Reads the Developer Mode registry flag on Windows. On non-Windows hosts
+     * the check is reported as not applicable (and not actionable).
+     */
+    private async checkDeveloperMode(): Promise<{ ok: boolean; detail: string; fixable: boolean }> {
+        if (process.platform !== 'win32') {
+            return { ok: true, detail: 'not applicable on this OS', fixable: false };
+        }
+        try {
+            const output = await this.executeCommand(
+                'reg query "HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\AppModelUnlock" /v AllowDevelopmentWithoutDevLicense',
+                undefined,
+                true,
+            );
+            // REG_DWORD values print as 0x1 / 0x0 in the query output.
+            const enabled = /AllowDevelopmentWithoutDevLicense\s+REG_DWORD\s+0x1/i.test(output);
+            return { ok: enabled, detail: enabled ? 'enabled' : 'disabled', fixable: true };
+        } catch {
+            return { ok: false, detail: 'disabled (registry value not set)', fixable: true };
+        }
     }
 
     /**
