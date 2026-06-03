@@ -19,6 +19,7 @@ This release modernizes the WinUI agent plugin setup to use the new [microsoft/w
 - **WinDev: Reactor: Install Agent Plugin** - Installs the Reactor agent plugin for the GitHub Copilot CLI
 - **Reactor project detection** - Projects referencing `Microsoft.UI.Reactor` are now detected and surfaced via the `windevHelper.isReactorProject` context key
 - **`windevHelper.reactor.repoPath` setting** - Points the Reactor bootstrap command at a local clone of `microsoft/microsoft-ui-reactor`
+- **Smart project-folder detection for item templates** - Add-item commands now locate the project directory automatically (searching the invocation path, immediate subfolders, then walking up the tree, and prompting to pick when multiple `.csproj` files are found) instead of assuming the workspace root, and offer a target-folder picker with **Current Folder**, **Project Folder**, and a category default (Views, Views/Controls, or Resources) - contributed by [@mcNets](https://github.com/mcNets)
 
 ### Changed
 

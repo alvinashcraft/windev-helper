@@ -364,7 +364,8 @@ dotnet new list
    - **WinUI: Add New User Control**
    - **WinUI: Add New Window**
 3. Enter the item name
-4. The files are created and opened
+4. Choose the target folder (**Current Folder**, **Project Folder**, or the category default such as **Views**) - the project directory is detected automatically
+5. The files are created and opened
 
 Or use the Command Palette:
 

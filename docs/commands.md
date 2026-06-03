@@ -75,8 +75,9 @@ Adds a new XAML page to your project.
 
 1. Right-click a folder in Explorer and select this command, or run from Command Palette
 2. Enter the page name (without extension)
-3. Creates `PageName.xaml` and `PageName.xaml.cs`
-4. Automatically adds `Imports.cs` with MVVM global usings if not present
+3. Choose the target folder (**Current Folder**, **Project Folder**, or the **Views** folder) - the project directory is detected automatically
+4. Creates `PageName.xaml` and `PageName.xaml.cs`
+5. Automatically adds `Imports.cs` with MVVM global usings if not present
 
 **Equivalent CLI:**
 
@@ -96,8 +97,9 @@ Adds a new XAML user control to your project.
 
 1. Right-click a folder or use Command Palette
 2. Enter the control name
-3. Creates `ControlName.xaml` and `ControlName.xaml.cs`
-4. Automatically adds `Imports.cs` with MVVM global usings if not present
+3. Choose the target folder (**Current Folder**, **Project Folder**, or the **Views/Controls** folder) - the project directory is detected automatically
+4. Creates `ControlName.xaml` and `ControlName.xaml.cs`
+5. Automatically adds `Imports.cs` with MVVM global usings if not present
 
 **Equivalent CLI:**
 
@@ -117,8 +119,9 @@ Adds a new window to your project.
 
 1. Right-click a folder or use Command Palette
 2. Enter the window name
-3. Creates `WindowName.xaml` and `WindowName.xaml.cs`
-4. Automatically adds `Imports.cs` with MVVM global usings if not present
+3. Choose the target folder (**Current Folder**, **Project Folder**, or the **Views** folder) - the project directory is detected automatically
+4. Creates `WindowName.xaml` and `WindowName.xaml.cs`
+5. Automatically adds `Imports.cs` with MVVM global usings if not present
 
 **Equivalent CLI:**
 
