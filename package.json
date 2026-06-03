@@ -2,7 +2,7 @@
   "name": "windev-helper",
   "displayName": "WinDev Helper",
   "description": "Build beautiful, performant WinUI apps with VS Code. Debug, build, package, and deploy Windows apps powered by the Windows App SDK.",
-  "version": "3.0.0",
+  "version": "3.1.0",
   "publisher": "alvinashcraft",
   "icon": "images/icon.png",
   "license": "MIT",
@@ -189,7 +189,37 @@
       },
       {
         "command": "windev-helper.installCopilotPlugin",
-        "title": "Install WinUI Copilot Plugin",
+        "title": "Install WinUI Agent + Skills Plugin",
+        "category": "WinDev"
+      },
+      {
+        "command": "windev-helper.openSkillsRepo",
+        "title": "Open WinUI Agent Skills Repository",
+        "category": "WinDev"
+      },
+      {
+        "command": "windev-helper.checkDevEnvironment",
+        "title": "Check Windows Dev Environment",
+        "category": "WinDev"
+      },
+      {
+        "command": "windev-helper.createReactorApp",
+        "title": "Create Reactor App",
+        "category": "WinDev"
+      },
+      {
+        "command": "windev-helper.runReactorBootstrap",
+        "title": "Reactor: Run Bootstrap",
+        "category": "WinDev"
+      },
+      {
+        "command": "windev-helper.openReactorDocs",
+        "title": "Reactor: Open Documentation",
+        "category": "WinDev"
+      },
+      {
+        "command": "windev-helper.installReactorPlugin",
+        "title": "Reactor: Install Agent Plugin",
         "category": "WinDev"
       },
       {
@@ -551,6 +581,11 @@
           "type": "boolean",
           "default": true,
           "description": "Allow installing prerelease versions of the official Microsoft WinUI template package."
+        },
+        "windevHelper.reactor.repoPath": {
+          "type": "string",
+          "default": "",
+          "description": "Path to a local clone of microsoft/microsoft-ui-reactor. Used by the Reactor bootstrap command to build the framework, the `mur` CLI, and the `dotnet new reactorapp` template. Leave empty to be prompted to select the clone."
         }
       }
     },

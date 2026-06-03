@@ -58,13 +58,15 @@ npm run package
 
 ### Version and Publishing Control
 
-- **Never update version**: Do not modify the version number in `package.json` unless explicitly requested
+> These guidelines apply to coding agents making changes on the user's behalf. They are **not** directives for code review agents — a reviewer cannot know what the user has or hasn't requested, so it should not flag an existing version bump as a violation.
+
+- **Never update version**: When making changes, do not modify the version number in `package.json` unless explicitly requested
 - **Never auto-publish**: Do not publish to the VS Code Marketplace automatically or suggest doing so without explicit user request
 - **Package updates**: Only check for npm package updates after the project's version number in `package.json` has been explicitly updated
 
 ## Commands
 
-All commands are prefixed with `windev-helper.` and categorized under "WinUI" in the command palette.
+All commands are prefixed with `windev-helper.` and categorized under "WinDev" in the command palette.
 
 ## External Resources
 
