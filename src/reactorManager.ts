@@ -146,12 +146,15 @@ export class ReactorManager {
         this.outputChannel.appendLine('');
 
         // Reactor's bootstrap is a PowerShell script. Run it in a terminal so
-        // the user sees progress and any prompts. `pwsh`/`powershell` resolve
-        // on PATH on Windows; the recommended invocation bypasses execution
-        // policy for the single script without changing machine policy.
+        // the user sees progress and any prompts. Windows ships Windows
+        // PowerShell as `powershell`; macOS/Linux only have PowerShell 7 as
+        // `pwsh` (which also works on Windows if installed). The recommended
+        // invocation bypasses execution policy for the single script without
+        // changing machine policy.
+        const pwshExe = process.platform === 'win32' ? 'powershell' : 'pwsh';
         const terminal = vscode.window.createTerminal({ name: 'Reactor Bootstrap', cwd: repoPath });
         terminal.show();
-        terminal.sendText('powershell -ExecutionPolicy Bypass -File ./bootstrap.ps1');
+        terminal.sendText(`${pwshExe} -ExecutionPolicy Bypass -File ./bootstrap.ps1`);
     }
 
     /**

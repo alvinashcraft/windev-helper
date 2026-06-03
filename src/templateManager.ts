@@ -962,6 +962,22 @@ public partial class ${viewModelName} : BaseViewModel
         const channel = vscode.window.createOutputChannel(OUTPUT_CHANNELS.DEV_ENVIRONMENT);
         channel.show(true);
         channel.appendLine('=== WinDev Environment Check ===');
+
+        // WinUI 3 development requires Windows. On other platforms the toolchain
+        // (and the remediation commands below, e.g. winget / reg) do not apply,
+        // so short-circuit with a clear message rather than emitting misleading
+        // Windows-only guidance.
+        if (process.platform !== 'win32') {
+            channel.appendLine('');
+            channel.appendLine('This check is for Windows only. WinUI 3 apps build and run on Windows,');
+            channel.appendLine('and the remediation commands (winget, reg) are Windows-specific.');
+            channel.appendLine(`Detected platform: ${process.platform}.`);
+            vscode.window.showInformationMessage(
+                'WinDev environment check is only applicable on Windows. See the output channel for details.',
+            );
+            return;
+        }
+
         channel.appendLine('Read-only verification of WinUI 3 development prerequisites.');
         channel.appendLine('');
 
