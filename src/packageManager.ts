@@ -107,8 +107,16 @@ export class PackageManager {
                 this.outputChannel.appendLine('Publishing project...');
                 this.outputChannel.show();
 
-                // Look for the manifest
-                const manifestPath = await this.findManifest(inputDirs[0]);
+                // Look for the manifest. When bundling, the user's selection order
+                // is not guaranteed, so scan all input folders and use the first
+                // that actually contains a manifest (falling back to the first folder).
+                let manifestPath: string | undefined;
+                for (const dir of inputDirs) {
+                    manifestPath = await this.findManifest(dir);
+                    if (manifestPath) {
+                        break;
+                    }
+                }
 
                 await this.winAppCli.package({
                     inputDirs,

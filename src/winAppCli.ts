@@ -76,12 +76,13 @@ export class WinAppCli {
     private parseSemver(input: string): { major: number; minor: number; patch: number } | null {
         // `winapp --version` may emit an extra "update available" banner (v0.3.2+)
         // on the first run of the day. Prefer a line that is *only* a version
-        // string so the banner's version can't be mistaken for the installed one;
+        // string (optionally prefixed with `v` or suffixed with a prerelease tag)
+        // so the banner's version can't be mistaken for the installed one;
         // fall back to the first semver found anywhere in the output.
         const versionLine = input
             .split(/\r?\n/)
             .map(l => l.trim())
-            .find(l => /^v?\d+\.\d+\.\d+/.test(l));
+            .find(l => /^v?\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/.test(l));
         const match = (versionLine ?? input).match(/(\d+)\.(\d+)\.(\d+)/);
         if (!match) {
             return null;

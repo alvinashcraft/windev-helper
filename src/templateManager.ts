@@ -1191,7 +1191,7 @@ public partial class ${viewModelName} : BaseViewModel
             const versionLine = output
                 .split(/\r?\n/)
                 .map(l => l.trim())
-                .find(l => /^v?\d+\.\d+/.test(l));
+                .find(l => /^v?\d+\.\d+(?:\.\d+)?(?:[-+][0-9A-Za-z.-]+)?$/.test(l));
             const match = /(\d+)\.(\d+)(?:\.(\d+))?/.exec(versionLine ?? output);
             if (!match) {
                 return { ok: false, detail: 'could not parse `winapp --version` output' };
