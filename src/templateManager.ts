@@ -1185,7 +1185,14 @@ public partial class ${viewModelName} : BaseViewModel
     private async checkWinAppCliVersion(): Promise<{ ok: boolean; detail: string }> {
         try {
             const output = await this.executeCommand('winapp --version', undefined, true);
-            const match = /(\d+)\.(\d+)(?:\.(\d+))?/.exec(output);
+            // v0.3.2+ may prepend an "update available" banner on the first run of
+            // the day; prefer a line that is only a version string so the banner
+            // can't be mistaken for the installed version.
+            const versionLine = output
+                .split(/\r?\n/)
+                .map(l => l.trim())
+                .find(l => /^v?\d+\.\d+/.test(l));
+            const match = /(\d+)\.(\d+)(?:\.(\d+))?/.exec(versionLine ?? output);
             if (!match) {
                 return { ok: false, detail: 'could not parse `winapp --version` output' };
             }
