@@ -223,6 +223,17 @@ Always use a timestamp server for production:
 For multi-architecture distribution, create a bundle:
 
 ```bash
+# winapp v0.3.2+: pass one input folder per architecture to produce a bundle
+winapp package ./publish-x64 ./publish-arm64 --output ./dist/MyApp.msixbundle
+```
+
+In VS Code, run **WinDev: Create MSIX Package** and choose a `.msixbundle`
+output file. You'll be prompted to select one build-output folder per
+architecture, which are bundled together automatically.
+
+On older CLI versions you can still bundle pre-built packages manually:
+
+```bash
 # Create architecture-specific packages
 winapp package -i ./publish-x64 -o ./packages/MyApp_x64.msix
 winapp package -i ./publish-arm64 -o ./packages/MyApp_arm64.msix

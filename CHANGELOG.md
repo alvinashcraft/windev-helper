@@ -5,6 +5,19 @@ All notable changes to the WinDev Helper extension will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.2.0] - 2026-06-04
+
+Aligns the extension with [winapp CLI v0.3.2](https://github.com/microsoft/winappCli/releases/tag/v0.3.2).
+
+### Added
+
+- **MSIX bundle packaging** - **WinDev: Create MSIX Package** now produces an `.msixbundle` when you choose a bundle output file. It prompts for one build-output folder per architecture (e.g. `x64` and `arm64`) and passes them all to `winapp package`, which creates a bundle from multiple input folders
+- **Screenshot window focus** - **WinDev: UI: Take Screenshot** can bring the target window to the foreground before capturing, using the new `winapp ui screenshot --focus` flag. The option is offered automatically when winapp CLI v0.3.2 or newer is detected
+
+### Changed
+
+- **More resilient `winapp --version` parsing** - Version detection now skips the daily "update available" banner introduced in winapp CLI v0.3.2 so the installed version is still read correctly
+
 ## [3.1.0] - 2026-05-20
 
 This release modernizes the WinUI agent plugin setup to use the new [microsoft/win-dev-skills](https://github.com/microsoft/win-dev-skills) marketplace, adds a Windows development environment checker, and introduces light-touch support for the experimental [Microsoft.UI.Reactor](https://microsoft.github.io/microsoft-ui-reactor/) declarative C# UI framework.

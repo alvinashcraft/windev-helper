@@ -74,7 +74,16 @@ export class WinAppCli {
      * Returns `null` if the input does not match.
      */
     private parseSemver(input: string): { major: number; minor: number; patch: number } | null {
-        const match = input.match(/(\d+)\.(\d+)\.(\d+)/);
+        // `winapp --version` may emit an extra "update available" banner (v0.3.2+)
+        // on the first run of the day. Prefer a line that is *only* a version
+        // string (optionally prefixed with `v` or suffixed with a prerelease tag)
+        // so the banner's version can't be mistaken for the installed one;
+        // fall back to the first semver found anywhere in the output.
+        const versionLine = input
+            .split(/\r?\n/)
+            .map(l => l.trim())
+            .find(l => /^v?\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/.test(l));
+        const match = (versionLine ?? input).match(/(\d+)\.(\d+)\.(\d+)/);
         if (!match) {
             return null;
         }
@@ -116,6 +125,22 @@ export class WinAppCli {
         return (v.major > 0) ||
             (v.major === 0 && v.minor > 3) ||
             (v.major === 0 && v.minor === 3 && v.patch >= 1);
+    }
+
+    /**
+     * Returns `true` when the installed winapp CLI supports the `--focus`
+     * flag on `ui screenshot` (introduced in v0.3.2). When the version cannot
+     * be determined, returns `false` so the flag is not passed to an older CLI
+     * that would reject it.
+     */
+    public async supportsScreenshotFocus(): Promise<boolean> {
+        const v = await this.getVersion();
+        if (!v) {
+            return false;
+        }
+        return (v.major > 0) ||
+            (v.major === 0 && v.minor > 3) ||
+            (v.major === 0 && v.minor === 3 && v.patch >= 2);
     }
 
     /**
@@ -357,9 +382,13 @@ export class WinAppCli {
     public async package(options: PackageOptions): Promise<void> {
         try {
             const args: string[] = [];
-            // Input folder is a positional argument (required)
-            if (options.inputDir) {
-                args.push(options.inputDir);
+            // Input folders are positional arguments (required). Supplying more
+            // than one produces an MSIX bundle (one folder per architecture).
+            const inputDirs = options.inputDirs && options.inputDirs.length > 0
+                ? options.inputDirs
+                : (options.inputDir ? [options.inputDir] : []);
+            for (const dir of inputDirs) {
+                args.push(dir);
             }
             // Use long-form options as per CLI spec
             if (options.outputPath) {
@@ -817,10 +846,16 @@ export class WinAppCli {
      * Take a screenshot of an app window (v0.3.0+)
      * @param appName App name to screenshot
      * @param outputPath Output file path for the screenshot
+     * @param focus Bring the target window to the foreground first (`--focus`, v0.3.2+)
      */
-    public async uiScreenshot(appName: string, outputPath: string): Promise<void> {
+    public async uiScreenshot(appName: string, outputPath: string, focus: boolean = false): Promise<void> {
         try {
-            await this.execute('ui', ['screenshot', '-a', appName, '-o', outputPath]);
+            const args = ['screenshot', '-a', appName, '-o', outputPath];
+            // v0.3.2+: bring the target window to the foreground before capture.
+            if (focus) {
+                args.push('--focus');
+            }
+            await this.execute('ui', args);
             vscode.window.showInformationMessage(`Screenshot saved to ${outputPath}`);
         } catch (error) {
             vscode.window.showErrorMessage(`Failed to take screenshot: ${error}`);
@@ -851,6 +886,11 @@ export class WinAppCli {
 
 export interface PackageOptions {
     inputDir?: string;
+    /**
+     * One or more input folders. Supplying multiple folders (one per
+     * architecture) creates an MSIX bundle. Takes precedence over `inputDir`.
+     */
+    inputDirs?: string[];
     outputPath?: string;
     manifestPath?: string;
     certPath?: string;

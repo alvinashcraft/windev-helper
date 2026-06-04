@@ -79,6 +79,24 @@ export class PackageManager {
             return;
         }
 
+        // Supplying multiple input folders (one per architecture) produces an
+        // MSIX bundle. Prompt for them when the user chose a .msixbundle output;
+        // otherwise package the single project directory.
+        let inputDirs: string[] = [projectDir];
+        if (outputUri.fsPath.toLowerCase().endsWith('.msixbundle')) {
+            const folderUris = await vscode.window.showOpenDialog({
+                canSelectFiles: false,
+                canSelectFolders: true,
+                canSelectMany: true,
+                defaultUri: vscode.Uri.file(projectDir),
+                title: 'Select build-output folders to bundle (one per architecture)'
+            });
+            if (!folderUris || folderUris.length === 0) {
+                return;
+            }
+            inputDirs = folderUris.map(u => u.fsPath);
+        }
+
         await vscode.window.withProgress({
             location: vscode.ProgressLocation.Notification,
             title: 'Creating MSIX package...',
@@ -89,11 +107,19 @@ export class PackageManager {
                 this.outputChannel.appendLine('Publishing project...');
                 this.outputChannel.show();
 
-                // Look for the manifest
-                const manifestPath = await this.findManifest(projectDir);
+                // Look for the manifest. When bundling, the user's selection order
+                // is not guaranteed, so scan all input folders and use the first
+                // that actually contains a manifest (falling back to the first folder).
+                let manifestPath: string | undefined;
+                for (const dir of inputDirs) {
+                    manifestPath = await this.findManifest(dir);
+                    if (manifestPath) {
+                        break;
+                    }
+                }
 
                 await this.winAppCli.package({
-                    inputDir: projectDir,
+                    inputDirs,
                     outputPath: outputUri.fsPath,
                     ...(manifestPath && { manifestPath })
                 });
@@ -858,6 +884,17 @@ export class PackageManager {
         });
         if (!appName) { return; }
 
+        // v0.3.2+: optionally bring the target window to the foreground first.
+        let focus = false;
+        if (await this.winAppCli.supportsScreenshotFocus()) {
+            const focusChoice = await vscode.window.showQuickPick(['Yes', 'No'], {
+                placeHolder: 'Bring the window to the foreground before capturing?',
+                title: 'Screenshot Focus'
+            });
+            if (!focusChoice) { return; }
+            focus = focusChoice === 'Yes';
+        }
+
         const workspaceUri = vscode.workspace.workspaceFolders?.[0]?.uri;
         const saveDialogOptions: vscode.SaveDialogOptions = {
             filters: {
@@ -878,7 +915,7 @@ export class PackageManager {
             title: 'Taking screenshot...',
             cancellable: false
         }, async () => {
-            await this.winAppCli.uiScreenshot(appName, outputUri.fsPath);
+            await this.winAppCli.uiScreenshot(appName, outputUri.fsPath, focus);
         });
     }
 
