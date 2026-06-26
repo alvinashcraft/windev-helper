@@ -628,7 +628,7 @@ Adds a `uap5:AppExecutionAlias` to the manifest so a packaged app can be launche
 
 **Command ID:** `windev-helper.uiListWindows`
 
-Lists all visible top-level windows. Optionally filter by app name. Results appear in the WinUI Packaging output channel.
+Lists visible top-level windows. Optionally filter by app name. On winapp CLI v0.4.0+, you can also include hidden/untitled zero-size windows (`--show-hidden`). Results appear in the WinUI Packaging output channel.
 
 **Uses:** `winapp ui list-windows` CLI command
 
@@ -651,6 +651,16 @@ Walks the full UI Automation tree of a running app. Prompts for the app name.
 Captures a screenshot of an app window. Prompts for the app name and output file location.
 
 **Uses:** `winapp ui screenshot` CLI command
+
+---
+
+### WinDev: UI: Hover Element
+
+**Command ID:** `windev-helper.uiHover`
+
+Triggers hover behavior for a UI element (tooltip/flyout/visual state changes). Prompts for selector, optional app filter, and optional dwell time.
+
+**Uses:** `winapp ui hover` CLI command (v0.4.0+)
 
 ---
 
@@ -741,6 +751,11 @@ dotnet new install VijayAnand.WinUITemplates
 Initializes a project with Windows SDK and App SDK references.
 
 **Uses:** `winapp init` CLI command
+
+Notes:
+
+1. The extension runs `init` with non-interactive defaults for reliable command execution.
+2. On winapp CLI v0.4.0+, non-interactive mode requires an explicit base directory; the extension now supplies it automatically.
 
 ---
 

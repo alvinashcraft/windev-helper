@@ -834,12 +834,22 @@ export class PackageManager {
             ignoreFocusOut: true
         });
 
+        let showHidden = false;
+        if (await this.winAppCli.supportsUiV040Features()) {
+            const showHiddenChoice = await vscode.window.showQuickPick(['No', 'Yes'], {
+                placeHolder: 'Include hidden/untitled zero-size windows?',
+                title: 'List Hidden Windows'
+            });
+            if (!showHiddenChoice) { return; }
+            showHidden = showHiddenChoice === 'Yes';
+        }
+
         await vscode.window.withProgress({
             location: vscode.ProgressLocation.Notification,
             title: 'Listing windows...',
             cancellable: false
         }, async () => {
-            const result = await this.winAppCli.uiListWindows(appName || undefined);
+            const result = await this.winAppCli.uiListWindows(appName || undefined, showHidden);
             if (result) {
                 this.outputChannel.appendLine('--- Windows ---');
                 this.outputChannel.appendLine(result);
@@ -916,6 +926,59 @@ export class PackageManager {
             cancellable: false
         }, async () => {
             await this.winAppCli.uiScreenshot(appName, outputUri.fsPath, focus);
+        });
+    }
+
+    /**
+     * Hover over a UI element to trigger tooltip/flyout behavior (v0.4.0+)
+     */
+    public async uiHover(): Promise<void> {
+        if (!(await this.winAppCli.supportsUiV040Features())) {
+            vscode.window.showWarningMessage('UI hover requires winapp CLI v0.4.0 or newer.');
+            return;
+        }
+
+        const selector = await vscode.window.showInputBox({
+            prompt: 'Enter UI selector (semantic slug or text)',
+            placeHolder: 'btn-minimize-d1a0',
+            ignoreFocusOut: true,
+            validateInput: (value) => value.trim() ? null : 'Selector is required'
+        });
+        if (!selector) { return; }
+
+        const appName = await vscode.window.showInputBox({
+            prompt: 'Enter app name to target (optional)',
+            placeHolder: 'App name (optional)',
+            ignoreFocusOut: true
+        });
+
+        const dwellInput = await vscode.window.showInputBox({
+            prompt: 'Hover dwell time in milliseconds (optional, default 800)',
+            placeHolder: '800',
+            ignoreFocusOut: true,
+            validateInput: (value) => {
+                if (!value.trim()) { return null; }
+                const num = Number(value);
+                if (!Number.isInteger(num) || num < 0) {
+                    return 'Enter a non-negative whole number';
+                }
+                return null;
+            }
+        });
+        if (dwellInput === undefined) { return; }
+        const dwellTime = dwellInput.trim() ? Number(dwellInput) : undefined;
+
+        await vscode.window.withProgress({
+            location: vscode.ProgressLocation.Notification,
+            title: 'Hovering UI element...',
+            cancellable: false
+        }, async () => {
+            const result = await this.winAppCli.uiHover(selector.trim(), appName?.trim() || undefined, dwellTime);
+            if (result) {
+                this.outputChannel.appendLine(`--- Hover Result: ${selector.trim()} ---`);
+                this.outputChannel.appendLine(result);
+                this.outputChannel.show();
+            }
         });
     }
 
