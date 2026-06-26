@@ -933,7 +933,12 @@ export class PackageManager {
      * Hover over a UI element to trigger tooltip/flyout behavior (v0.4.0+)
      */
     public async uiHover(): Promise<void> {
-        if (!(await this.winAppCli.supportsUiV040Features())) {
+        const v = await this.winAppCli.getVersion();
+        if (!v) {
+            vscode.window.showWarningMessage('Unable to determine winapp CLI version. Ensure winapp CLI is installed and v0.4.0 or newer is available.');
+            return;
+        }
+        if (v.major === 0 && v.minor < 4) {
             vscode.window.showWarningMessage('UI hover requires winapp CLI v0.4.0 or newer.');
             return;
         }
