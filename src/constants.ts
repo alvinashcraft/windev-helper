@@ -84,6 +84,8 @@ export const COMMANDS = {
     UI_LIST_WINDOWS: 'windev-helper.uiListWindows',
     UI_INSPECT: 'windev-helper.uiInspect',
     UI_SCREENSHOT: 'windev-helper.uiScreenshot',
+    // UI hover command (v0.4.0+)
+    UI_HOVER: 'windev-helper.uiHover',
     // Parity commands with the official Microsoft WinApp VS Code extension (v2.10.0+)
     MANIFEST_UPDATE_ASSETS: 'windev-helper.manifestUpdateAssets',
     RUN_SDK_TOOL: 'windev-helper.runSdkTool',

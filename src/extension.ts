@@ -419,6 +419,12 @@ function registerCommands(context: vscode.ExtensionContext): void {
         })
     );
 
+    context.subscriptions.push(
+        vscode.commands.registerCommand(COMMANDS.UI_HOVER, async () => {
+            await services.packageManager.uiHover();
+        })
+    );
+
     // Parity commands with the official Microsoft WinApp VS Code extension
     context.subscriptions.push(
         vscode.commands.registerCommand(COMMANDS.MANIFEST_UPDATE_ASSETS, async () => {

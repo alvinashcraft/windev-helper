@@ -5,6 +5,19 @@ All notable changes to the WinDev Helper extension will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.3.0] - 2026-06-26
+
+Aligns UI automation and init workflows with [winapp CLI v0.4.0](https://github.com/microsoft/winappCli/releases/tag/v0.4.0).
+
+### Added
+
+- **UI hover automation** - Added **WinDev: UI: Hover Element**, which wraps `winapp ui hover` to trigger tooltip/flyout behavior with optional app targeting and dwell time
+- **Hidden-window listing option** - **WinDev: UI: List Windows** now supports `--show-hidden` on winapp CLI v0.4.0+, so untitled/hidden windows can be included when needed
+
+### Changed
+
+- **`init` non-interactive compatibility** - `WinDev: Initialize Project with Windows SDK` now provides an explicit base directory when running with `--no-prompt`, matching winapp CLI v0.4.0 requirements
+
 ## [3.2.0] - 2026-06-04
 
 Aligns the extension with [winapp CLI v0.3.2](https://github.com/microsoft/winappCli/releases/tag/v0.3.2).

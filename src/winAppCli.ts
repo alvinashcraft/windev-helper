@@ -144,6 +144,18 @@ export class WinAppCli {
     }
 
     /**
+     * Returns `true` when the installed winapp CLI supports v0.4.0 features
+     * used by this extension (`ui list-windows --show-hidden`, `ui hover`).
+     */
+    public async supportsUiV040Features(): Promise<boolean> {
+        const v = await this.getVersion();
+        if (!v) {
+            return false;
+        }
+        return (v.major > 0) || (v.major === 0 && v.minor >= 4);
+    }
+
+    /**
      * Executes a winapp CLI command
      * @param command - The CLI command to execute
      * @param args - Arguments to pass to the command
@@ -300,11 +312,15 @@ export class WinAppCli {
     public async init(projectPath?: string, skipPrompts: boolean = true): Promise<boolean> {
         try {
             const args: string[] = [];
+            // winapp v0.4.0+ requires an explicit base directory when using
+            // --no-prompt/--use-defaults. Default to current directory when a
+            // project path wasn't provided by the caller.
+            const initPath = projectPath || (skipPrompts ? '.' : undefined);
+            if (initPath) {
+                args.push(initPath);
+            }
             if (skipPrompts) {
                 args.push('--no-prompt');
-            }
-            if (projectPath) {
-                args.push(projectPath);
             }
             await this.execute('init', args);
             
@@ -811,11 +827,14 @@ export class WinAppCli {
      * List all visible windows (v0.3.0+)
      * @param appName Optional app name filter
      */
-    public async uiListWindows(appName?: string): Promise<string> {
+    public async uiListWindows(appName?: string, showHidden: boolean = false): Promise<string> {
         try {
             const args: string[] = ['list-windows'];
             if (appName) {
                 args.push('-a', appName);
+            }
+            if (showHidden) {
+                args.push('--show-hidden');
             }
             return await this.execute('ui', args);
         } catch (error) {
@@ -859,6 +878,28 @@ export class WinAppCli {
             vscode.window.showInformationMessage(`Screenshot saved to ${outputPath}`);
         } catch (error) {
             vscode.window.showErrorMessage(`Failed to take screenshot: ${error}`);
+        }
+    }
+
+    /**
+     * Hover over a UI element to trigger tooltip/flyout behavior (v0.4.0+)
+     * @param selector Semantic slug or text selector
+     * @param appName Optional app name filter
+     * @param dwellTime Optional dwell time in ms
+     */
+    public async uiHover(selector: string, appName?: string, dwellTime?: number): Promise<string> {
+        try {
+            const args: string[] = ['hover', selector];
+            if (appName) {
+                args.push('-a', appName);
+            }
+            if (dwellTime !== undefined) {
+                args.push('--dwell-time', dwellTime.toString());
+            }
+            return await this.execute('ui', args);
+        } catch (error) {
+            vscode.window.showErrorMessage(`Failed to hover UI element: ${error}`);
+            return '';
         }
     }
 

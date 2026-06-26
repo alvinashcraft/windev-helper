@@ -56,6 +56,8 @@ winapp init [project-path]
 
 **VS Code command:** WinUI: Initialize Project with Windows SDK
 
+> **v0.4.0:** `init` adds JS/TS WinRT binding support and expects an explicit base directory when using non-interactive defaults (`--no-prompt` / `--use-defaults`). WinDev Helper now passes a directory automatically in non-interactive mode.
+
 > **v0.2.0 Breaking Change:** `init` no longer generates a certificate automatically. Run `winapp cert generate` explicitly when you need a dev signing certificate.
 >
 > **v0.2.0 .NET Projects:** When `winapp init` detects a `.csproj`, it configures NuGet packages in the project file directly instead of creating a `winapp.yaml`.
@@ -403,7 +405,7 @@ If a CLI command fails:
 
 ```bash
 # 1. Initialize project
-winapp init
+winapp init . --use-defaults
 
 # 2. Create debug identity (optional)
 winapp create-debug-identity
@@ -412,6 +414,16 @@ winapp create-debug-identity
 
 # 4. Package for testing
 winapp package -i ./bin/x64/Debug -o ./test/MyApp.msix
+```
+
+### UI Automation (v0.4.0+)
+
+```bash
+# List windows, including hidden/untitled windows
+winapp ui list-windows --show-hidden
+
+# Hover an element to trigger tooltip/flyout behavior
+winapp ui hover "btn-minimize-d1a0" -a MyApp --dwell-time 1000
 ```
 
 ### Release Packaging
