@@ -9,6 +9,7 @@ import {
     FILE_PATTERNS,
     PROJECT_INDICATORS
 } from '../constants';
+import { decideDesignerEdit, findClassInsertionOffset, getXamlClassName, hasVoidMethod } from '../designer';
 
 suite('Extension Test Suite', () => {
     vscode.window.showInformationMessage('Start all tests.');
@@ -20,7 +21,8 @@ suite('Extension Test Suite', () => {
             assert.strictEqual(COMMANDS.DEBUG_PROJECT, 'windev-helper.debugProject');
             assert.strictEqual(COMMANDS.ADD_PAGE, 'windev-helper.addPage');
             assert.strictEqual(COMMANDS.ADD_VIEW_MODEL, 'windev-helper.addViewModel');
-            assert.strictEqual(COMMANDS.OPEN_XAML_PREVIEW, 'windev-helper.openXamlPreview');
+            assert.strictEqual(COMMANDS.OPEN_XAML_DESIGNER, 'windev-helper.openXamlDesigner');
+            assert.strictEqual(COMMANDS.OPEN_XAML_TEXT, 'windev-helper.openXamlText');
         });
 
         test('CONFIG should have expected configuration keys', () => {
@@ -44,6 +46,52 @@ suite('Extension Test Suite', () => {
             assert.strictEqual(PROJECT_INDICATORS.USE_WINUI, '<UseWinUI>true</UseWinUI>');
             assert.strictEqual(PROJECT_INDICATORS.WINDOWS_APP_SDK, 'Microsoft.WindowsAppSDK');
             assert.ok(PROJECT_INDICATORS.WINDOWS_TARGET_REGEX instanceof RegExp);
+        });
+    });
+
+    suite('XAML Designer Synchronization', () => {
+        test('applies only edits based on the current document revision', () => {
+            assert.strictEqual(decideDesignerEdit('<Grid />', {
+                baseText: '<Grid />',
+                text: '<Grid><Button /></Grid>'
+            }), 'apply');
+            assert.strictEqual(decideDesignerEdit('<Grid><TextBlock /></Grid>', {
+                baseText: '<Grid />',
+                text: '<Grid><Button /></Grid>'
+            }), 'conflict');
+            assert.strictEqual(decideDesignerEdit('<Grid />', {
+                baseText: '<Grid />',
+                text: '<Grid />'
+            }), 'noop');
+            assert.strictEqual(decideDesignerEdit('<Grid />', { text: 42 }), 'invalid');
+        });
+    });
+
+    suite('XAML Designer Code-Behind', () => {
+        test('reads the class name from x:Class', () => {
+            assert.strictEqual(
+                getXamlClassName('<Window x:Class="Sample.App.MainWindow" />'),
+                'MainWindow'
+            );
+        });
+
+        test('finds the target partial class closing brace', () => {
+            const source = `namespace Sample.App;
+
+public sealed partial class MainWindow
+{
+    private string Value => "}";
+
+    private void Existing()
+    {
+    }
+}
+`;
+            const offset = findClassInsertionOffset(source, 'MainWindow');
+            assert.ok(offset > source.indexOf('Existing'));
+            assert.strictEqual(source[offset], '}');
+            assert.ok(hasVoidMethod(source, 'Existing'));
+            assert.ok(!hasVoidMethod(source, 'Missing'));
         });
     });
 

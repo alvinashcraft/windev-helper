@@ -36,6 +36,11 @@ export class XamlPreviewController implements vscode.Disposable {
     private readonly _onRendererChanged = new vscode.EventEmitter<RendererStatus>();
     public readonly onRendererChanged = this._onRendererChanged.event;
 
+    /** Whether the bundled native WinUI renderer can run on this machine. */
+    public get nativeRendererAvailable(): boolean {
+        return this.renderers.get('native')?.available ?? false;
+    }
+
     constructor(private readonly extensionPath: string) {
         this.projectContextProvider = new ProjectContextProvider();
         this.projectContextProvider.setupWatchers();
@@ -218,6 +223,28 @@ export class XamlPreviewController implements vscode.Disposable {
                 success: false,
                 code: 'RENDER_ERROR',
                 message: err instanceof Error ? err.message : String(err)
+            };
+        }
+    }
+
+    /** Renders with the native WinUI host regardless of the configured fallback. */
+    public async renderNative(xaml: string, options: RenderWithContextOptions): Promise<RenderResult> {
+        const renderer = this.renderers.get('native');
+        if (!renderer?.available) {
+            return {
+                success: false,
+                code: 'NATIVE_RENDERER_UNAVAILABLE',
+                message: 'Native WinUI preview is available only on Windows with a matching renderer binary.'
+            };
+        }
+        try {
+            await renderer.initialize();
+            return await renderer.render(xaml, await this.buildRenderOptions(options));
+        } catch (error) {
+            return {
+                success: false,
+                code: 'NATIVE_RENDER_ERROR',
+                message: error instanceof Error ? error.message : String(error)
             };
         }
     }

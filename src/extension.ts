@@ -8,13 +8,10 @@ import { WinAppDebugConfigurationProvider } from './winAppDebugProvider';
 import { ServiceLocator } from './serviceLocator';
 import { COMMANDS, CONFIG, DEBUG_TYPES } from './constants';
 import { XamlPreviewController } from './xamlPreview';
-import { XamlDesignerPanel } from './xamlDesigner';
-import { PropertyPaneController } from './propertyPane';
+import { XamlDesignerEditorProvider } from './designer';
 
 let services: ServiceLocator;
 let previewController: XamlPreviewController;
-let propertyPaneController: PropertyPaneController;
-let designerSelectionSubscription: vscode.Disposable | undefined;
 let winAppDebugProvider: WinAppDebugConfigurationProvider | undefined;
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
@@ -26,27 +23,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     // Initialize XAML preview controller
     previewController = new XamlPreviewController(context.extensionPath);
     context.subscriptions.push(previewController);
-
-    // Initialize property pane controller
-    propertyPaneController = new PropertyPaneController(context);
-    context.subscriptions.push(propertyPaneController);
-
-    // Connect designer selection events to property pane
-    designerSelectionSubscription = XamlDesignerPanel.onElementSelected(event => {
-        propertyPaneController.updateDocument(event.document);
-        propertyPaneController.selectElement(event.element);
-    });
-    context.subscriptions.push(designerSelectionSubscription);
-
-    // Also update property pane when active editor changes to a XAML file
-    context.subscriptions.push(
-        vscode.window.onDidChangeActiveTextEditor(editor => {
-            if (editor && (editor.document.languageId === 'xaml' || editor.document.fileName.endsWith('.xaml'))) {
-                propertyPaneController.updateDocument(editor.document);
-                propertyPaneController.clearSelection();
-            }
-        })
-    );
+    context.subscriptions.push(XamlDesignerEditorProvider.register(context, previewController));
 
     // Register debug configuration provider
     const debugProvider = new DebugConfigurationProvider(
@@ -450,14 +427,23 @@ function registerCommands(context: vscode.ExtensionContext): void {
         })
     );
 
-    // XAML Preview command
+    // XAML designer commands
     context.subscriptions.push(
-        vscode.commands.registerCommand(COMMANDS.OPEN_XAML_PREVIEW, async () => {
-            const editor = vscode.window.activeTextEditor;
-            if (editor && (editor.document.languageId === 'xaml' || editor.document.fileName.endsWith('.xaml'))) {
-                XamlDesignerPanel.createOrShow(context.extensionUri, previewController, editor.document);
-            } else {
-                XamlDesignerPanel.createOrShow(context.extensionUri, previewController);
+        vscode.commands.registerCommand(COMMANDS.OPEN_XAML_DESIGNER, async (resource?: vscode.Uri) => {
+            const uri = resource ?? vscode.window.activeTextEditor?.document.uri ?? XamlDesignerEditorProvider.activeDocumentUri;
+            if (!uri || !uri.fsPath.toLowerCase().endsWith('.xaml')) {
+                void vscode.window.showWarningMessage('Open a XAML file before launching the WinUI XAML Designer.');
+                return;
+            }
+            await vscode.commands.executeCommand('vscode.openWith', uri, XamlDesignerEditorProvider.viewType);
+        })
+    );
+
+    context.subscriptions.push(
+        vscode.commands.registerCommand(COMMANDS.OPEN_XAML_TEXT, async (resource?: vscode.Uri) => {
+            const uri = resource ?? XamlDesignerEditorProvider.activeDocumentUri ?? vscode.window.activeTextEditor?.document.uri;
+            if (uri) {
+                await vscode.commands.executeCommand('vscode.openWith', uri, 'default');
             }
         })
     );

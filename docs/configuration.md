@@ -143,31 +143,33 @@ Access these settings through:
 
 ---
 
-## XAML Preview Settings (Preview Feature)
+## XAML Designer Settings
 
-> ⚠️ These settings are for the preview XAML feature in WinDev Helper 2.x.
+### windevHelper.designer.gridSize
 
-### windevHelper.preview.renderer
+**Type:** `number`
 
-**Type:** `string`
+**Default:** `8`
 
-**Default:** `"auto"`
+**Range:** `1` to `64`
 
-**Options:** `"auto"`, `"native"`, `"html"`
+**Description:** Grid size in pixels used when snapping movement and resizing in the visual designer.
 
-**Description:** The renderer to use for XAML preview.
+---
 
-```json
-{
-  "windevHelper.preview.renderer": "auto"
-}
-```
+### windevHelper.designer.snapToGrid
 
-**Options:**
+**Type:** `boolean`
 
-- **auto**: Automatically selects the best renderer for your platform (native on Windows, HTML elsewhere)
-- **native**: Uses the WinUI 3 rendering engine for accurate preview (Windows only)
-- **html**: Uses an HTML-based approximation (cross-platform, less accurate)
+**Default:** `true`
+
+**Description:** Enables grid snapping when the designer opens. It can also be toggled from the designer toolbar.
+
+---
+
+## Native XAML Preview Settings
+
+These settings apply to the Windows-only Preview mode integrated into the XAML Designer.
 
 ---
 
@@ -177,7 +179,7 @@ Access these settings through:
 
 **Default:** `800`
 
-**Description:** Default width of the XAML preview in pixels.
+**Description:** Default native render width in device-independent pixels when the XAML root does not provide a width.
 
 ```json
 {
@@ -193,34 +195,13 @@ Access these settings through:
 
 **Default:** `600`
 
-**Description:** Default height of the XAML preview in pixels.
+**Description:** Default native render height in device-independent pixels when the XAML root does not provide a height.
 
 ```json
 {
   "windevHelper.preview.height": 768
 }
 ```
-
----
-
-### windevHelper.preview.updateDelay
-
-**Type:** `number`
-
-**Default:** `300`
-
-**Description:** Delay in milliseconds before updating the preview after editing XAML.
-
-```json
-{
-  "windevHelper.preview.updateDelay": 500
-}
-```
-
-**When to adjust:**
-
-- Increase if preview updates cause performance issues
-- Decrease for more responsive previews on fast machines
 
 ---
 
@@ -242,7 +223,7 @@ Access these settings through:
 
 **Options:**
 
-- **auto**: Follows VS Code theme, or uses project's App.xaml `RequestedTheme` if set
+- **auto**: Follows the active VS Code color theme
 - **light**: Always use light theme
 - **dark**: Always use dark theme
 

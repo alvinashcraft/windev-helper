@@ -24,14 +24,14 @@ This document provides an overview of the WinDev Helper extension architecture f
 │  │   Manager   │  │   Manager   │  │   Provider  │             │
 │  └─────────────┘  └─────────────┘  └─────────────┘             │
 ├─────────────────────────────────────────────────────────────────┤
-│                       XAML Features                               │
+│                       XAML Designer                               │
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐             │
-│  │   Preview   │  │  Property   │  │    XAML     │             │
-│  │ Controller  │  │    Pane     │  │Preprocessor │             │
+│  │   Custom    │  │  Designer   │  │  Control    │             │
+│  │   Editor    │  │    Sync     │  │  Catalog    │             │
 │  └─────────────┘  └─────────────┘  └─────────────┘             │
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐             │
 │  │   Native    │  │    HTML     │  │  Control    │             │
-│  │  Renderer   │  │  Fallback   │  │  Metadata   │             │
+│  │  Preview    │  │   Canvas    │  │  Metadata   │             │
 │  └─────────────┘  └─────────────┘  └─────────────┘             │
 ├─────────────────────────────────────────────────────────────────┤
 │                       Utilities                                  │
@@ -623,7 +623,29 @@ suite('Extension Integration', () => {
 
 ---
 
-## XAML Features Architecture
+## XAML Designer Architecture
+
+### Custom Editor (`designer/xamlDesignerEditorProvider.ts`)
+
+The `windevHelper.xamlDesigner` custom text editor owns the visual editing session while the `.xaml` text document remains authoritative:
+
+- Loads the webview assets from `media/designer.js` and `media/designer.css`
+- Sends source changes into the canvas and serializes designer mutations through a message queue
+- Uses `designerSync.ts` to accept only full-document edits based on the current source revision
+- Applies changes through `WorkspaceEdit`, preserving VS Code undo/redo behavior
+- Routes Windows-only Preview requests to the native renderer
+
+The webview parses XAML with the browser XML DOM and renders an editable HTML/CSS approximation. `controlCatalog.ts` combines a curated toolbox with inherited property metadata from `propertyPane/controlMetadata.ts`. Property bindings are displayed but not rewritten.
+
+### Design Interaction
+
+- Toolbox drag/drop finds the deepest compatible layout container
+- Canvas children use `Canvas.Left` and `Canvas.Top`; Grid additions use alignment and margin defaults
+- Selection overlays provide eight resize handles, a control name label, zoom, and configurable grid snapping
+- Property changes update XML attributes and commit through the same optimistic transaction path
+- Double-clicking a supported control adds the default event attribute and asks `codeBehind.ts` to insert a validated C# handler in `.xaml.cs`
+
+The event generator uses dependency-free C# text scanning and fully qualified WinUI event argument types. It does not call C# Dev Kit APIs.
 
 ### XAML Preprocessor (`xamlPreview/xamlPreprocessor.ts`)
 
@@ -636,19 +658,12 @@ Sanitizes XAML before sending it to the native renderer, handling third-party co
 - **Resource cleanup**: Strips unknown namespace entries from resource dictionaries
 - **Warning collection**: Reports all replaced/removed elements so the preview can display warnings
 
-### Property Pane (`propertyPane/`)
-
-Provides a tree view showing properties for the selected XAML element:
-
-- **`controlMetadata.ts`**: Database of ~85 WinUI 3 control types with full inheritance chains, ~35 attached properties, category classification, and default values
-- **`propertyPaneProvider.ts`**: TreeDataProvider that merges explicit XAML attributes with metadata defaults; supports grouped and flat views
-- **`propertyPaneController.ts`**: Manages lifecycle, listens for cursor position changes, and registers view commands
-
-### Native Renderer (`xamlPreview/nativeRenderer.ts`)
+### Native Preview (`xamlPreview/nativeRenderer.ts`)
 
 Manages the WinUI 3 host process for rendering XAML:
 
-- Pre-initializes during renderer selection (eliminates first-render timeout)
+- Runs only on Windows when a renderer binary exists for the current architecture
+- Is invoked explicitly by the designer's Edit/Preview toggle
 - Sends warm-up ping after pipe connection
 - Integrates XAML preprocessor before sending XAML to host
 - Merges preprocessing warnings into render results

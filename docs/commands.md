@@ -263,30 +263,25 @@ Installs the Reactor agent plugin for the GitHub Copilot CLI from the `microsoft
 
 ---
 
-## XAML Preview Commands (Preview Feature)
+## XAML Designer Commands
 
-> ⚠️ These commands are for the preview feature in WinDev Helper 2.x.
+`.xaml` files open in the visual designer by default. The designer is editable on every supported VS Code platform; its optional native Preview mode is Windows-only.
 
-### WinUI: Open XAML Preview
+### WinDev: Open XAML Designer
 
-**Command ID:** `windev-helper.openXamlPreview`
+**Command ID:** `windev-helper.openXamlDesigner`
 
-Opens the native XAML preview panel for the current XAML file.
+**Keyboard Shortcut:** `Ctrl+Shift+V`
 
-**Usage:**
+Opens the current `.xaml` file with the editable WinUI XAML Designer.
 
-1. Open a `.xaml` file in the editor
-2. Run this command from the Command Palette
-3. The preview panel opens beside your editor
+---
 
-**Features:**
+### WinDev: Open XAML as Text
 
-- Real-time preview using the WinUI 3 rendering engine
-- Click elements to navigate to their XAML definition
-- Cursor position syncs between editor and preview
-- Supports light and dark themes
+**Command ID:** `windev-helper.openXamlText`
 
-**Note:** The native renderer is only available on Windows.
+Reopens the active designer document in VS Code's text editor. The `</>` button in the designer toolbar performs the same action.
 
 ---
 
@@ -372,52 +367,6 @@ Builds and runs the application without the debugger attached.
 
 - **Unpackaged apps** (`WindowsPackageType=None`): Uses `dotnet run` to launch
 - **Packaged apps** (default MSIX): Builds, deploys the MSIX package via `Add-AppxPackage -Register`, and launches through the package identity using `shell:AppsFolder`
-
----
-
-## XAML Properties Pane Commands (Preview Feature)
-
-> ⚠️ These commands are for the preview feature in WinDev Helper 2.5.
-
-The Properties pane appears in the XAML panel when editing `.xaml` files. It displays properties for the currently selected XAML element.
-
-### WinDev: Refresh Properties
-
-**Command ID:** `windevHelper.propertyPane.refresh`
-
-Refreshes the Properties pane to reflect the latest XAML content.
-
----
-
-### WinDev: Toggle Property Grouping
-
-**Command ID:** `windevHelper.propertyPane.toggleGrouping`
-
-Switches between grouped view (properties organized by category like Layout, Appearance, Common, etc.) and a flat alphabetical list.
-
----
-
-### WinDev: Toggle Default Properties
-
-**Command ID:** `windevHelper.propertyPane.toggleDefaults`
-
-Toggles display of default (unset) properties. When enabled, shows all available properties for the selected control type from the built-in metadata database (~85 WinUI control types). Default values appear dimmed to distinguish them from explicitly set values.
-
----
-
-### WinDev: Copy Value
-
-**Command ID:** `windevHelper.propertyPane.copyValue`
-
-Copies the value of the selected property to the clipboard. Available from the context menu on property items.
-
----
-
-### WinDev: Go to Definition
-
-**Command ID:** `windevHelper.propertyPane.goToDefinition`
-
-Navigates to the property's definition in the XAML source. Available from the context menu on property items.
 
 ---
 
