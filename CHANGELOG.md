@@ -28,6 +28,9 @@ This major release replaces the separate read-only XAML preview and Properties p
 ### Fixed
 
 - **.NET package restore** - Startup and manual restores now run `dotnet restore` against the detected `.csproj` instead of requiring `winapp.yaml`; YAML-based non-.NET workspaces continue to use `winapp restore`
+- **Existing XAML layout rendering** - Controls without explicit `Width` or `Height` now use designer defaults instead of collapsing the design surface to zero width
+- **Native Window preview** - XML declarations no longer prevent `<Window>` conversion, so common `MainWindow.xaml` files with `Window.SystemBackdrop` render through the native host
+- **Native preview startup** - The named-pipe client accepts the UTF-8 BOM on the host's first response, avoiding a failed warm-up ping and unnecessary delay
 
 ### Removed
 

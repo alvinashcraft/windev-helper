@@ -397,7 +397,7 @@ export class NativeXamlRenderer implements IXamlRenderer {
         // Messages are newline-delimited JSON
         let newlineIndex: number;
         while ((newlineIndex = this.responseBuffer.indexOf('\n')) !== -1) {
-            const message = this.responseBuffer.substring(0, newlineIndex);
+            const message = this.responseBuffer.substring(0, newlineIndex).replace(/^\uFEFF/, '');
             this.responseBuffer = this.responseBuffer.substring(newlineIndex + 1);
 
             if (message.trim()) {

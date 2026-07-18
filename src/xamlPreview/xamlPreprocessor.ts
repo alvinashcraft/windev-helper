@@ -163,8 +163,8 @@ export function preprocessXaml(xaml: string): PreprocessResult {
  * like `<Window.SystemBackdrop>` and `<Window.Title>` are removed.
  */
 function replaceWindowRoot(xaml: string, warnings: string[]): string {
-    // Check if root element is <Window
-    const rootMatch = xaml.match(/^(\s*)<Window(\s|>)/);
+    // Preserve an optional XML declaration before the root element.
+    const rootMatch = xaml.match(/^(\s*(?:<\?xml[^?]*\?>\s*)?)<Window(\s|>)/);
     if (!rootMatch) {
         return xaml;
     }
@@ -172,7 +172,7 @@ function replaceWindowRoot(xaml: string, warnings: string[]): string {
     let result = xaml;
 
     // Replace opening tag: <Window ... > → <Grid ... >
-    result = result.replace(/^(\s*)<Window(\s)/, '$1<Grid$2');
+    result = result.replace(/^(\s*(?:<\?xml[^?]*\?>\s*)?)<Window(\s|>)/, '$1<Grid$2');
 
     // Replace closing tag: </Window> → </Grid>
     result = result.replace(/<\/Window\s*>\s*$/, '</Grid>');

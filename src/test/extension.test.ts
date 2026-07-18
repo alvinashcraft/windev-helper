@@ -12,6 +12,7 @@ import {
 } from '../constants';
 import { decideDesignerEdit, findClassInsertionOffset, getXamlClassName, hasVoidMethod } from '../designer';
 import { resolveRestoreTarget } from '../winAppCli';
+import { preprocessXaml } from '../xamlPreview/xamlPreprocessor';
 
 suite('Extension Test Suite', () => {
     vscode.window.showInformationMessage('Start all tests.');
@@ -130,6 +131,20 @@ public sealed partial class MainWindow
                 resolveRestoreTarget(workspaceDir, workspaceDir),
                 { kind: 'winapp', workingDir: workspaceDir }
             );
+        });
+    });
+
+    suite('Native XAML Preview Preprocessing', () => {
+        test('converts a Window root after an XML declaration', () => {
+            const result = preprocessXaml(`<?xml version="1.0" encoding="utf-8"?>
+<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation">
+    <Window.SystemBackdrop><MicaBackdrop /></Window.SystemBackdrop>
+    <Grid />
+</Window>`);
+
+            assert.ok(result.xaml.startsWith('<?xml version="1.0" encoding="utf-8"?>\n<Grid'));
+            assert.ok(result.xaml.endsWith('</Grid>'));
+            assert.ok(!result.xaml.includes('Window.SystemBackdrop'));
         });
     });
 

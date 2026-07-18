@@ -119,7 +119,11 @@
     }
 
     function numberAttribute(element, name, fallback) {
-        const parsed = Number(element.getAttribute(name));
+        const value = element.getAttribute(name);
+        if (value === null || value.trim() === '' || value === 'Auto') {
+            return fallback;
+        }
+        const parsed = Number(value);
         return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
     }
 
