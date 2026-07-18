@@ -8,6 +8,31 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { CONFIG, OUTPUT_CHANNELS } from './constants';
 
+export type RestoreTarget =
+    | { kind: 'dotnet'; projectFile: string; workingDir: string }
+    | { kind: 'winapp'; workingDir: string | undefined };
+
+/** Selects the restore tool without requiring a winapp.yaml for .NET projects. */
+export function resolveRestoreTarget(
+    projectPath: string | undefined,
+    workspaceDir: string | undefined,
+    discoveredProjectFile?: string
+): RestoreTarget {
+    const explicitProjectFile = projectPath?.toLowerCase().endsWith('.csproj') ? projectPath : undefined;
+    const projectFile = explicitProjectFile ?? discoveredProjectFile;
+    if (projectFile) {
+        return {
+            kind: 'dotnet',
+            projectFile,
+            workingDir: path.dirname(projectFile)
+        };
+    }
+    return {
+        kind: 'winapp',
+        workingDir: projectPath || workspaceDir
+    };
+}
+
 /**
  * Wrapper for the Windows App Development CLI (winapp)
  * Provides methods to interact with the CLI for various WinUI development tasks
@@ -345,10 +370,30 @@ export class WinAppCli {
     /**
      * Restore packages and dependencies
      * Returns true if restore was successful or skipped, false if failed
-     * Note: For .NET projects (v0.2.0+), packages are configured in .csproj directly
+     * Note: For .NET projects, packages are configured in .csproj and restored
+     * with dotnet. winapp restore is reserved for winapp.yaml workspaces.
      */
     public async restore(projectPath?: string): Promise<boolean> {
-        const workingDir = projectPath || vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+        const workspaceDir = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+        const explicitProjectFile = projectPath?.toLowerCase().endsWith('.csproj') ? projectPath : undefined;
+        const candidateWorkingDir = explicitProjectFile ? path.dirname(explicitProjectFile) : (projectPath || workspaceDir);
+        const discoveredProjectFile = !explicitProjectFile && candidateWorkingDir
+            ? this.findCsprojFiles(candidateWorkingDir)[0]
+            : undefined;
+        const target = resolveRestoreTarget(projectPath, workspaceDir, discoveredProjectFile);
+
+        if (target.kind === 'dotnet') {
+            try {
+                await this.executeDotnetRestore(target.projectFile);
+                vscode.window.showInformationMessage('NuGet packages restored successfully.');
+                return true;
+            } catch (error) {
+                vscode.window.showErrorMessage(`Failed to restore NuGet packages: ${error}`);
+                return false;
+            }
+        }
+
+        const workingDir = target.workingDir;
 
         // Check if winapp workspace is initialized
         if (!this.isInitialized(workingDir)) {
@@ -377,6 +422,37 @@ export class WinAppCli {
             vscode.window.showErrorMessage(`Failed to restore packages: ${error}`);
             return false;
         }
+    }
+
+    /** Restore a .NET project without requiring a winapp.yaml file. */
+    private async executeDotnetRestore(projectFile: string): Promise<void> {
+        return new Promise((resolve, reject) => {
+            const args = ['restore', projectFile];
+            this.outputChannel.appendLine(`> dotnet restore "${projectFile}"`);
+            this.outputChannel.show();
+
+            const process = cp.spawn('dotnet', args, {
+                cwd: path.dirname(projectFile),
+                shell: false,
+                windowsHide: true
+            });
+
+            let stderr = '';
+            process.stdout?.on('data', data => this.outputChannel.append(data.toString()));
+            process.stderr?.on('data', data => {
+                const text = data.toString();
+                stderr += text;
+                this.outputChannel.append(text);
+            });
+            process.on('close', code => {
+                if (code === 0) {
+                    resolve();
+                } else {
+                    reject(new Error(stderr || `dotnet restore failed with exit code ${code}`));
+                }
+            });
+            process.on('error', reject);
+        });
     }
 
     /**

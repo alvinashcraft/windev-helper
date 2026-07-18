@@ -266,7 +266,7 @@ This extension integrates with the **Windows App Development CLI (winapp)**, whi
 ### Setup Commands
 
 - `winapp init` - Initialize project with Windows SDK and App SDK
-- `winapp restore` - Restore packages and dependencies
+- `winapp restore` - Restore packages for non-.NET workspaces configured with `winapp.yaml` (`dotnet restore` is used for `.csproj` projects)
 - `winapp update` - Update packages to latest versions
 
 ### App Identity & Debugging

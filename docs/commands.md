@@ -639,12 +639,14 @@ Opens the Package.appxmanifest file in the editor.
 
 Restores NuGet packages for the project.
 
-**Uses:** `winapp restore` CLI command
+**Uses:** `dotnet restore <project.csproj>` for .NET projects. Workspaces configured with `winapp.yaml` continue to use `winapp restore`.
+
+Modern .NET projects do not require a `winapp.yaml` file. Their Windows App SDK and NuGet dependencies are declared in the project file.
 
 **Equivalent CLI:**
 
 ```bash
-dotnet restore
+dotnet restore MyApp.csproj
 ```
 
 ---

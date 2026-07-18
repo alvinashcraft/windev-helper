@@ -1,4 +1,5 @@
 import * as assert from 'assert';
+import * as path from 'path';
 import * as vscode from 'vscode';
 import { 
     COMMANDS, 
@@ -10,6 +11,7 @@ import {
     PROJECT_INDICATORS
 } from '../constants';
 import { decideDesignerEdit, findClassInsertionOffset, getXamlClassName, hasVoidMethod } from '../designer';
+import { resolveRestoreTarget } from '../winAppCli';
 
 suite('Extension Test Suite', () => {
     vscode.window.showInformationMessage('Start all tests.');
@@ -92,6 +94,42 @@ public sealed partial class MainWindow
             assert.strictEqual(source[offset], '}');
             assert.ok(hasVoidMethod(source, 'Existing'));
             assert.ok(!hasVoidMethod(source, 'Missing'));
+        });
+    });
+
+    suite('Package Restore Routing', () => {
+        test('uses dotnet restore for an explicit .NET project', () => {
+            const workspaceDir = path.join('repo');
+            const projectFile = path.join(workspaceDir, 'App', 'App.csproj');
+            assert.deepStrictEqual(
+                resolveRestoreTarget(projectFile, workspaceDir),
+                {
+                    kind: 'dotnet',
+                    projectFile,
+                    workingDir: path.dirname(projectFile)
+                }
+            );
+        });
+
+        test('uses dotnet restore for a project discovered in the workspace', () => {
+            const workspaceDir = path.join('repo');
+            const projectFile = path.join(workspaceDir, 'src', 'App.csproj');
+            assert.deepStrictEqual(
+                resolveRestoreTarget(undefined, workspaceDir, projectFile),
+                {
+                    kind: 'dotnet',
+                    projectFile,
+                    workingDir: path.dirname(projectFile)
+                }
+            );
+        });
+
+        test('keeps YAML workspaces on winapp restore', () => {
+            const workspaceDir = path.join('repo');
+            assert.deepStrictEqual(
+                resolveRestoreTarget(workspaceDir, workspaceDir),
+                { kind: 'winapp', workingDir: workspaceDir }
+            );
         });
     });
 

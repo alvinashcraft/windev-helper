@@ -72,7 +72,7 @@ function initializeInBackground(): void {
                 const config = vscode.workspace.getConfiguration(CONFIG.SECTION);
                 if (config.get<boolean>(CONFIG.AUTO_RESTORE_ON_OPEN)) {
                     try {
-                        await services.packageManager.restorePackages();
+                        await services.packageManager.restorePackages(services.projectManager.currentProject);
                     } catch (err) {
                         console.error('Auto-restore failed:', err);
                     }
@@ -239,7 +239,7 @@ function registerCommands(context: vscode.ExtensionContext): void {
     // Package management commands
     context.subscriptions.push(
         vscode.commands.registerCommand(COMMANDS.RESTORE_PACKAGES, async () => {
-            await services.packageManager.restorePackages();
+            await services.packageManager.restorePackages(services.projectManager.currentProject);
         })
     );
 

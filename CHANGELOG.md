@@ -25,6 +25,10 @@ This major release replaces the separate read-only XAML preview and Properties p
 - **Toolchain refresh** - Updated npm development dependencies, including TypeScript 6 and ESLint 10, with targeted patched transitive overrides and zero npm audit findings
 - **Default XAML editor** - The visual designer is now the default editor for `.xaml`; use **WinDev: Open XAML as Text** to switch to source
 
+### Fixed
+
+- **.NET package restore** - Startup and manual restores now run `dotnet restore` against the detected `.csproj` instead of requiring `winapp.yaml`; YAML-based non-.NET workspaces continue to use `winapp restore`
+
 ### Removed
 
 - **Separate XAML Preview panel** - Removed `windev-helper.openXamlPreview` and the old read-only preview webview
