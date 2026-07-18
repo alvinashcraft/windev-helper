@@ -497,9 +497,10 @@
         row.appendChild(name);
         const value = getPropertyValue(element, property.name);
         const choices = enumValues[property.type];
-        const editor = choices ? document.createElement('select') : document.createElement('input');
+        const isBinding = value.startsWith('{Binding') || value.startsWith('{x:Bind');
+        const editor = choices && !isBinding ? document.createElement('select') : document.createElement('input');
         editor.className = 'property-editor';
-        if (choices) {
+        if (choices && !isBinding) {
             const unset = document.createElement('option');
             unset.value = '';
             unset.textContent = `(default: ${property.defaultValue})`;
@@ -512,7 +513,7 @@
             }
         }
         editor.value = value;
-        if (value.startsWith('{Binding') || value.startsWith('{x:Bind')) {
+        if (isBinding) {
             editor.classList.add('binding');
             editor.readOnly = true;
             editor.title = 'Binding expressions are preserved and read-only in the visual designer.';

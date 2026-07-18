@@ -26,7 +26,7 @@ This extension leverages **winapp**, the Windows App Development CLI, to provide
 
 The editable surface is cross-platform. Native Preview requires Windows and a bundled renderer matching the current architecture. Use **WinDev: Open XAML as Text** or the `</>` toolbar button whenever direct source editing is preferable. See the [XAML Designer guide](docs/xaml-designer.md).
 
-### �🚀 Debugging & Running
+### Debugging & Running
 
 - **Hit F5 to debug your app** on Windows
 - Debug your WinUI app on any supported Windows device

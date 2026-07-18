@@ -21,6 +21,7 @@
   },
   "qna": "marketplace",
   "engines": {
+    "node": ">=22",
     "vscode": "^1.108.1"
   },
   "categories": [

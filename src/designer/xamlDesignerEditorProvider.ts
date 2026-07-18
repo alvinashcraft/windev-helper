@@ -3,7 +3,7 @@ import { randomBytes } from 'crypto';
 import { decideDesignerEdit } from './designerSync';
 import { getDesignerControlCatalog } from './controlCatalog';
 import { XamlPreviewController } from '../xamlPreview';
-import { ensureWinUIEventHandler } from './codeBehind';
+import { ensureWinUIEventHandler, isCSharpIdentifier } from './codeBehind';
 
 interface DesignerMessage {
     type?: unknown;
@@ -169,6 +169,7 @@ export class XamlDesignerEditorProvider implements vscode.CustomTextEditorProvid
             typeof message.handlerName !== 'string'
             || typeof message.eventArgsType !== 'string'
             || typeof message.eventName !== 'string'
+            || !isCSharpIdentifier(message.handlerName)
             || !/^[A-Za-z_][A-Za-z0-9_]*$/.test(message.eventName)
         ) {
             throw new Error('The designer sent invalid event handler data.');

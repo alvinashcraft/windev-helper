@@ -3,6 +3,7 @@
 .vscode-test
 .vscode-test/**
 .vscode-test.mjs
+.nvmrc
 .github/**
 
 # Source files (bundled via esbuild)
