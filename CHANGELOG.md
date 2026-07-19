@@ -32,6 +32,8 @@ This major release replaces the separate read-only XAML preview and Properties p
 - **Native Window preview** - XML declarations no longer prevent `<Window>` conversion, so common `MainWindow.xaml` files with `Window.SystemBackdrop` render through the native host
 - **Native preview startup** - The named-pipe client accepts the UTF-8 BOM on the host's first response, avoiding a failed warm-up ping and unnecessary delay
 - **Native preview recovery** - Process exits, closed pipes, and write failures now invalidate stale transport state, restart the host once, and retry the render instead of surfacing repeated `write EOF` errors
+- **Third-party controls after XML declarations** - Namespace detection now reads the actual XAML root element, allowing legacy controls such as CommunityToolkit `MarkdownTextBlock` to be replaced with preview placeholders instead of causing native parse failures
+- **Windows App SDK control compatibility** - `TitleBar` controls are represented by layout-preserving placeholders when the target project's default style is incompatible with the native preview host
 
 ### Removed
 

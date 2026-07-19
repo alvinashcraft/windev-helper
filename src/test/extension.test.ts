@@ -146,6 +146,37 @@ public sealed partial class MainWindow
             assert.ok(result.xaml.endsWith('</Grid>'));
             assert.ok(!result.xaml.includes('Window.SystemBackdrop'));
         });
+
+        test('replaces third-party controls when an XML declaration is present', () => {
+            const result = preprocessXaml(`<?xml version="1.0" encoding="utf-8"?>
+<Window
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:ct="using:CommunityToolkit.WinUI.UI.Controls">
+    <Grid><ct:MarkdownTextBlock /></Grid>
+</Window>`);
+
+            assert.ok(!result.xaml.includes('ct:MarkdownTextBlock'));
+            assert.ok(result.xaml.includes('Tag="ct:MarkdownTextBlock"'));
+            assert.ok(result.warnings.some(warning => warning.includes("Third-party namespace 'ct'")));
+        });
+
+        test('replaces TitleBar controls whose default styles may be host-incompatible', () => {
+            const result = preprocessXaml(`<Window
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Grid>
+        <TitleBar x:Name="titleBar" Grid.Row="2" Height="48">
+            <TitleBar.IconSource><ImageIconSource ImageSource="/Assets/app.ico" /></TitleBar.IconSource>
+        </TitleBar>
+    </Grid>
+</Window>`);
+
+            assert.ok(!result.xaml.includes('<TitleBar'));
+            assert.ok(result.xaml.includes('x:Name="titleBar"'));
+            assert.ok(result.xaml.includes('Grid.Row="2"'));
+            assert.ok(result.xaml.includes('Text="[TitleBar]"'));
+            assert.ok(result.warnings.some(warning => warning.includes('TitleBar control')));
+        });
     });
 
     suite('Extension Activation', () => {
