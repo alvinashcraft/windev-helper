@@ -2,7 +2,7 @@
   "name": "windev-helper",
   "displayName": "WinDev Helper",
   "description": "Build beautiful, performant WinUI apps with VS Code. Debug, build, package, and deploy Windows apps powered by the Windows App SDK.",
-  "version": "3.3.0",
+  "version": "4.0.0",
   "publisher": "alvinashcraft",
   "icon": "images/icon.png",
   "license": "MIT",
@@ -21,6 +21,7 @@
   },
   "qna": "marketplace",
   "engines": {
+    "node": ">=22",
     "vscode": "^1.108.1"
   },
   "categories": [
@@ -46,6 +47,18 @@
     "ms-dotnettools.csharp"
   ],
   "contributes": {
+    "customEditors": [
+      {
+        "viewType": "windevHelper.xamlDesigner",
+        "displayName": "WinUI XAML Designer",
+        "selector": [
+          {
+            "filenamePattern": "*.xaml"
+          }
+        ],
+        "priority": "default"
+      }
+    ],
     "commands": [
       {
         "command": "windev-helper.createProject",
@@ -308,61 +321,18 @@
         "category": "WinDev"
       },
       {
-        "command": "windev-helper.openXamlPreview",
-        "title": "Open XAML Preview",
+        "command": "windev-helper.openXamlDesigner",
+        "title": "Open XAML Designer",
         "category": "WinDev",
-        "icon": "$(preview)"
+        "icon": "$(edit)"
       },
       {
-        "command": "windevHelper.propertyPane.refresh",
-        "title": "Refresh Properties",
+        "command": "windev-helper.openXamlText",
+        "title": "Open XAML as Text",
         "category": "WinDev",
-        "icon": "$(refresh)"
-      },
-      {
-        "command": "windevHelper.propertyPane.toggleGrouping",
-        "title": "Toggle Property Grouping",
-        "category": "WinDev",
-        "icon": "$(list-tree)"
-      },
-      {
-        "command": "windevHelper.propertyPane.toggleDefaults",
-        "title": "Toggle Default Properties",
-        "category": "WinDev",
-        "icon": "$(eye)"
-      },
-      {
-        "command": "windevHelper.propertyPane.copyValue",
-        "title": "Copy Value",
-        "category": "WinDev",
-        "icon": "$(copy)"
-      },
-      {
-        "command": "windevHelper.propertyPane.goToDefinition",
-        "title": "Go to Definition",
-        "category": "WinDev",
-        "icon": "$(go-to-file)"
+        "icon": "$(code)"
       }
     ],
-    "viewsContainers": {
-      "panel": [
-        {
-          "id": "windevHelperPanel",
-          "title": "XAML",
-          "icon": "$(symbol-misc)"
-        }
-      ]
-    },
-    "views": {
-      "windevHelperPanel": [
-        {
-          "id": "windevHelper.propertyPane",
-          "name": "Properties",
-          "when": "resourceExtname == .xaml || editorLangId == xaml",
-          "contextualTitle": "XAML Properties"
-        }
-      ]
-    },
     "menus": {
       "explorer/context": [
         {
@@ -399,20 +369,6 @@
           "command": "windev-helper.addViewModel",
           "when": "explorerResourceIsFolder && resourceFilename != 'bin' && resourceFilename != 'obj'",
           "group": "winui@7"
-        }
-      ],
-      "view/title": [
-        {
-          "command": "windevHelper.propertyPane.refresh",
-          "when": "view == windevHelper.propertyPane",
-          "group": "navigation"
-        }
-      ],
-      "view/item/context": [
-        {
-          "command": "windevHelper.propertyPane.copyValue",
-          "when": "view == windevHelper.propertyPane",
-          "group": "inline"
         }
       ],
       "csharp.solutionExplorer.context": [
@@ -478,14 +434,23 @@
           "when": "windevHelper.isWinUIProject"
         },
         {
-          "command": "windev-helper.openXamlPreview",
+          "command": "windev-helper.openXamlDesigner",
           "when": "resourceExtname == .xaml || editorLangId == xaml"
+        },
+        {
+          "command": "windev-helper.openXamlText",
+          "when": "activeCustomEditorId == windevHelper.xamlDesigner"
         }
       ],
       "editor/title": [
         {
-          "command": "windev-helper.openXamlPreview",
-          "when": "resourceExtname == .xaml || editorLangId == xaml",
+          "command": "windev-helper.openXamlDesigner",
+          "when": "resourceExtname == .xaml && activeCustomEditorId != windevHelper.xamlDesigner",
+          "group": "navigation"
+        },
+        {
+          "command": "windev-helper.openXamlText",
+          "when": "activeCustomEditorId == windevHelper.xamlDesigner",
           "group": "navigation"
         }
       ]
@@ -532,29 +497,18 @@
           "default": "",
           "description": "Default path to the certificate file for signing packages."
         },
-        "windevHelper.preview.renderer": {
-          "type": "string",
-          "enum": [
-            "auto",
-            "native",
-            "html"
-          ],
-          "default": "auto",
-          "description": "XAML preview renderer. 'auto' uses native WinUI on Windows, HTML elsewhere."
-        },
-        "windevHelper.preview.updateDelay": {
-          "type": "number",
-          "default": 300,
-          "description": "Delay in milliseconds before updating preview after XAML changes."
-        },
         "windevHelper.preview.width": {
           "type": "number",
           "default": 800,
+          "minimum": 100,
+          "maximum": 4096,
           "description": "Default width for native XAML preview rendering."
         },
         "windevHelper.preview.height": {
           "type": "number",
           "default": 600,
+          "minimum": 100,
+          "maximum": 4096,
           "description": "Default height for native XAML preview rendering."
         },
         "windevHelper.preview.theme": {
@@ -566,6 +520,18 @@
           ],
           "default": "auto",
           "description": "Theme for XAML preview. 'auto' follows VS Code theme or project's App.xaml RequestedTheme."
+        },
+        "windevHelper.designer.gridSize": {
+          "type": "number",
+          "default": 8,
+          "minimum": 1,
+          "maximum": 64,
+          "description": "Grid size used when snapping controls in the visual XAML designer."
+        },
+        "windevHelper.designer.snapToGrid": {
+          "type": "boolean",
+          "default": true,
+          "description": "Snap control movement and sizing to the visual designer grid."
         },
         "windevHelper.templates.source": {
           "type": "string",
@@ -606,7 +572,7 @@
         "when": "windevHelper.isWinUIProject && !inDebugMode"
       },
       {
-        "command": "windev-helper.openXamlPreview",
+        "command": "windev-helper.openXamlDesigner",
         "key": "ctrl+shift+v",
         "when": "resourceExtname == .xaml || editorLangId == xaml"
       }
@@ -802,16 +768,20 @@
   },
   "devDependencies": {
     "@types/mocha": "^10.0.10",
-    "@types/node": "22.x",
-    "@types/vscode": "^1.108.1",
-    "@vscode/test-cli": "^0.0.12",
-    "@vscode/test-electron": "^2.5.2",
-    "@vscode/vsce": "^3.9.1",
-    "esbuild": "^0.27.2",
-    "eslint": "^9.39.2",
+    "@types/node": "22.20.1",
+    "@types/vscode": "1.108.1",
+    "@vscode/test-cli": "^0.0.15",
+    "@vscode/test-electron": "^3.0.0",
+    "@vscode/vsce": "^3.9.2",
+    "esbuild": "^0.28.1",
+    "eslint": "^10.7.0",
     "npm-run-all": "^4.1.5",
-    "ovsx": "^0.10.11",
-    "typescript": "^5.9.3",
-    "typescript-eslint": "^8.52.0"
+    "ovsx": "^1.0.2",
+    "typescript": "6.0.3",
+    "typescript-eslint": "^8.64.0"
+  },
+  "overrides": {
+    "diff": "9.0.0",
+    "serialize-javascript": "7.0.7"
   }
 }

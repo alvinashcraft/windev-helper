@@ -1,5 +1,7 @@
 # XAML Native Preview - Design Document
 
+> **Historical document:** This describes the read-only preview architecture used before WinDev Helper 4.0. For the current editable custom editor and integrated Windows Preview mode, see [XAML Designer](xaml-designer.md) and [Extension Architecture](architecture.md#xaml-designer-architecture).
+
 ## Overview
 
 This document describes the architecture for native WinUI XAML preview in VS Code, supporting both local Windows rendering and optional Azure-hosted remote rendering.

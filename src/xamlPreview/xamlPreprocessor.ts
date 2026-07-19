@@ -75,6 +75,10 @@ export function preprocessXaml(xaml: string): PreprocessResult {
     // and cannot be loaded by XamlReader.Load() inside the render host.
     result = replaceWindowRoot(result, warnings);
 
+    // Step 0.5: Replace built-in controls that can fail-fast when the
+    // preview host's Windows App SDK differs from the target project.
+    result = replaceHostIncompatibleControls(result, warnings);
+
     // Step 1: Identify namespace prefixes → URIs from root element
     const { unknownPrefixes } = classifyNamespacePrefixes(result);
 
@@ -163,8 +167,8 @@ export function preprocessXaml(xaml: string): PreprocessResult {
  * like `<Window.SystemBackdrop>` and `<Window.Title>` are removed.
  */
 function replaceWindowRoot(xaml: string, warnings: string[]): string {
-    // Check if root element is <Window
-    const rootMatch = xaml.match(/^(\s*)<Window(\s|>)/);
+    // Preserve an optional XML declaration before the root element.
+    const rootMatch = xaml.match(/^(\s*(?:<\?xml[^?]*\?>\s*)?)<Window(\s|>)/);
     if (!rootMatch) {
         return xaml;
     }
@@ -172,7 +176,7 @@ function replaceWindowRoot(xaml: string, warnings: string[]): string {
     let result = xaml;
 
     // Replace opening tag: <Window ... > → <Grid ... >
-    result = result.replace(/^(\s*)<Window(\s)/, '$1<Grid$2');
+    result = result.replace(/^(\s*(?:<\?xml[^?]*\?>\s*)?)<Window(\s|>)/, '$1<Grid$2');
 
     // Replace closing tag: </Window> → </Grid>
     result = result.replace(/<\/Window\s*>\s*$/, '</Grid>');
@@ -202,6 +206,37 @@ function replaceWindowRoot(xaml: string, warnings: string[]): string {
 }
 
 /**
+ * Replace controls whose default styles are tied to a newer Windows App SDK
+ * than the preview host. WinUI may fail-fast instead of throwing a catchable
+ * XAML parse exception when those styles cannot be resolved.
+ */
+function replaceHostIncompatibleControls(xaml: string, warnings: string[]): string {
+    let result = xaml;
+    let replacements = 0;
+
+    const createTitleBarPlaceholder = (_match: string, attrs: string): string => {
+        replacements++;
+        const cleanAttrs = cleanAttributes(attrs);
+        return `<Border${cleanAttrs} BorderBrush="#808080" BorderThickness="1" Background="#20808080" Padding="12"><TextBlock Text="[TitleBar]" Foreground="#808080" FontStyle="Italic" VerticalAlignment="Center"/></Border>`;
+    };
+
+    result = result.replace(
+        /<TitleBar((?:[^>]|\n)*?)\/>/g,
+        createTitleBarPlaceholder
+    );
+    result = result.replace(
+        /<TitleBar((?:[^>]|\n)*?)>[\s\S]*?<\/TitleBar\s*>/g,
+        createTitleBarPlaceholder
+    );
+
+    if (replacements > 0) {
+        warnings.push(`Replaced ${replacements} TitleBar control${replacements === 1 ? '' : 's'} with preview placeholders`);
+    }
+
+    return result;
+}
+
+/**
  * Parse xmlns declarations from the root element and classify prefixes
  * as known (can be rendered by the host) or unknown (third-party).
  */
@@ -212,12 +247,13 @@ function classifyNamespacePrefixes(xaml: string): {
     const knownPrefixes = new Map<string, string>();
     const unknownPrefixes = new Map<string, string>();
 
-    // Match all xmlns:prefix="uri" in root element
-    const rootEnd = xaml.indexOf('>');
-    if (rootEnd === -1) {
+    // Match declarations on the actual root element, not an XML declaration.
+    const rootStart = xaml.search(/<(?!!|\?|\/)[A-Za-z_]/);
+    const rootEnd = rootStart >= 0 ? xaml.indexOf('>', rootStart) : -1;
+    if (rootStart < 0 || rootEnd === -1) {
         return { knownPrefixes, unknownPrefixes };
     }
-    const rootTag = xaml.substring(0, rootEnd + 1);
+    const rootTag = xaml.substring(rootStart, rootEnd + 1);
 
     const nsRegex = /xmlns:(\w+)\s*=\s*"([^"]*)"/g;
     let match;

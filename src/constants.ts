@@ -61,7 +61,8 @@ export const COMMANDS = {
     CHECK_DEV_ENVIRONMENT: 'windev-helper.checkDevEnvironment',
     OPEN_SKILLS_REPO: 'windev-helper.openSkillsRepo',
     CHECK_WINAPP_CLI: 'windev-helper.checkWinAppCli',
-    OPEN_XAML_PREVIEW: 'windev-helper.openXamlPreview',
+    OPEN_XAML_DESIGNER: 'windev-helper.openXamlDesigner',
+    OPEN_XAML_TEXT: 'windev-helper.openXamlText',
     // Microsoft.UI.Reactor commands (v3.1.0+)
     CREATE_REACTOR_APP: 'windev-helper.createReactorApp',
     RUN_REACTOR_BOOTSTRAP: 'windev-helper.runReactorBootstrap',

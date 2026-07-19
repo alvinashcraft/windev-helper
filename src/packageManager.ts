@@ -23,14 +23,14 @@ export class PackageManager {
     /**
      * Restores NuGet packages
      */
-    public async restorePackages(): Promise<void> {
+    public async restorePackages(projectUri?: vscode.Uri): Promise<void> {
         await vscode.window.withProgress({
             location: vscode.ProgressLocation.Notification,
             title: 'Restoring NuGet packages...',
             cancellable: false
         }, async () => {
             try {
-                await this.winAppCli.restore();
+                await this.winAppCli.restore(projectUri?.fsPath);
             } catch (error) {
                 vscode.window.showErrorMessage(`Failed to restore packages: ${error}`);
             }

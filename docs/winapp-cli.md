@@ -74,6 +74,8 @@ winapp restore [project-path]
 
 **VS Code command:** WinUI: Restore Packages
 
+The VS Code command runs `dotnet restore <project.csproj>` when a .NET project is detected. It invokes `winapp restore` only for non-.NET workspaces configured with `winapp.yaml`.
+
 > **v0.2.0 Note:** winapp now uses the NuGet global cache for packages instead of `%userprofile%/.winapp/packages`. This avoids duplicate downloads if you already have packages cached.
 
 ---

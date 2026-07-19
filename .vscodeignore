@@ -1,7 +1,9 @@
 # VS Code and development
 .vscode/**
+.vscode-test
 .vscode-test/**
 .vscode-test.mjs
+.nvmrc
 .github/**
 
 # Source files (bundled via esbuild)
@@ -14,6 +16,8 @@ native-renderer/**
 
 # Build configuration
 esbuild.js
+scripts/**
+windev-helper.sln
 **/tsconfig.json
 **/eslint.config.mjs
 .eslintcache
@@ -33,7 +37,6 @@ package-lock.json
 # Source maps and TypeScript files
 **/*.map
 **/*.ts
-!**/*.d.ts
 
 # Test and coverage
 coverage/**

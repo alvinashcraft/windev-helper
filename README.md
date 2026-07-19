@@ -14,38 +14,19 @@ This extension leverages **winapp**, the Windows App Development CLI, to provide
 
 ## Features
 
-### 🎨 Native XAML Preview (Preview)
+### XAML Designer
 
-- **Real-time XAML preview** - See your WinUI XAML rendered using the actual WinUI 3 rendering engine
-- **Click-to-navigate** - Click any element in the preview to jump to its definition in your XAML
-- **Cursor sync** - Move your cursor in XAML and the preview highlights the corresponding element
-- **Theme support** - Preview respects your VS Code light/dark theme
-- **Project resource support** - Uses your project's App.xaml and merged dictionaries
-- **Data binding indicators** - Shows where bindings are used with placeholder values
+- **Editable visual design surface** - `.xaml` files open in a custom editor with an HTML/CSS approximation of WinUI controls on Windows, macOS, and Linux
+- **Toolbox and drag-and-drop** - Search a curated WinUI control catalog, drag controls into layout containers, or double-click to add
+- **Direct manipulation** - Select controls, move Canvas children, resize with eight handles, snap to a configurable grid, zoom from 25% to 200%, and delete with the keyboard
+- **Embedded property grid** - Edit categorized WinUI and attached properties without leaving the designer; `{Binding}` and `{x:Bind}` expressions are preserved as read-only values
+- **Two-way source synchronization** - Designer edits use VS Code document edits for native undo/redo and reject stale changes when the XAML source has changed concurrently
+- **C# event generation** - Double-click a supported control to wire its default event and add the matching handler to the `.xaml.cs` file
+- **Native Preview on Windows** - Switch to Preview mode to render with the bundled WinUI host, including project resources and theme support
 
-#### HTML Fallback Preview (macOS/Linux)
+The editable surface is cross-platform. Native Preview requires Windows and a bundled renderer matching the current architecture. Use **WinDev: Open XAML as Text** or the `</>` toolbar button whenever direct source editing is preferable. See the [XAML Designer guide](docs/xaml-designer.md).
 
-On non-Windows platforms, the extension provides an HTML-based preview renderer as a fallback:
-
-- **Cross-platform** - Works on macOS, Linux, and Windows
-- **Approximate rendering** - Uses HTML/CSS to approximate WinUI control appearance
-- **69 supported controls** - Layout, input, navigation, picker, shape, and icon controls
-- **Same interaction model** - Click-to-navigate and cursor sync work the same way
-- **Automatic fallback** - No configuration needed; the extension detects your platform
-
-> **Note**: The HTML renderer provides a visual approximation of WinUI controls but may not match native rendering exactly. For pixel-perfect preview, use Windows with the native renderer.
-
-### � XAML Properties Pane (Preview)
-
-- **Full property inspection** - View all properties for the selected XAML element
-- **Rich metadata** - Built-in metadata for ~85 WinUI 3 control types with full inheritance
-- **Attached properties** - ~35 attached property definitions (Grid.Row, Canvas.Left, ScrollViewer, etc.)
-- **Category grouping** - Properties organized by Layout, Appearance, Common, Content, Interaction, Text, Brushes, and Accessibility
-- **Set vs. default** - Toggle between showing only explicitly set properties and all available properties
-- **Data binding indicators** - Visual markers for properties using `{x:Bind}` or `{Binding}`
-- **Copy & navigate** - Copy property values or jump to their XAML definition
-
-### �🚀 Debugging & Running
+### Debugging & Running
 
 - **Hit F5 to debug your app** on Windows
 - Debug your WinUI app on any supported Windows device
@@ -119,6 +100,8 @@ On non-Windows platforms, the extension provides an HTML-based preview renderer 
   - Code navigation and refactoring
   - Roslyn-powered language features
 
+The XAML Designer and its C# event generation do not call C# Dev Kit APIs. C# Dev Kit remains an optional integration for Solution Explorer and related language tooling.
+
 ## Requirements
 
 ### Required Extensions
@@ -142,9 +125,10 @@ This extension requires the following VS Code extension:
 
 ### System Requirements
 
-- **Windows 10** version 1809 (build 17763) or later
-- **Windows 11** (recommended)
 - **Visual Studio Code** 1.108.1 or later
+- **Windows, macOS, or Linux** for XAML visual editing and source workflows
+- **Windows 10** version 1809 (build 17763) or later for WinUI build, run, debug, packaging, and native Preview
+- **Windows 11** is recommended for full WinUI development
 
 ## Getting Started
 
@@ -208,10 +192,8 @@ dotnet new winui-lib -n MyLib
 | `WinUI: Add New Content Dialog` | Add a new ContentDialog |
 | `WinUI: Add New Templated Control` | Add a new templated (custom) control |
 | `WinUI: Add New Resource Dictionary` | Add a new ResourceDictionary XAML file |
-| `WinUI: Open XAML Preview` | Open native XAML preview panel (Preview) |
-| `WinDev: Refresh Properties` | Refresh the XAML Properties pane |
-| `WinDev: Toggle Property Grouping` | Switch between grouped and flat property view |
-| `WinDev: Toggle Default Properties` | Show/hide default (unset) properties |
+| `WinDev: Open XAML Designer` | Open the editable visual designer for a XAML file |
+| `WinDev: Open XAML as Text` | Reopen the active designer document as source text |
 | `WinUI: Build Project` | Build the current project |
 | `WinUI: Rebuild Project` | Clean and rebuild the project |
 | `WinUI: Clean Project` | Clean build outputs |
@@ -261,11 +243,11 @@ This extension contributes the following settings:
 | `windevHelper.autoRestoreOnOpen` | boolean | `true` | Auto-restore packages on project open |
 | `windevHelper.showStatusBarItems` | boolean | `true` | Show config/platform in status bar |
 | `windevHelper.certificatePath` | string | `""` | Default certificate path for signing |
-| `windevHelper.preview.renderer` | string | `auto` | XAML preview renderer: auto, native, html |
+| `windevHelper.designer.gridSize` | number | `8` | Snap grid size for movement and resizing |
+| `windevHelper.designer.snapToGrid` | boolean | `true` | Initial designer snap state |
 | `windevHelper.preview.theme` | string | `auto` | Preview theme: auto, light, dark |
-| `windevHelper.preview.width` | number | `800` | Default preview width |
-| `windevHelper.preview.height` | number | `600` | Default preview height |
-| `windevHelper.preview.updateDelay` | number | `300` | Delay (ms) before updating preview after edits |
+| `windevHelper.preview.width` | number | `800` | Native Preview width |
+| `windevHelper.preview.height` | number | `600` | Native Preview height |
 | `windevHelper.templates.source` | string | `auto` | Template package preference: `auto`, `official`, or `community` |
 | `windevHelper.templates.allowPrerelease` | boolean | `true` | Install prerelease versions of the official Microsoft template pack |
 
@@ -275,6 +257,7 @@ This extension contributes the following settings:
 |----------|---------|
 | `F5` | Debug Project |
 | `Ctrl+Shift+B` | Build Project |
+| `Ctrl+Shift+V` | Open XAML Designer |
 
 ## Windows App Development CLI
 
@@ -283,7 +266,7 @@ This extension integrates with the **Windows App Development CLI (winapp)**, whi
 ### Setup Commands
 
 - `winapp init` - Initialize project with Windows SDK and App SDK
-- `winapp restore` - Restore packages and dependencies
+- `winapp restore` - Restore packages for non-.NET workspaces configured with `winapp.yaml` (`dotnet restore` is used for `.csproj` projects)
 - `winapp update` - Update packages to latest versions
 
 ### App Identity & Debugging
@@ -341,11 +324,12 @@ MyApp/
 ## Known Issues
 
 - **MSIX Packaged Apps**: Debugger attachment is not yet supported for packaged apps. They launch without a debugger; set `<WindowsPackageType>None</WindowsPackageType>` in your .csproj for full F5 debug support
-- **XAML Preview (Preview)**: Third-party controls (e.g., CommunityToolkit) are replaced with placeholder grids in the preview
-- **Properties Pane (Preview)**: Metadata covers ~85 WinUI control types; third-party controls may have limited property defaults
+- **Designer fidelity**: The editable canvas approximates WinUI in HTML/CSS; use Windows native Preview to verify final rendering
+- **Custom controls**: Third-party controls appear as generic placeholders and do not receive full metadata-driven property editors
+- **Layout editing**: Direct movement currently applies to Canvas children; use attached properties for Grid and RelativePanel placement
 - XAML IntelliSense and Hot Reload are planned for future releases
 - Some advanced debugging scenarios may require Visual Studio
-- XAML Preview requires Windows (the native renderer uses WinUI 3)
+- Native Preview requires Windows; visual XAML editing remains available on macOS and Linux
 
 ## Contributing
 
@@ -377,6 +361,16 @@ Contributions are welcome! Please see our [Contributing Guide](docs/CONTRIBUTING
 - 🔄 Debugger attachment for MSIX-packaged apps
 - 🔄 Improved element matching for complex layouts
 - 🔄 DataTemplate and ItemsControl preview support
+
+### v4.0
+
+- ✅ Cross-platform editable XAML custom editor
+- ✅ Searchable WinUI toolbox and drag-and-drop
+- ✅ Selection, Canvas movement, eight-handle resizing, snapping, and zoom
+- ✅ Embedded categorized property editing with binding preservation
+- ✅ Optimistic two-way document synchronization
+- ✅ C# default-event generation without C# Dev Kit APIs
+- ✅ Integrated Windows-only native Preview mode
 
 ### Future Releases
 

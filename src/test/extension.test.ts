@@ -1,4 +1,5 @@
 import * as assert from 'assert';
+import * as path from 'path';
 import * as vscode from 'vscode';
 import { 
     COMMANDS, 
@@ -9,6 +10,9 @@ import {
     FILE_PATTERNS,
     PROJECT_INDICATORS
 } from '../constants';
+import { decideDesignerEdit, findClassInsertionOffset, getXamlClassName, hasVoidMethod } from '../designer';
+import { resolveRestoreTarget } from '../winAppCli';
+import { preprocessXaml } from '../xamlPreview/xamlPreprocessor';
 
 suite('Extension Test Suite', () => {
     vscode.window.showInformationMessage('Start all tests.');
@@ -20,7 +24,8 @@ suite('Extension Test Suite', () => {
             assert.strictEqual(COMMANDS.DEBUG_PROJECT, 'windev-helper.debugProject');
             assert.strictEqual(COMMANDS.ADD_PAGE, 'windev-helper.addPage');
             assert.strictEqual(COMMANDS.ADD_VIEW_MODEL, 'windev-helper.addViewModel');
-            assert.strictEqual(COMMANDS.OPEN_XAML_PREVIEW, 'windev-helper.openXamlPreview');
+            assert.strictEqual(COMMANDS.OPEN_XAML_DESIGNER, 'windev-helper.openXamlDesigner');
+            assert.strictEqual(COMMANDS.OPEN_XAML_TEXT, 'windev-helper.openXamlText');
         });
 
         test('CONFIG should have expected configuration keys', () => {
@@ -44,6 +49,133 @@ suite('Extension Test Suite', () => {
             assert.strictEqual(PROJECT_INDICATORS.USE_WINUI, '<UseWinUI>true</UseWinUI>');
             assert.strictEqual(PROJECT_INDICATORS.WINDOWS_APP_SDK, 'Microsoft.WindowsAppSDK');
             assert.ok(PROJECT_INDICATORS.WINDOWS_TARGET_REGEX instanceof RegExp);
+        });
+    });
+
+    suite('XAML Designer Synchronization', () => {
+        test('applies only edits based on the current document revision', () => {
+            assert.strictEqual(decideDesignerEdit('<Grid />', {
+                baseText: '<Grid />',
+                text: '<Grid><Button /></Grid>'
+            }), 'apply');
+            assert.strictEqual(decideDesignerEdit('<Grid><TextBlock /></Grid>', {
+                baseText: '<Grid />',
+                text: '<Grid><Button /></Grid>'
+            }), 'conflict');
+            assert.strictEqual(decideDesignerEdit('<Grid />', {
+                baseText: '<Grid />',
+                text: '<Grid />'
+            }), 'noop');
+            assert.strictEqual(decideDesignerEdit('<Grid />', { text: 42 }), 'invalid');
+        });
+    });
+
+    suite('XAML Designer Code-Behind', () => {
+        test('reads the class name from x:Class', () => {
+            assert.strictEqual(
+                getXamlClassName('<Window x:Class="Sample.App.MainWindow" />'),
+                'MainWindow'
+            );
+        });
+
+        test('finds the target partial class closing brace', () => {
+            const source = `namespace Sample.App;
+
+public sealed partial class MainWindow
+{
+    private string Value => "}";
+
+    private void Existing()
+    {
+    }
+}
+`;
+            const offset = findClassInsertionOffset(source, 'MainWindow');
+            assert.ok(offset > source.indexOf('Existing'));
+            assert.strictEqual(source[offset], '}');
+            assert.ok(hasVoidMethod(source, 'Existing'));
+            assert.ok(!hasVoidMethod(source, 'Missing'));
+        });
+    });
+
+    suite('Package Restore Routing', () => {
+        test('uses dotnet restore for an explicit .NET project', () => {
+            const workspaceDir = path.join('repo');
+            const projectFile = path.join(workspaceDir, 'App', 'App.csproj');
+            assert.deepStrictEqual(
+                resolveRestoreTarget(projectFile, workspaceDir),
+                {
+                    kind: 'dotnet',
+                    projectFile,
+                    workingDir: path.dirname(projectFile)
+                }
+            );
+        });
+
+        test('uses dotnet restore for a project discovered in the workspace', () => {
+            const workspaceDir = path.join('repo');
+            const projectFile = path.join(workspaceDir, 'src', 'App.csproj');
+            assert.deepStrictEqual(
+                resolveRestoreTarget(undefined, workspaceDir, projectFile),
+                {
+                    kind: 'dotnet',
+                    projectFile,
+                    workingDir: path.dirname(projectFile)
+                }
+            );
+        });
+
+        test('keeps YAML workspaces on winapp restore', () => {
+            const workspaceDir = path.join('repo');
+            assert.deepStrictEqual(
+                resolveRestoreTarget(workspaceDir, workspaceDir),
+                { kind: 'winapp', workingDir: workspaceDir }
+            );
+        });
+    });
+
+    suite('Native XAML Preview Preprocessing', () => {
+        test('converts a Window root after an XML declaration', () => {
+            const result = preprocessXaml(`<?xml version="1.0" encoding="utf-8"?>
+<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation">
+    <Window.SystemBackdrop><MicaBackdrop /></Window.SystemBackdrop>
+    <Grid />
+</Window>`);
+
+            assert.ok(result.xaml.startsWith('<?xml version="1.0" encoding="utf-8"?>\n<Grid'));
+            assert.ok(result.xaml.endsWith('</Grid>'));
+            assert.ok(!result.xaml.includes('Window.SystemBackdrop'));
+        });
+
+        test('replaces third-party controls when an XML declaration is present', () => {
+            const result = preprocessXaml(`<?xml version="1.0" encoding="utf-8"?>
+<Window
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:ct="using:CommunityToolkit.WinUI.UI.Controls">
+    <Grid><ct:MarkdownTextBlock /></Grid>
+</Window>`);
+
+            assert.ok(!result.xaml.includes('ct:MarkdownTextBlock'));
+            assert.ok(result.xaml.includes('Tag="ct:MarkdownTextBlock"'));
+            assert.ok(result.warnings.some(warning => warning.includes("Third-party namespace 'ct'")));
+        });
+
+        test('replaces TitleBar controls whose default styles may be host-incompatible', () => {
+            const result = preprocessXaml(`<Window
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Grid>
+        <TitleBar x:Name="titleBar" Grid.Row="2" Height="48">
+            <TitleBar.IconSource><ImageIconSource ImageSource="/Assets/app.ico" /></TitleBar.IconSource>
+        </TitleBar>
+    </Grid>
+</Window>`);
+
+            assert.ok(!result.xaml.includes('<TitleBar'));
+            assert.ok(result.xaml.includes('x:Name="titleBar"'));
+            assert.ok(result.xaml.includes('Grid.Row="2"'));
+            assert.ok(result.xaml.includes('Text="[TitleBar]"'));
+            assert.ok(result.warnings.some(warning => warning.includes('TitleBar control')));
         });
     });
 

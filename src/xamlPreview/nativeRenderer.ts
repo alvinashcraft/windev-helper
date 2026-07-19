@@ -59,6 +59,7 @@ interface NativeRenderResponse {
 
 interface PendingRequest {
     resolve: (result: RenderResult | void) => void;
+    reject?: (error: Error) => void;
     timeout: NodeJS.Timeout;
     startTime: number;
     /** For ping requests that need rejection on dispose */
@@ -90,16 +91,13 @@ export class NativeXamlRenderer implements IXamlRenderer {
     private responseBuffer = '';
     private healthCheckInterval: NodeJS.Timeout | null = null;
     private lastActivityTime = 0;
-    private reconnectAttempts = 0;
-    private isReconnecting = false;
+    private disposed = false;
 
     // Configurable timeouts
     private readonly startupTimeoutMs = 15000;
     private readonly renderTimeoutMs = 30000;
     private readonly pingTimeoutMs = 5000;
     private readonly healthCheckIntervalMs = 30000;
-    private readonly maxReconnectAttempts = 3;
-    private readonly reconnectDelayMs = 1000;
     private cachedAvailable: boolean | null = null;
 
     constructor(extensionPath: string) {
@@ -164,8 +162,16 @@ export class NativeXamlRenderer implements IXamlRenderer {
      * Initialize the native renderer process
      */
     public async initialize(): Promise<void> {
-        if (this.initialized) {
+        if (this.initialized && this.isTransportReady()) {
             return;
+        }
+
+        if (this.disposed) {
+            throw new Error('Native renderer has been disposed');
+        }
+
+        if (this.initialized) {
+            this.resetTransport('Renderer transport was no longer writable');
         }
 
         if (this.initPromise) {
@@ -176,11 +182,13 @@ export class NativeXamlRenderer implements IXamlRenderer {
         
         try {
             await this.initPromise;
+            if (!this.isTransportReady()) {
+                throw new Error('Renderer exited before initialization completed');
+            }
             this.initialized = true;
-            this.reconnectAttempts = 0;
             this.startHealthCheck();
         } catch (err) {
-            this.initPromise = null;
+            this.resetTransport(err instanceof Error ? err.message : String(err));
             throw err;
         }
     }
@@ -204,14 +212,10 @@ export class NativeXamlRenderer implements IXamlRenderer {
         // Connect to the named pipe
         await this.connectToPipe();
 
-        // Send a warm-up ping to ensure the host is fully ready
-        // (forces WinUI dispatcher initialization before real render requests)
-        try {
-            await this.ping();
-            console.log('[NativeRenderer] Warm-up ping succeeded');
-        } catch {
-            console.warn('[NativeRenderer] Warm-up ping failed (non-fatal)');
-        }
+        // A successful ping prevents a process that exits after printing READY
+        // from being published as an initialized renderer.
+        await this.ping();
+        console.log('[NativeRenderer] Warm-up ping succeeded');
 
         console.log('[NativeRenderer] Initialized successfully');
     }
@@ -263,55 +267,61 @@ export class NativeXamlRenderer implements IXamlRenderer {
             
             console.log(`[NativeRenderer] Spawning: ${rendererPath} ${args.join(' ')}`);
             
-            this.process = spawn(rendererPath, args, {
+            const child = spawn(rendererPath, args, {
                 windowsHide: true,
                 stdio: ['ignore', 'pipe', 'pipe']
             });
+            this.process = child;
 
             let startupError = '';
             let resolved = false;
+            const startupTimeout = setTimeout(() => {
+                if (!resolved) {
+                    resolved = true;
+                    child.kill();
+                    reject(new Error(`Renderer startup timed out after ${this.startupTimeoutMs}ms`));
+                }
+            }, this.startupTimeoutMs);
 
-            this.process.stderr?.on('data', (data: Buffer) => {
+            child.stderr?.on('data', (data: Buffer) => {
                 const msg = data.toString();
                 startupError += msg;
                 console.error('[XamlPreviewHost stderr]', msg.trim());
             });
 
-            this.process.stdout?.on('data', (data: Buffer) => {
+            child.stdout?.on('data', (data: Buffer) => {
                 const msg = data.toString().trim();
                 console.log('[XamlPreviewHost stdout]', msg);
                 if (msg.includes('READY') && !resolved) {
                     resolved = true;
+                    clearTimeout(startupTimeout);
                     resolve();
                 }
             });
 
-            this.process.on('error', (err) => {
+            child.on('error', (err) => {
                 console.error('[NativeRenderer] Process error:', err);
                 if (!resolved) {
                     resolved = true;
+                    clearTimeout(startupTimeout);
                     reject(new Error(`Failed to start renderer: ${err.message}`));
                 }
             });
 
-            this.process.on('exit', (code, signal) => {
+            child.on('exit', (code, signal) => {
                 console.log(`[NativeRenderer] Process exited: code=${code}, signal=${signal}`);
                 if (!resolved) {
                     resolved = true;
+                    clearTimeout(startupTimeout);
+                    if (this.process === child) {
+                        this.process = null;
+                    }
                     reject(new Error(`Renderer exited during startup: code=${code}, signal=${signal}${startupError ? `, stderr: ${startupError}` : ''}`));
                 } else {
-                    this.handleProcessExit();
+                    this.handleProcessExit(child);
                 }
             });
 
-            // Timeout for startup
-            setTimeout(() => {
-                if (!resolved) {
-                    resolved = true;
-                    this.process?.kill();
-                    reject(new Error(`Renderer startup timed out after ${this.startupTimeoutMs}ms`));
-                }
-            }, this.startupTimeoutMs);
         });
     }
 
@@ -353,7 +363,7 @@ export class NativeXamlRenderer implements IXamlRenderer {
                 }
             }, 5000);
 
-            this.pipeClient = net.createConnection(pipePath, () => {
+            const socket = net.createConnection(pipePath, () => {
                 if (!connectionResolved) {
                     connectionResolved = true;
                     clearTimeout(connectionTimeout);
@@ -362,27 +372,28 @@ export class NativeXamlRenderer implements IXamlRenderer {
                     resolve();
                 }
             });
+            this.pipeClient = socket;
 
-            this.pipeClient.on('data', (data: Buffer) => {
+            socket.on('data', (data: Buffer) => {
                 this.lastActivityTime = Date.now();
                 this.handlePipeData(data);
             });
 
-            this.pipeClient.on('error', (err) => {
+            socket.on('error', (err) => {
                 console.error('[NativeRenderer] Pipe error:', err);
                 if (!connectionResolved) {
                     connectionResolved = true;
                     clearTimeout(connectionTimeout);
                     reject(new Error(`Failed to connect to pipe: ${err.message}`));
-                } else if (this.initialized) {
-                    this.handlePipeError(err);
+                } else if (this.pipeClient === socket) {
+                    this.handleConnectionFailure(err);
                 }
             });
 
-            this.pipeClient.on('close', () => {
+            socket.on('close', () => {
                 console.log('[NativeRenderer] Pipe closed');
-                if (this.initialized && !this.isReconnecting) {
-                    this.scheduleReconnect();
+                if (this.pipeClient === socket && !this.disposed) {
+                    this.handleConnectionFailure(new Error('Renderer pipe closed'));
                 }
             });
         });
@@ -397,7 +408,7 @@ export class NativeXamlRenderer implements IXamlRenderer {
         // Messages are newline-delimited JSON
         let newlineIndex: number;
         while ((newlineIndex = this.responseBuffer.indexOf('\n')) !== -1) {
-            const message = this.responseBuffer.substring(0, newlineIndex);
+            const message = this.responseBuffer.substring(0, newlineIndex).replace(/^\uFEFF/, '');
             this.responseBuffer = this.responseBuffer.substring(newlineIndex + 1);
 
             if (message.trim()) {
@@ -465,71 +476,58 @@ export class NativeXamlRenderer implements IXamlRenderer {
     /**
      * Handle pipe errors
      */
-    private handlePipeError(err: Error): void {
-        // Reject all pending requests
-        for (const [, pending] of this.pendingRequests) {
-            clearTimeout(pending.timeout);
-            pending.resolve({
-                success: false,
-                code: 'PIPE_ERROR',
-                message: err.message
-            });
-        }
-        this.pendingRequests.clear();
+    private handleConnectionFailure(err: Error): void {
+        console.error('[NativeRenderer] Connection failed:', err.message);
+        this.resetTransport(err.message, 'PIPE_ERROR');
     }
 
     /**
      * Handle renderer process exit
      */
-    private handleProcessExit(): void {
-        this.stopHealthCheck();
-        this.initialized = false;
-        this.initPromise = null;
-        
-        if (this.pipeClient) {
-            this.pipeClient.destroy();
-            this.pipeClient = null;
+    private handleProcessExit(child: ChildProcess): void {
+        if (this.process !== child) {
+            return;
         }
-        this.process = null;
-
-        // Reject all pending requests with a retriable error
-        for (const [, pending] of this.pendingRequests) {
-            clearTimeout(pending.timeout);
-            pending.resolve({
-                success: false,
-                code: 'PROCESS_EXITED',
-                message: 'Renderer process exited. Will restart on next request.'
-            });
-        }
-        this.pendingRequests.clear();
-
+        this.resetTransport('Renderer process exited', 'PROCESS_EXITED', false);
         console.log('[NativeRenderer] Process exited, will reinitialize on next render');
     }
 
-    /**
-     * Schedule a reconnection attempt
-     */
-    private scheduleReconnect(): void {
-        if (this.isReconnecting || this.reconnectAttempts >= this.maxReconnectAttempts) {
-            return;
-        }
-
-        this.isReconnecting = true;
+    private resetTransport(message: string, code: string = 'PIPE_ERROR', killProcess: boolean = true): void {
+        this.stopHealthCheck();
         this.initialized = false;
         this.initPromise = null;
+        this.responseBuffer = '';
 
-        console.log(`[NativeRenderer] Scheduling reconnect attempt ${this.reconnectAttempts + 1}/${this.maxReconnectAttempts}`);
+        const socket = this.pipeClient;
+        this.pipeClient = null;
+        if (socket && !socket.destroyed) {
+            socket.destroy();
+        }
 
-        setTimeout(async () => {
-            this.reconnectAttempts++;
-            try {
-                await this.initialize();
-                console.log('[NativeRenderer] Reconnected successfully');
-            } catch (err) {
-                console.error('[NativeRenderer] Reconnect failed:', err);
+        const child = this.process;
+        this.process = null;
+        if (killProcess && child && child.exitCode === null && !child.killed) {
+            child.kill();
+        }
+
+        for (const [, pending] of this.pendingRequests) {
+            clearTimeout(pending.timeout);
+            if (pending.isPing) {
+                pending.reject?.(new Error(message));
+            } else {
+                pending.resolve({ success: false, code, message });
             }
-            this.isReconnecting = false;
-        }, this.reconnectDelayMs);
+        }
+        this.pendingRequests.clear();
+    }
+
+    private isTransportReady(): boolean {
+        return this.process !== null
+            && this.process.exitCode === null
+            && !this.process.killed
+            && this.pipeClient !== null
+            && !this.pipeClient.destroyed
+            && this.pipeClient.writable;
     }
 
     /**
@@ -553,8 +551,7 @@ export class NativeXamlRenderer implements IXamlRenderer {
                 await this.ping();
             } catch (err) {
                 console.error('[NativeRenderer] Health check failed:', err);
-                // Connection might be dead, trigger reconnect
-                this.scheduleReconnect();
+                this.resetTransport(err instanceof Error ? err.message : String(err));
             }
         }, this.healthCheckIntervalMs);
     }
@@ -586,18 +583,25 @@ export class NativeXamlRenderer implements IXamlRenderer {
             }, this.pingTimeoutMs);
 
             this.pendingRequests.set(requestId, {
-                resolve: () => {
+                resolve: (_result?: RenderResult | void) => {
                     clearTimeout(timeout);
                     this.pendingRequests.delete(requestId);
                     resolve();
                 },
+                reject,
                 timeout,
                 startTime: Date.now(),
                 isPing: true
             });
 
             const message = JSON.stringify(request) + '\n';
-            this.pipeClient?.write(message, 'utf-8', (err) => {
+            if (!this.isTransportReady()) {
+                clearTimeout(timeout);
+                this.pendingRequests.delete(requestId);
+                reject(new Error('Renderer pipe is not writable'));
+                return;
+            }
+            this.pipeClient!.write(message, 'utf-8', (err) => {
                 if (err) {
                     clearTimeout(timeout);
                     this.pendingRequests.delete(requestId);
@@ -611,6 +615,16 @@ export class NativeXamlRenderer implements IXamlRenderer {
      * Render XAML content
      */
     public async render(xaml: string, options: RenderOptions): Promise<RenderResult> {
+        let result = await this.renderOnce(xaml, options);
+        if (!result.success && ['WRITE_ERROR', 'PIPE_ERROR', 'PROCESS_EXITED', 'NOT_CONNECTED'].includes(result.code)) {
+            console.warn(`[NativeRenderer] Retrying render after transport failure: ${result.code}`);
+            this.resetTransport(result.message, result.code);
+            result = await this.renderOnce(xaml, options);
+        }
+        return result;
+    }
+
+    private async renderOnce(xaml: string, options: RenderOptions): Promise<RenderResult> {
         if (!this.available) {
             return {
                 success: false,
@@ -630,7 +644,7 @@ export class NativeXamlRenderer implements IXamlRenderer {
             };
         }
 
-        if (!this.pipeClient) {
+        if (!this.isTransportReady()) {
             return {
                 success: false,
                 code: 'NOT_CONNECTED',
@@ -674,6 +688,16 @@ export class NativeXamlRenderer implements IXamlRenderer {
             });
 
             const message = JSON.stringify(request) + '\n';
+            if (!this.isTransportReady()) {
+                clearTimeout(timeout);
+                this.pendingRequests.delete(requestId);
+                resolve({
+                    success: false,
+                    code: 'NOT_CONNECTED',
+                    message: 'Renderer pipe is not writable'
+                });
+                return;
+            }
             this.pipeClient!.write(message, 'utf-8', (err) => {
                 if (err) {
                     clearTimeout(timeout);
@@ -707,7 +731,7 @@ export class NativeXamlRenderer implements IXamlRenderer {
      */
     public dispose(): void {
         console.log('[NativeRenderer] Disposing...');
-        
+        this.disposed = true;
         this.stopHealthCheck();
 
         // Resolve all pending requests with appropriate responses

@@ -10,7 +10,7 @@ Please be respectful and constructive in all interactions. We welcome contributo
 
 ### Prerequisites
 
-- Node.js 18 or later
+- Node.js 22 or later (see `.nvmrc`)
 - Visual Studio Code 1.108.1 or later
 - Git
 

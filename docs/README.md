@@ -11,7 +11,8 @@ Welcome to the WinDev Helper extension documentation. This folder contains detai
 - [Templates](templates.md) - Project and item templates guide
 - [Debugging](debugging.md) - Debugging WinUI apps (including packaged app support)
 - [Packaging](packaging.md) - Creating and signing MSIX packages
-- [XAML Preview](XAML_NATIVE_PREVIEW_DESIGN.md) - Native XAML preview feature (Preview)
+- [XAML Designer](xaml-designer.md) - Visual editing, property changes, event generation, and native Preview
+- [Historical Native Preview Design](XAML_NATIVE_PREVIEW_DESIGN.md) - Original preview architecture retained for project history
 - [Contributing](CONTRIBUTING.md) - How to contribute to this project
 - [Architecture](architecture.md) - Extension architecture overview
 

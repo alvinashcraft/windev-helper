@@ -1,0 +1,91 @@
+:root {
+    color-scheme: light dark;
+    --designer-accent: var(--vscode-focusBorder, #0078d4);
+    --designer-border: var(--vscode-panel-border, #454545);
+    --designer-surface: var(--vscode-editor-background, #1e1e1e);
+    --designer-panel: var(--vscode-sideBar-background, #252526);
+    --designer-hover: var(--vscode-list-hoverBackground, #2a2d2e);
+}
+
+* { box-sizing: border-box; }
+html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; }
+body { color: var(--vscode-foreground); background: var(--designer-surface); font: 13px var(--vscode-font-family); }
+button, input, select { color: inherit; font: inherit; }
+button:focus-visible, input:focus-visible, select:focus-visible { outline: 1px solid var(--designer-accent); outline-offset: -1px; }
+
+.designer-app { display: grid; grid-template-rows: 36px minmax(0, 1fr) 24px; width: 100%; height: 100%; }
+.designer-toolbar { display: flex; align-items: center; gap: 4px; padding: 3px 8px; border-bottom: 1px solid var(--designer-border); background: var(--vscode-editorGroupHeader-tabsBackground); }
+.toolbar-spacer { flex: 1; }
+.tool-button { display: inline-grid; place-items: center; min-width: 28px; height: 28px; border: 1px solid transparent; border-radius: 3px; background: transparent; cursor: pointer; }
+.tool-button:hover { background: var(--designer-hover); }
+.tool-button.active { border-color: var(--designer-accent); background: var(--vscode-button-secondaryBackground); }
+.tool-button[disabled] { opacity: .45; cursor: default; }
+.mode-button { padding: 0 10px; }
+.zoom-label { min-width: 48px; text-align: center; font-variant-numeric: tabular-nums; }
+.snap-control { display: flex; align-items: center; gap: 5px; padding: 0 5px; }
+
+.designer-workspace { display: grid; grid-template-columns: 220px minmax(320px, 1fr) 300px; min-height: 0; }
+.designer-sidebar { min-width: 0; overflow: hidden; background: var(--designer-panel); }
+.toolbox { border-right: 1px solid var(--designer-border); }
+.properties { border-left: 1px solid var(--designer-border); }
+.pane-title { height: 32px; display: flex; align-items: center; padding: 0 10px; border-bottom: 1px solid var(--designer-border); font-size: 11px; font-weight: 600; text-transform: uppercase; }
+.pane-search { width: calc(100% - 16px); height: 28px; margin: 8px; padding: 0 8px; border: 1px solid var(--vscode-input-border, transparent); background: var(--vscode-input-background); }
+.toolbox-list, .property-content { height: calc(100% - 76px); overflow: auto; }
+.tool-section-title, .property-category { padding: 6px 9px; background: var(--vscode-sideBarSectionHeader-background); font-weight: 600; }
+.tool-item { display: grid; grid-template-columns: 22px 1fr; align-items: center; min-height: 28px; padding: 2px 8px; cursor: grab; }
+.tool-item:hover { background: var(--designer-hover); }
+.tool-glyph { color: var(--vscode-symbolIcon-classForeground, #ee9d28); font-weight: 700; }
+
+.stage-viewport { position: relative; overflow: auto; background-color: var(--vscode-editor-background); background-image: linear-gradient(45deg, var(--vscode-editorWidget-border) 25%, transparent 25%), linear-gradient(-45deg, var(--vscode-editorWidget-border) 25%, transparent 25%), linear-gradient(45deg, transparent 75%, var(--vscode-editorWidget-border) 75%), linear-gradient(-45deg, transparent 75%, var(--vscode-editorWidget-border) 75%); background-size: 20px 20px; background-position: 0 0, 0 10px, 10px -10px, -10px 0; }
+.stage-center { min-width: 100%; min-height: 100%; display: grid; place-items: start center; padding: 36px; }
+.design-surface { position: relative; width: 800px; min-height: 600px; overflow: visible; transform-origin: top center; color: #1b1b1b; background: #f7f7f7; box-shadow: 0 8px 30px rgba(0,0,0,.35); }
+.design-root { position: relative; width: 100%; min-height: 600px; overflow: hidden; }
+.xaml-element { position: relative; min-width: 16px; min-height: 16px; }
+.xaml-container { border: 1px dashed rgba(0, 90, 158, .25); }
+.xaml-grid { display: grid; }
+.xaml-stackpanel { display: flex; }
+.xaml-canvas, .xaml-relativepanel { position: relative; }
+.xaml-canvas > .xaml-element { position: absolute; }
+.xaml-border { border-style: solid; }
+.xaml-control { display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.xaml-button { border: 1px solid #8a8886; border-radius: 3px; background: #fff; }
+.xaml-textblock { justify-content: flex-start; }
+.xaml-textbox, .xaml-combobox, .xaml-datepicker { justify-content: flex-start; padding: 0 8px; border: 1px solid #8a8886; background: #fff; }
+.xaml-checkbox, .xaml-radiobutton { justify-content: flex-start; gap: 7px; }
+.xaml-checkbox::before { content: ''; width: 14px; height: 14px; border: 1px solid #666; }
+.xaml-radiobutton::before { content: ''; width: 14px; height: 14px; border: 1px solid #666; border-radius: 50%; }
+.xaml-toggleswitch { justify-content: flex-start; gap: 8px; }
+.xaml-toggleswitch::after { content: ''; width: 38px; height: 18px; border-radius: 9px; background: #777; }
+.xaml-slider::before, .xaml-progressbar::before { content: ''; width: 100%; height: 4px; background: linear-gradient(90deg, #0067c0 50%, #aaa 50%); }
+.xaml-image { background: repeating-linear-gradient(45deg, #ddd 0 8px, #eee 8px 16px); color: #555; }
+.xaml-navigationview { align-items: stretch; justify-content: stretch; background: #f3f3f3; }
+.xaml-navigationview::before { content: 'Navigation'; width: 140px; padding: 16px; background: #e8e8e8; }
+.unknown-control { border: 1px dashed #b146c2; background: rgba(177,70,194,.08); }
+.drop-target { outline: 2px solid var(--designer-accent); outline-offset: -2px; }
+
+.selection-box { position: absolute; z-index: 1000; pointer-events: none; border: 1px solid #0078d4; }
+.selection-tag { position: absolute; left: -1px; bottom: calc(100% + 3px); max-width: 180px; padding: 2px 5px; overflow: hidden; color: #fff; background: #0078d4; font-size: 11px; white-space: nowrap; text-overflow: ellipsis; }
+.resize-handle { position: absolute; width: 8px; height: 8px; border: 1px solid #0078d4; background: #fff; pointer-events: auto; }
+.handle-nw { left: -5px; top: -5px; cursor: nwse-resize; }.handle-n { left: calc(50% - 4px); top: -5px; cursor: ns-resize; }.handle-ne { right: -5px; top: -5px; cursor: nesw-resize; }.handle-e { right: -5px; top: calc(50% - 4px); cursor: ew-resize; }.handle-se { right: -5px; bottom: -5px; cursor: nwse-resize; }.handle-s { left: calc(50% - 4px); bottom: -5px; cursor: ns-resize; }.handle-sw { left: -5px; bottom: -5px; cursor: nesw-resize; }.handle-w { left: -5px; top: calc(50% - 4px); cursor: ew-resize; }
+
+.selection-summary { min-height: 54px; padding: 9px; border-bottom: 1px solid var(--designer-border); }
+.selection-name { font-weight: 600; }
+.selection-type { margin-top: 3px; color: var(--vscode-descriptionForeground); }
+.property-content { height: calc(100% - 86px); }
+.property-row { display: grid; grid-template-columns: minmax(90px, 42%) minmax(0, 1fr); min-height: 28px; border-bottom: 1px solid color-mix(in srgb, var(--designer-border) 55%, transparent); }
+.property-name { padding: 6px 7px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.property-editor { width: 100%; min-width: 0; height: 27px; padding: 2px 6px; border: 0; border-left: 1px solid var(--designer-border); background: transparent; }
+.property-editor.binding { color: var(--vscode-symbolIcon-variableForeground); }
+.empty-state, .error-state { padding: 18px; color: var(--vscode-descriptionForeground); text-align: center; }
+.error-state { color: var(--vscode-errorForeground); }
+.preview-pane { display: none; min-width: 100%; min-height: 100%; place-items: center; padding: 28px; }
+.preview-pane.active { display: grid; }
+.preview-image { max-width: 100%; max-height: calc(100vh - 110px); box-shadow: 0 8px 30px rgba(0,0,0,.35); }
+.preview-progress { color: var(--vscode-descriptionForeground); }
+.designer-status { display: flex; align-items: center; gap: 12px; padding: 0 8px; border-top: 1px solid var(--designer-border); background: var(--vscode-statusBar-background); color: var(--vscode-statusBar-foreground); font-size: 11px; }
+.status-spacer { flex: 1; }
+
+@media (max-width: 850px) {
+    .designer-workspace { grid-template-columns: 180px minmax(280px, 1fr); }
+    .properties { display: none; }
+}

@@ -5,6 +5,41 @@ All notable changes to the WinDev Helper extension will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.0.0] - 2026-07-18
+
+This major release replaces the separate read-only XAML preview and Properties pane with an editable, cross-platform WinUI XAML Designer.
+
+### Added
+
+- **Editable XAML Designer** - `.xaml` files now open in a custom editor with a searchable toolbox, drag-and-drop, double-click add, selection, Canvas movement, eight-handle resizing, grid snapping, 25-200% zoom, keyboard deletion, and an embedded categorized property grid
+- **Safe two-way synchronization** - Visual edits participate in VS Code document undo/redo and use optimistic revision checks to avoid overwriting concurrent source changes
+- **C# event generation** - Double-clicking supported controls wires the default event in XAML and adds a matching handler to `.xaml.cs` without requiring C# Dev Kit APIs
+- **Integrated native Preview** - Windows users can switch from Edit to Preview mode to render through the bundled WinUI `XamlPreviewHost.exe` over named pipes
+- **Designer commands** - Added `windev-helper.openXamlDesigner` and `windev-helper.openXamlText`; `Ctrl+Shift+V` opens the designer
+- **Designer settings** - Added `windevHelper.designer.gridSize` and `windevHelper.designer.snapToGrid`
+- **Third-party attribution** - Added `THIRD-PARTY-NOTICES.md` for the MIT-licensed WinForm-GUI-Maker project whose interaction and synchronization patterns informed this release
+
+### Changed
+
+- **Cross-platform editing** - The editable HTML/CSS designer works on Windows, macOS, and Linux; only native WinUI rendering is Windows-specific
+- **Toolchain refresh** - Updated npm development dependencies, including TypeScript 6 and ESLint 10, with targeted patched transitive overrides and zero npm audit findings
+- **Default XAML editor** - The visual designer is now the default editor for `.xaml`; use **WinDev: Open XAML as Text** to switch to source
+
+### Fixed
+
+- **.NET package restore** - Startup and manual restores now run `dotnet restore` against the detected `.csproj` instead of requiring `winapp.yaml`; YAML-based non-.NET workspaces continue to use `winapp restore`
+- **Existing XAML layout rendering** - Controls without explicit `Width` or `Height` now use designer defaults instead of collapsing the design surface to zero width
+- **Native Window preview** - XML declarations no longer prevent `<Window>` conversion, so common `MainWindow.xaml` files with `Window.SystemBackdrop` render through the native host
+- **Native preview startup** - The named-pipe client accepts the UTF-8 BOM on the host's first response, avoiding a failed warm-up ping and unnecessary delay
+- **Native preview recovery** - Process exits, closed pipes, and write failures now invalidate stale transport state, restart the host once, and retry the render instead of surfacing repeated `write EOF` errors
+- **Third-party controls after XML declarations** - Namespace detection now reads the actual XAML root element, allowing legacy controls such as CommunityToolkit `MarkdownTextBlock` to be replaced with preview placeholders instead of causing native parse failures
+- **Windows App SDK control compatibility** - `TitleBar` controls are represented by layout-preserving placeholders when the target project's default style is incompatible with the native preview host
+
+### Removed
+
+- **Separate XAML Preview panel** - Removed `windev-helper.openXamlPreview` and the old read-only preview webview
+- **Read-only Properties TreeView** - Removed the `windevHelper.propertyPane` view and its refresh/grouping/default/copy/navigation commands; property editing now lives inside the designer
+
 ## [3.3.0] - 2026-06-26
 
 Aligns UI automation and init workflows with [winapp CLI v0.4.0](https://github.com/microsoft/winappCli/releases/tag/v0.4.0).
