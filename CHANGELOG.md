@@ -31,6 +31,7 @@ This major release replaces the separate read-only XAML preview and Properties p
 - **Existing XAML layout rendering** - Controls without explicit `Width` or `Height` now use designer defaults instead of collapsing the design surface to zero width
 - **Native Window preview** - XML declarations no longer prevent `<Window>` conversion, so common `MainWindow.xaml` files with `Window.SystemBackdrop` render through the native host
 - **Native preview startup** - The named-pipe client accepts the UTF-8 BOM on the host's first response, avoiding a failed warm-up ping and unnecessary delay
+- **Native preview recovery** - Process exits, closed pipes, and write failures now invalidate stale transport state, restart the host once, and retry the render instead of surfacing repeated `write EOF` errors
 
 ### Removed
 
