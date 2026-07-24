@@ -26,6 +26,10 @@ suite('Extension Test Suite', () => {
             assert.strictEqual(COMMANDS.ADD_VIEW_MODEL, 'windev-helper.addViewModel');
             assert.strictEqual(COMMANDS.OPEN_XAML_DESIGNER, 'windev-helper.openXamlDesigner');
             assert.strictEqual(COMMANDS.OPEN_XAML_TEXT, 'windev-helper.openXamlText');
+            assert.strictEqual(COMMANDS.UI_SEND_KEYS, 'windev-helper.uiSendKeys');
+            assert.strictEqual(COMMANDS.UI_CLICK, 'windev-helper.uiClick');
+            assert.strictEqual(COMMANDS.UI_SET_VALUE, 'windev-helper.uiSetValue');
+            assert.strictEqual(COMMANDS.UI_RECORD, 'windev-helper.uiRecord');
         });
 
         test('CONFIG should have expected configuration keys', () => {

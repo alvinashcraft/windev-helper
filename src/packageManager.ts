@@ -636,7 +636,7 @@ export class PackageManager {
             [
                 { label: 'Run (wait for exit)', description: 'Launch and wait for the app to close', mode: 'wait' },
                 { label: 'Run detached', description: 'Launch and return control immediately', mode: 'detach' },
-                { label: 'Run with debug output', description: 'Capture OutputDebugString and crash dumps', mode: 'debugOutput' },
+                { label: 'Run with debug output', description: 'Capture diagnostics and automatically triage WinUI crashes', mode: 'debugOutput' },
             ],
             { placeHolder: 'Select run mode' }
         );
@@ -647,6 +647,16 @@ export class PackageManager {
             { placeHolder: 'Unregister package when app exits?' }
         );
         if (!unregisterOnExit) { return; }
+
+        let symbols = false;
+        if (runMode.mode === 'debugOutput') {
+            const symbolsChoice = await vscode.window.showQuickPick(['No', 'Yes'], {
+                placeHolder: 'Download symbols for fully resolved crash diagnostics?',
+                title: 'Resolve Debug Symbols'
+            });
+            if (!symbolsChoice) { return; }
+            symbols = symbolsChoice === 'Yes';
+        }
 
         // v0.3.1+: optional application arguments forwarded after `--`.
         // Only prompt when the installed CLI actually supports the passthrough
@@ -672,6 +682,7 @@ export class PackageManager {
                     inputFolder,
                     detach: runMode.mode === 'detach',
                     debugOutput: runMode.mode === 'debugOutput',
+                    symbols,
                     unregisterOnExit: unregisterOnExit === 'Yes',
                     ...(appArgs.length > 0 ? { appArgs } : {}),
                 }, projectPath);
@@ -985,6 +996,222 @@ export class PackageManager {
                 this.outputChannel.show();
             }
         });
+    }
+
+    /**
+     * Send keyboard input to a running app or a specific UI element (v0.5.0+).
+     */
+    public async uiSendKeys(): Promise<void> {
+        if (!await this.ensureUiV050Support()) { return; }
+
+        const keys = await vscode.window.showInputBox({
+            prompt: 'Enter text, keys, or chords to send',
+            placeHolder: 'ctrl+a delete',
+            ignoreFocusOut: true,
+            validateInput: value => value.length > 0 ? null : 'Keys or text are required'
+        });
+        if (keys === undefined || keys.length === 0) { return; }
+
+        const appName = await vscode.window.showInputBox({
+            prompt: 'Enter app name to target (optional)',
+            placeHolder: 'App name (optional)',
+            ignoreFocusOut: true
+        });
+        if (appName === undefined) { return; }
+
+        const target = await vscode.window.showInputBox({
+            prompt: 'Enter a target UI selector (optional)',
+            placeHolder: 'txt-name-a1b2',
+            ignoreFocusOut: true
+        });
+        if (target === undefined) { return; }
+
+        type TransportPick = vscode.QuickPickItem & {
+            transport: 'post-message' | 'send-input';
+        };
+        const transport = await vscode.window.showQuickPick<TransportPick>([
+            {
+                label: 'Send input',
+                description: 'Recommended for WinUI; sends real OS keyboard input',
+                transport: 'send-input'
+            },
+            {
+                label: 'Post message',
+                description: 'Window-scoped; intended for classic Win32 and WinForms controls',
+                transport: 'post-message'
+            }
+        ], {
+            placeHolder: 'Select keyboard input transport',
+            title: 'Send Keys Transport'
+        });
+        if (!transport) { return; }
+
+        let allowSystemKeys = false;
+        if (transport.transport === 'send-input') {
+            const systemKeysChoice = await vscode.window.showQuickPick(['No', 'Yes'], {
+                placeHolder: 'Allow system-level key combinations?',
+                title: 'Allow System Keys'
+            });
+            if (!systemKeysChoice) { return; }
+            allowSystemKeys = systemKeysChoice === 'Yes';
+        }
+
+        await vscode.window.withProgress({
+            location: vscode.ProgressLocation.Notification,
+            title: 'Sending keyboard input...',
+            cancellable: false
+        }, async () => {
+            const result = await this.winAppCli.uiSendKeys(
+                keys,
+                transport.transport,
+                appName.trim() || undefined,
+                target.trim() || undefined,
+                allowSystemKeys
+            );
+            if (result) {
+                this.outputChannel.appendLine('--- Send Keys Result ---');
+                this.outputChannel.appendLine(result);
+                this.outputChannel.show();
+            }
+        });
+    }
+
+    /**
+     * Click a UI element in a running app (v0.5.0+).
+     */
+    public async uiClick(): Promise<void> {
+        if (!await this.ensureUiV050Support()) { return; }
+
+        const selector = await vscode.window.showInputBox({
+            prompt: 'Enter UI selector to click',
+            placeHolder: 'btn-submit-a1b2',
+            ignoreFocusOut: true,
+            validateInput: value => value.trim() ? null : 'Selector is required'
+        });
+        if (!selector) { return; }
+
+        const appName = await vscode.window.showInputBox({
+            prompt: 'Enter app name to target (optional)',
+            placeHolder: 'App name (optional)',
+            ignoreFocusOut: true
+        });
+        if (appName === undefined) { return; }
+
+        await vscode.window.withProgress({
+            location: vscode.ProgressLocation.Notification,
+            title: 'Clicking UI element...',
+            cancellable: false
+        }, async () => {
+            const result = await this.winAppCli.uiClick(selector.trim(), appName.trim() || undefined);
+            if (result) {
+                this.outputChannel.appendLine(`--- Click Result: ${selector.trim()} ---`);
+                this.outputChannel.appendLine(result);
+                this.outputChannel.show();
+            }
+        });
+    }
+
+    /**
+     * Set the value of an editable UI element (v0.5.0+).
+     */
+    public async uiSetValue(): Promise<void> {
+        if (!await this.ensureUiV050Support()) { return; }
+
+        const selector = await vscode.window.showInputBox({
+            prompt: 'Enter UI selector for the editable element',
+            placeHolder: 'txt-name-a1b2',
+            ignoreFocusOut: true,
+            validateInput: value => value.trim() ? null : 'Selector is required'
+        });
+        if (!selector) { return; }
+
+        const value = await vscode.window.showInputBox({
+            prompt: 'Enter the value to set (leave empty to clear the control)',
+            placeHolder: 'Value',
+            ignoreFocusOut: true
+        });
+        if (value === undefined) { return; }
+
+        const appName = await vscode.window.showInputBox({
+            prompt: 'Enter app name to target (optional)',
+            placeHolder: 'App name (optional)',
+            ignoreFocusOut: true
+        });
+        if (appName === undefined) { return; }
+
+        await vscode.window.withProgress({
+            location: vscode.ProgressLocation.Notification,
+            title: 'Setting UI element value...',
+            cancellable: false
+        }, async () => {
+            const result = await this.winAppCli.uiSetValue(selector.trim(), value, appName.trim() || undefined);
+            if (result) {
+                this.outputChannel.appendLine(`--- Set Value Result: ${selector.trim()} ---`);
+                this.outputChannel.appendLine(result);
+                this.outputChannel.show();
+            }
+        });
+    }
+
+    /**
+     * Record a running app interaction session to an MP4 file (v0.5.0+).
+     */
+    public async uiRecord(): Promise<void> {
+        if (!await this.ensureUiV050Support()) { return; }
+
+        const appName = await vscode.window.showInputBox({
+            prompt: 'Enter the app name to record',
+            placeHolder: 'App name',
+            ignoreFocusOut: true,
+            validateInput: value => value.trim() ? null : 'App name is required'
+        });
+        if (!appName) { return; }
+
+        const durationInput = await vscode.window.showInputBox({
+            prompt: 'Enter recording duration in seconds',
+            value: '10',
+            ignoreFocusOut: true,
+            validateInput: value => {
+                const duration = Number(value);
+                return Number.isInteger(duration) && duration > 0 ? null : 'Enter a positive whole number';
+            }
+        });
+        if (!durationInput) { return; }
+
+        const workspaceUri = vscode.workspace.workspaceFolders?.[0]?.uri;
+        const saveDialogOptions: vscode.SaveDialogOptions = {
+            filters: {
+                'MP4 Video': ['mp4']
+            },
+            title: 'Save UI Recording'
+        };
+        if (workspaceUri) {
+            saveDialogOptions.defaultUri = vscode.Uri.joinPath(workspaceUri, 'recording.mp4');
+        }
+
+        const outputUri = await vscode.window.showSaveDialog(saveDialogOptions);
+        if (!outputUri) { return; }
+
+        await vscode.window.withProgress({
+            location: vscode.ProgressLocation.Notification,
+            title: 'Recording app interaction...',
+            cancellable: false
+        }, async () => {
+            await this.winAppCli.uiRecord(appName.trim(), Number(durationInput), outputUri.fsPath);
+        });
+    }
+
+    private async ensureUiV050Support(): Promise<boolean> {
+        if (await this.winAppCli.supportsUiV050Features()) {
+            return true;
+        }
+
+        const version = await this.winAppCli.getVersion();
+        const message = version
+            ? 'This UI automation command requires winapp CLI v0.5.0 or newer.'
+            : 'Unable to determine winapp CLI version. Ensure winapp CLI v0.5.0 or newer is installed.';
+        vscode.window.showWarningMessage(message);
+        return false;
     }
 
     // ============================================

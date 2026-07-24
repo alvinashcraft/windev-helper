@@ -531,7 +531,7 @@ Creates an external catalog for streamlined asset management across applications
 
 ## Run & Automation Commands
 
-These commands provide packaged app launch and UI automation capabilities. They require winapp CLI v0.3.0 or later.
+These commands provide packaged app launch and UI automation capabilities. They require winapp CLI v0.3.0 or later; the interactive commands added in WinDev Helper 4.1 require winapp CLI v0.5.0 or later.
 
 ### WinDev: Run as Packaged App
 
@@ -542,6 +542,10 @@ Launches an application as a packaged app from a build output folder. Prompts fo
 1. Build output folder containing your compiled app
 2. Run mode: normal, detached, or with debug output
 3. Whether to unregister the package on exit
+4. Whether to resolve symbols when using debug output
+5. Optional application arguments when supported by the installed CLI
+
+On winapp CLI v0.5.0+, debug-output mode automatically triages WinUI stowed exceptions after a crash. Symbol resolution is only offered in this mode so `--symbols` is never passed alone.
 
 **Uses:** `winapp run` CLI command
 
@@ -610,6 +614,46 @@ Captures a screenshot of an app window. Prompts for the app name and output file
 Triggers hover behavior for a UI element (tooltip/flyout/visual state changes). Prompts for selector, optional app filter, and optional dwell time.
 
 **Uses:** `winapp ui hover` CLI command (v0.4.0+)
+
+---
+
+### WinDev: UI: Send Keys
+
+**Command ID:** `windev-helper.uiSendKeys`
+
+Sends text, named keys, or key chords to a running app or selected UI element. Prompts for an app, optional target selector, and keyboard transport. `send-input` is recommended for WinUI controls; system-level key combinations require an explicit opt-in and are only available with that transport.
+
+**Uses:** `winapp ui send-keys` CLI command (v0.5.0+)
+
+---
+
+### WinDev: UI: Invoke/Click Element
+
+**Command ID:** `windev-helper.uiClick`
+
+Clicks a UI element identified by semantic selector or text, with an optional app filter.
+
+**Uses:** `winapp ui click` CLI command (v0.5.0+)
+
+---
+
+### WinDev: UI: Set Element Value
+
+**Command ID:** `windev-helper.uiSetValue`
+
+Sets an editable control's value through UI Automation. An empty value clears the control. For rich text controls that do not expose a writable value pattern, use **WinDev: UI: Send Keys** with the `send-input` transport.
+
+**Uses:** `winapp ui set-value` CLI command (v0.5.0+)
+
+---
+
+### WinDev: UI: Record App Interaction
+
+**Command ID:** `windev-helper.uiRecord`
+
+Records a running app for a selected duration and saves the result as an H.264 MP4 file.
+
+**Uses:** `winapp ui record` CLI command (v0.5.0+)
 
 ---
 

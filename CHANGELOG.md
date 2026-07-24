@@ -5,6 +5,22 @@ All notable changes to the WinDev Helper extension will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.1.0] - 2026-07-24
+
+Aligns the extension with [winapp CLI v0.5.0](https://github.com/microsoft/winappCli/releases/tag/v0.5.0), expanding UI automation and WinUI crash diagnostics.
+
+### Added
+
+- **Keyboard automation** - Added **WinDev: UI: Send Keys** with target selection, WinUI-friendly `send-input`, classic `post-message`, and explicit system-key opt-in
+- **Element interaction** - Added **WinDev: UI: Invoke/Click Element** and **WinDev: UI: Set Element Value** for selector-based UI automation
+- **MP4 interaction recording** - Added **WinDev: UI: Record App Interaction** with configurable duration and output path
+
+### Changed
+
+- **WinUI crash diagnostics** - **WinDev: Run as Packaged App** now describes v0.5.0 automatic stowed-exception triage and offers symbol resolution only with `--debug-output`
+- **v0.5.0 compatibility gate** - New interactive UI commands verify that winapp CLI v0.5.0 or newer is installed before running
+- **Coordinate terminology** - Documentation now uses the v0.5.0 **screen coordinates** terminology in place of the former app-coordinate name
+
 ## [4.0.0] - 2026-07-18
 
 This major release replaces the separate read-only XAML preview and Properties pane with an editable, cross-platform WinUI XAML Designer.

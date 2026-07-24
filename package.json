@@ -2,7 +2,7 @@
   "name": "windev-helper",
   "displayName": "WinDev Helper",
   "description": "Build beautiful, performant WinUI apps with VS Code. Debug, build, package, and deploy Windows apps powered by the Windows App SDK.",
-  "version": "4.0.0",
+  "version": "4.1.0",
   "publisher": "alvinashcraft",
   "icon": "images/icon.png",
   "license": "MIT",
@@ -298,6 +298,26 @@
       {
         "command": "windev-helper.uiHover",
         "title": "UI: Hover Element",
+        "category": "WinDev"
+      },
+      {
+        "command": "windev-helper.uiSendKeys",
+        "title": "UI: Send Keys",
+        "category": "WinDev"
+      },
+      {
+        "command": "windev-helper.uiClick",
+        "title": "UI: Invoke/Click Element",
+        "category": "WinDev"
+      },
+      {
+        "command": "windev-helper.uiSetValue",
+        "title": "UI: Set Element Value",
+        "category": "WinDev"
+      },
+      {
+        "command": "windev-helper.uiRecord",
+        "title": "UI: Record App Interaction",
         "category": "WinDev"
       },
       {
