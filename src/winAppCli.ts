@@ -181,18 +181,6 @@ export class WinAppCli {
     }
 
     /**
-     * Returns `true` when the installed winapp CLI supports v0.5.0 UI
-     * automation features used by this extension.
-     */
-    public async supportsUiV050Features(): Promise<boolean> {
-        const v = await this.getVersion();
-        if (!v) {
-            return false;
-        }
-        return (v.major > 0) || (v.major === 0 && v.minor >= 5);
-    }
-
-    /**
      * Executes a winapp CLI command
      * @param command - The CLI command to execute
      * @param args - Arguments to pass to the command

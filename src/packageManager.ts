@@ -1008,9 +1008,9 @@ export class PackageManager {
             prompt: 'Enter text, keys, or chords to send',
             placeHolder: 'ctrl+a delete',
             ignoreFocusOut: true,
-            validateInput: value => value.length > 0 ? null : 'Keys or text are required'
+            validateInput: value => value.trim().length > 0 ? null : 'Keys or text are required'
         });
-        if (keys === undefined || keys.length === 0) { return; }
+        if (keys === undefined || keys.trim().length === 0) { return; }
 
         const appName = await vscode.window.showInputBox({
             prompt: 'Enter app name to target (optional)',
@@ -1202,11 +1202,11 @@ export class PackageManager {
     }
 
     private async ensureUiV050Support(): Promise<boolean> {
-        if (await this.winAppCli.supportsUiV050Features()) {
+        const version = await this.winAppCli.getVersion();
+        if (version && ((version.major > 0) || (version.major === 0 && version.minor >= 5))) {
             return true;
         }
 
-        const version = await this.winAppCli.getVersion();
         const message = version
             ? 'This UI automation command requires winapp CLI v0.5.0 or newer.'
             : 'Unable to determine winapp CLI version. Ensure winapp CLI v0.5.0 or newer is installed.';
