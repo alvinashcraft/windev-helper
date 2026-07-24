@@ -60,6 +60,8 @@ The editable surface is cross-platform. Native Preview requires Windows and a bu
 - **List windows** - Enumerate visible app windows
 - **Inspect UI trees** - Walk the UI Automation tree of any running Windows app
 - **Take screenshots** - Capture app window screenshots
+- **Interact with controls** - Hover, click, set values, and send real keyboard input to running WinUI apps
+- **Record app interactions** - Capture timed UI automation sessions as H.264 MP4 videos
 - Enables automated testing and agentic workflows via `winapp ui`
 
 ### 📝 Project & Item Templates
@@ -226,6 +228,11 @@ dotnet new winui-lib -n MyLib
 | `WinDev: UI: List Windows` | List visible app windows |
 | `WinDev: UI: Inspect App` | Inspect UI Automation tree |
 | `WinDev: UI: Take Screenshot` | Capture app window screenshot |
+| `WinDev: UI: Hover Element` | Trigger element hover states and flyouts |
+| `WinDev: UI: Send Keys` | Send text, named keys, and key chords |
+| `WinDev: UI: Invoke/Click Element` | Click an element by selector or text |
+| `WinDev: UI: Set Element Value` | Set or clear an editable control |
+| `WinDev: UI: Record App Interaction` | Record a timed app interaction to MP4 |
 | `WinDev: Update Manifest Assets` | Auto-generate app icon assets from a single source image |
 | `WinDev: Run SDK Tool` | Run `makeappx`, `signtool`, `mt`, or `makepri` via `winapp tool` |
 | `WinDev: Get WinApp Path` | Show paths to installed Windows SDK components |
@@ -292,7 +299,7 @@ This extension integrates with the **Windows App Development CLI (winapp)**, whi
 - `winapp run` - Run a build output as a packaged app (v0.3.1+: forward application args after `--`)
 - `winapp unregister` - Remove a sideloaded dev package
 - `winapp manifest add-alias` - Add an app execution alias to the manifest
-- `winapp ui` - UI Automation: list windows, inspect trees, click, screenshot, and more
+- `winapp ui` - UI Automation: list windows, inspect trees, click, set values, send keys, screenshot, hover, and record MP4 video
 - `winapp complete` - Set up shell tab completion
 
 Learn more at [github.com/microsoft/WinAppCli](https://github.com/microsoft/WinAppCli).

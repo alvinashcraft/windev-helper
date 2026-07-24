@@ -792,7 +792,9 @@ export class WinAppCli {
      *
      * Throws when the underlying CLI invocation fails so callers (e.g. the
      * `winapp` debug provider) can short-circuit follow-up steps such as
-     * debugger attach. Callers are expected to surface a user-facing error.
+    * debugger attach. With winapp CLI v0.5.0+, `--debug-output`
+    * automatically triages WinUI stowed exceptions after a crash. Callers
+    * are expected to surface a user-facing error.
      *
      * @param options Run options
      * @param cwd Optional working directory for the command
@@ -976,6 +978,96 @@ export class WinAppCli {
         } catch (error) {
             vscode.window.showErrorMessage(`Failed to hover UI element: ${error}`);
             return '';
+        }
+    }
+
+    /**
+     * Send keyboard input to an app or UI element (v0.5.0+).
+     * @param keys Text, named keys, or key chords to send
+     * @param transport Keyboard injection transport
+     * @param appName Optional app name filter
+     * @param target Optional selector to focus before sending keys
+     * @param allowSystemKeys Allow shell-reserved key combinations with send-input
+     */
+    public async uiSendKeys(
+        keys: string,
+        transport: 'post-message' | 'send-input',
+        appName?: string,
+        target?: string,
+        allowSystemKeys: boolean = false
+    ): Promise<string> {
+        try {
+            const args: string[] = ['send-keys', keys, '--via', transport];
+            if (target) {
+                args.push('--target', target);
+            }
+            if (appName) {
+                args.push('-a', appName);
+            }
+            if (allowSystemKeys) {
+                args.push('--allow-system-keys');
+            }
+            return await this.execute('ui', args);
+        } catch (error) {
+            vscode.window.showErrorMessage(`Failed to send keys: ${error}`);
+            return '';
+        }
+    }
+
+    /**
+     * Click a UI element (v0.5.0+).
+     * @param selector Semantic slug or text selector
+     * @param appName Optional app name filter
+     */
+    public async uiClick(selector: string, appName?: string): Promise<string> {
+        try {
+            const args: string[] = ['click', selector];
+            if (appName) {
+                args.push('-a', appName);
+            }
+            return await this.execute('ui', args);
+        } catch (error) {
+            vscode.window.showErrorMessage(`Failed to click UI element: ${error}`);
+            return '';
+        }
+    }
+
+    /**
+     * Set the value of an editable UI element (v0.5.0+).
+     * @param selector Semantic slug or text selector
+     * @param value Value to assign; may be empty to clear the control
+     * @param appName Optional app name filter
+     */
+    public async uiSetValue(selector: string, value: string, appName?: string): Promise<string> {
+        try {
+            const args: string[] = ['set-value', selector, value];
+            if (appName) {
+                args.push('-a', appName);
+            }
+            return await this.execute('ui', args);
+        } catch (error) {
+            vscode.window.showErrorMessage(`Failed to set UI element value: ${error}`);
+            return '';
+        }
+    }
+
+    /**
+     * Record an app interaction session to MP4 (v0.5.0+).
+     * @param appName App name, window title, or process ID to record
+     * @param durationSeconds Positive recording duration in seconds
+     * @param outputPath Destination MP4 file path
+     */
+    public async uiRecord(appName: string, durationSeconds: number, outputPath: string): Promise<void> {
+        try {
+            await this.execute('ui', [
+                'record',
+                '-a', appName,
+                '--duration-sec', durationSeconds.toString(),
+                '--output', outputPath
+            ]);
+            vscode.window.showInformationMessage(`Recording saved to ${outputPath}`);
+        } catch (error) {
+            vscode.window.showErrorMessage(`Failed to record UI session: ${error}`);
         }
     }
 
