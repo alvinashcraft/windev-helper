@@ -526,17 +526,9 @@ Custom debugger type:
 
 ## Dependencies
 
-### Extension Dependencies
+### Optional Extension Integrations
 
-```json
-{
-  "extensionDependencies": [
-    "ms-dotnettools.csharp"
-  ]
-}
-```
-
-C# Dev Kit (`ms-dotnettools.csdevkit`) is a **soft / recommended** dependency. The `csharp.solutionExplorer.context` menu contributions registered in `package.json` only become visible when C# Dev Kit is installed; without it, the same commands remain accessible from the Command Palette and the file Explorer context menu, so all functionality continues to work.
+WinDev Helper has no `extensionDependencies`, which keeps it installable from both the Visual Studio Marketplace and Open VSX without requiring Marketplace-only extensions. The C# extension (`ms-dotnettools.csharp`) is recommended for language tooling and debugging. C# Dev Kit (`ms-dotnettools.csdevkit`) is also optional; its `csharp.solutionExplorer.context` menu contributions only become visible when it is installed. Without either integration, the same WinDev Helper commands remain available from the Command Palette and file Explorer context menu.
 
 ### External Tools
 

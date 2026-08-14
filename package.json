@@ -43,9 +43,6 @@
     "onLanguage:xaml"
   ],
   "main": "./dist/extension.js",
-  "extensionDependencies": [
-    "ms-dotnettools.csharp"
-  ],
   "contributes": {
     "customEditors": [
       {

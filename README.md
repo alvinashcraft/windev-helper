@@ -113,15 +113,12 @@ The XAML Designer and its C# event generation do not call C# Dev Kit APIs. C# De
 
 ## Requirements
 
-### Required Extensions
-
-This extension requires the following VS Code extension:
-
-- [C#](https://marketplace.visualstudio.com/items?itemName=ms-dotnettools.csharp) (open source, MIT)
-
 ### Recommended Extensions
 
+- [C#](https://marketplace.visualstudio.com/items?itemName=ms-dotnettools.csharp) (open source, MIT) — enables C# language tooling and debugging for WinUI projects
 - [C# Dev Kit](https://marketplace.visualstudio.com/items?itemName=ms-dotnettools.csdevkit) — enables Solution Explorer, Test Explorer, and the Solution Explorer context-menu entries used by `Add New Page`, `Add New User Control`, `Add New Window`, and `Add New ViewModel`. C# Dev Kit is proprietary and its [license](https://aka.ms/vs/csdevkit/license) restricts who may use it; install it only if your usage scenario qualifies. All build, debug, packaging, and template features in this extension work without C# Dev Kit — you'll just lose the Solution Explorer context-menu shortcuts (the same commands remain available from the Command Palette and the file Explorer).
+
+WinDev Helper does not declare Marketplace-specific extension dependencies, so it can be installed from either the Visual Studio Marketplace or Open VSX. Install the C# extensions that suit your editor and workflow.
 
 ### Required Tools
 
