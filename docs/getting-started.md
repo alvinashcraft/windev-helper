@@ -20,11 +20,11 @@ dotnet --version
 
 Download VS Code from [code.visualstudio.com](https://code.visualstudio.com).
 
-### 3. Required VS Code Extensions
+### 3. Recommended VS Code Extensions
 
 Install the following extensions:
 
-- **C#** (`ms-dotnettools.csharp`) — required (open source, MIT)
+- **C#** (`ms-dotnettools.csharp`) — recommended for C# language tooling and debugging (open source, MIT)
 - **C# Dev Kit** (`ms-dotnettools.csdevkit`) — recommended; enables Solution Explorer integration. Proprietary; install only if your usage qualifies under [its license](https://aka.ms/vs/csdevkit/license).
 - **WinDev Helper** (`windev-helper.windev-helper`)
 

@@ -22,6 +22,10 @@ Aligns the extension with [winapp CLI v0.6.0](https://github.com/microsoft/winap
 - **Dependency maintenance** - Updated compatible development tooling and applied npm audit remediation, leaving zero reported vulnerabilities
 - **v0.6 documentation** - Documented `winapp new`, corrected MSIX bundle version generation, project-mode run, sparse packages, Find UI, and Azure Trusted Signing
 
+### Fixed
+
+- **Open VSX publishing** - Removed the hard `ms-dotnettools.csharp` Marketplace dependency; C# and C# Dev Kit integrations are now optional
+
 ## [4.1.0] - 2026-07-24
 
 Aligns the extension with [winapp CLI v0.5.0](https://github.com/microsoft/winappCli/releases/tag/v0.5.0), expanding UI automation and WinUI crash diagnostics.
@@ -181,7 +185,7 @@ This release brings WinDev Helper closer to feature parity with the official [Mi
 - **`winapp run`** now accepts an `outputAppxDirectory` option (mirrors `--output`) so the loose-layout package can be redirected when needed by the new debug type
 - **C# Dev Kit is now an optional / recommended dependency** ([#7](https://github.com/alvinashcraft/windev-helper/issues/7))
   - Removed `ms-dotnettools.csdevkit` from `extensionDependencies` so users who cannot use C# Dev Kit under [its proprietary license](https://aka.ms/vs/csdevkit/license) are no longer forced to install it
-  - The open-source `ms-dotnettools.csharp` extension remains required
+  - At the time, the open-source `ms-dotnettools.csharp` extension remained required; it became optional in 4.2.0
   - All build, debug, packaging, manifest, certificate, and template features continue to work without C# Dev Kit. The only feature gated by C# Dev Kit is the Solution Explorer context-menu shortcut for `Add New Page` / `User Control` / `Window` / `ViewModel` — those commands remain available from the Command Palette and the file Explorer context menu
 - **Open VSX Registry support**
   - Added `ovsx` as a devDependency and new `publish:openvsx` / `publish:openvsx:prerelease` npm scripts so the extension can be published to [Open VSX](https://open-vsx.org/) alongside the Visual Studio Marketplace

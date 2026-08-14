@@ -32,7 +32,7 @@ Double-click a supported control to wire its default event. The designer:
 4. Adds a handler with a fully qualified WinUI event argument type when one does not already exist.
 5. Opens the handler beside the designer.
 
-This workflow does not require C# Dev Kit. The open-source C# extension remains the extension's only required VS Code dependency.
+This workflow does not require C# Dev Kit or the C# extension. Install C# tooling when you want language features and debugging for the code-behind file.
 
 ## Native Preview
 
