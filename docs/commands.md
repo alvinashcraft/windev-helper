@@ -531,13 +531,13 @@ Creates an external catalog for streamlined asset management across applications
 
 ## Run & Automation Commands
 
-These commands provide packaged app launch and UI automation capabilities. They require winapp CLI v0.3.0 or later; the interactive commands added in WinDev Helper 4.1 require winapp CLI v0.5.0 or later.
+These commands provide packaged app launch and UI automation capabilities. They require winapp CLI v0.3.0 or later; commands added in WinDev Helper 4.2 require winapp CLI v0.6.0 or later.
 
 ### WinDev: Run as Packaged App
 
 **Command ID:** `windev-helper.runPackagedApp`
 
-Launches an application as a packaged app from a build output folder. Prompts for:
+Launches an application as a packaged app from a build output folder, or builds and launches the active `.csproj` through v0.6.0 project mode. Project mode prompts for configuration, architecture, and whether to build before launch. Folder mode retains the existing loose-layout flow. Both modes prompt for:
 
 1. Build output folder containing your compiled app
 2. Run mode: normal, detached, or with debug output
@@ -574,6 +574,36 @@ Adds a `uap5:AppExecutionAlias` to the manifest so a packaged app can be launche
 3. The alias is added to the manifest
 
 **Uses:** `winapp manifest add-alias` CLI command (v0.3.0+)
+
+---
+
+### WinDev: Create Sparse MSIX Package
+
+**Command ID:** `windev-helper.createSparsePackage`
+
+Creates an identity-only MSIX package from an `AllowExternalContent` app manifest. Prompts for the sparse manifest and output `.msix` location.
+
+**Uses:** `winapp package <appxmanifest.xml>` CLI command (v0.6.0+)
+
+---
+
+### WinDev: Sign with Azure Trusted Signing
+
+**Command ID:** `windev-helper.azureSignPackage`
+
+Signs an `.exe`, `.msix`, or `.msixbundle` using Azure Trusted Signing. Use either a prepared `metadata.json` file or specify the subscription, resource group, signing account, and certificate profile. Azure authentication must already be available to the CLI.
+
+**Uses:** `winapp az-sign` CLI command (v0.6.0+)
+
+---
+
+### WinDev: Find WinUI Controls & Samples
+
+**Command ID:** `windev-helper.findUi`
+
+Searches working control samples in the WinUI 3 Gallery, Windows Community Toolkit, Reactor Gallery, or built-in offline patterns. Results are shown in the WinUI Packaging output channel.
+
+**Uses:** `winapp find-ui` CLI command (v0.6.0+)
 
 ---
 
