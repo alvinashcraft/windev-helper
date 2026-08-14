@@ -474,13 +474,16 @@ export class WinAppCli {
     public async package(options: PackageOptions): Promise<void> {
         try {
             const args: string[] = [];
-            // Input folders are positional arguments (required). Supplying more
-            // than one produces an MSIX bundle (one folder per architecture).
-            const inputDirs = options.inputDirs && options.inputDirs.length > 0
-                ? options.inputDirs
+            // Input paths are positional arguments (required). Multiple layout
+            // folders produce an MSIX bundle; one manifest path produces a
+            // sparse identity-only package.
+            const inputPaths = options.inputPaths && options.inputPaths.length > 0
+                ? options.inputPaths
+                : options.inputDirs && options.inputDirs.length > 0
+                    ? options.inputDirs
                 : (options.inputDir ? [options.inputDir] : []);
-            for (const dir of inputDirs) {
-                args.push(dir);
+            for (const inputPath of inputPaths) {
+                args.push(inputPath);
             }
             // Use long-form options as per CLI spec
             if (options.outputPath) {
@@ -618,6 +621,69 @@ export class WinAppCli {
             vscode.window.showInformationMessage('Package signed successfully.');
         } catch (error) {
             vscode.window.showErrorMessage(`Failed to sign package: ${error}`);
+        }
+    }
+
+    /**
+     * Sign a package or executable with Azure Trusted Signing (v0.6.0+).
+     * @param filePath Path to the executable, MSIX, or MSIX bundle to sign
+     * @param options Azure signing account or metadata-file options
+     */
+    public async azureSign(filePath: string, options: AzureSignOptions = {}): Promise<void> {
+        try {
+            const args: string[] = [filePath];
+            if (options.subscription) {
+                args.push('--subscription', options.subscription);
+            }
+            if (options.resourceGroup) {
+                args.push('--resource-group', options.resourceGroup);
+            }
+            if (options.account) {
+                args.push('--account', options.account);
+            }
+            if (options.profile) {
+                args.push('--profile', options.profile);
+            }
+            if (options.metadataFile) {
+                args.push('--metadata-file', options.metadataFile);
+            }
+            await this.execute('az-sign', args);
+            vscode.window.showInformationMessage('Package signed with Azure Trusted Signing successfully.');
+        } catch (error) {
+            vscode.window.showErrorMessage(`Failed to sign with Azure Trusted Signing: ${error}`);
+        }
+    }
+
+    /**
+     * Search WinUI controls and samples (v0.6.0+).
+     * @param query Search phrase, or undefined to list controls
+     * @param options Search result source and retrieval options
+     */
+    public async findUi(query?: string, options: FindUiOptions = {}): Promise<string> {
+        try {
+            const args: string[] = [];
+            if (query?.trim()) {
+                args.push(query.trim());
+            }
+            for (const id of options.ids ?? []) {
+                args.push('--id', id);
+            }
+            if (options.list) {
+                args.push('--list');
+            }
+            if (options.source) {
+                args.push('--source', options.source);
+            }
+            if (options.maxResults !== undefined) {
+                args.push('--max', options.maxResults.toString());
+            }
+            if (options.refresh) {
+                args.push('--refresh');
+            }
+            return await this.execute('find-ui', args);
+        } catch (error) {
+            vscode.window.showErrorMessage(`Failed to find WinUI controls and samples: ${error}`);
+            return '';
         }
     }
 
@@ -787,8 +853,9 @@ export class WinAppCli {
     // ============================================
 
     /**
-     * Run an application as a packaged app (v0.3.0+)
-     * Registers a loose package, launches the app, and preserves LocalState across re-deploys.
+        * Run an application as a packaged app (v0.3.0+) or directly from a
+        * project (v0.6.0+). Project mode builds then launches the project;
+        * folder mode registers a loose package and preserves LocalState.
      *
      * Throws when the underlying CLI invocation fails so callers (e.g. the
      * `winapp` debug provider) can short-circuit follow-up steps such as
@@ -800,12 +867,12 @@ export class WinAppCli {
      * @param cwd Optional working directory for the command
      */
     public async run(options: RunOptions, cwd?: string): Promise<void> {
-        const inputFolder = options.inputFolder.trim();
-        if (!inputFolder) {
-            throw new Error('An input folder is required to run a packaged app.');
+        const inputPath = options.inputPath.trim();
+        if (!inputPath) {
+            throw new Error('An input path is required to run an app.');
         }
 
-        const args: string[] = [inputFolder];
+        const args: string[] = [inputPath];
         if (options.manifest) {
             args.push('--manifest', options.manifest);
         }
@@ -822,7 +889,37 @@ export class WinAppCli {
             args.push('--symbols');
         }
         if (options.outputAppxDirectory) {
-            args.push('--output', options.outputAppxDirectory);
+            args.push('--output-appx-directory', options.outputAppxDirectory);
+        }
+        if (options.clean) {
+            args.push('--clean');
+        }
+        if (options.noLaunch) {
+            args.push('--no-launch');
+        }
+        if (options.withAlias) {
+            args.push('--with-alias');
+        }
+        if (options.configuration) {
+            args.push('--configuration', options.configuration);
+        }
+        if (options.architecture) {
+            args.push('--arch', options.architecture);
+        }
+        if (options.framework) {
+            args.push('--framework', options.framework);
+        }
+        if (options.noBuild) {
+            args.push('--no-build');
+        }
+        if (options.noRestore) {
+            args.push('--no-restore');
+        }
+        for (const property of options.properties ?? []) {
+            args.push('--property', property);
+        }
+        if (options.project) {
+            args.push('--project', options.project);
         }
         // v0.3.1+: pass application arguments after `--` so the CLI forwards them
         // verbatim to the launched app without requiring quote escaping.
@@ -1100,6 +1197,11 @@ export interface PackageOptions {
      * architecture) creates an MSIX bundle. Takes precedence over `inputDir`.
      */
     inputDirs?: string[];
+    /**
+     * One or more layout folders, or one sparse appxmanifest.xml path. Takes
+     * precedence over the legacy `inputDirs` and `inputDir` properties.
+     */
+    inputPaths?: string[];
     outputPath?: string;
     manifestPath?: string;
     certPath?: string;
@@ -1121,6 +1223,22 @@ export interface SignOptions {
     certPath?: string;
     password?: string;
     timestampUrl?: string;
+}
+
+export interface AzureSignOptions {
+    subscription?: string;
+    resourceGroup?: string;
+    account?: string;
+    profile?: string;
+    metadataFile?: string;
+}
+
+export interface FindUiOptions {
+    ids?: string[];
+    list?: boolean;
+    source?: 'gallery' | 'toolkit' | 'reactor' | 'core';
+    maxResults?: number;
+    refresh?: boolean;
 }
 
 // Microsoft Store options (v0.2.0+)
@@ -1153,7 +1271,8 @@ export interface StorePackageOptions {
 // Run options (v0.3.0+)
 
 export interface RunOptions {
-    inputFolder: string;
+    /** Build-output folder or .csproj/.sln project input (v0.6.0+). */
+    inputPath: string;
     manifest?: string;
     detach?: boolean;
     unregisterOnExit?: boolean;
@@ -1161,9 +1280,28 @@ export interface RunOptions {
     symbols?: boolean;
     /**
      * Output directory for the loose-layout package produced by
-     * `winapp run`. Defaults to an `AppX` folder inside `inputFolder`.
+        * `winapp run`. Defaults to an `AppX` folder inside `inputPath`.
      */
     outputAppxDirectory?: string;
+    /** Remove existing package application data before re-deploying. */
+    clean?: boolean;
+    /** Register the package or debug identity without launching the app. */
+    noLaunch?: boolean;
+    /** Launch through an App Execution Alias rather than AUMID activation. */
+    withAlias?: boolean;
+    /** Project-mode build configuration. */
+    configuration?: string;
+    /** Project-mode architecture. */
+    architecture?: 'x86' | 'x64' | 'arm64';
+    /** Project-mode target framework for multi-targeted projects. */
+    framework?: string;
+    /** Project-mode build controls. */
+    noBuild?: boolean;
+    noRestore?: boolean;
+    /** Project-mode MSBuild properties in Name=Value form. */
+    properties?: string[];
+    /** Select a project when the input is a solution or multi-project directory. */
+    project?: string;
     /**
      * Application arguments forwarded to the launched app via `--` (v0.3.1+).
      * Each entry is passed as a separate argv element, no shell escaping required.

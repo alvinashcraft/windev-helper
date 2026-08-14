@@ -128,7 +128,7 @@ export class WinAppDebugConfigurationProvider implements vscode.DebugConfigurati
 
         try {
             await this.winAppCli.run({
-                inputFolder,
+                inputPath: inputFolder,
                 ...(winAppConfig.manifest ? { manifest: winAppConfig.manifest } : {}),
                 ...(winAppConfig.outputAppxDirectory ? { outputAppxDirectory: winAppConfig.outputAppxDirectory } : {}),
                 detach: true,

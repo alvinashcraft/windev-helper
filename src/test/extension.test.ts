@@ -30,6 +30,9 @@ suite('Extension Test Suite', () => {
             assert.strictEqual(COMMANDS.UI_CLICK, 'windev-helper.uiClick');
             assert.strictEqual(COMMANDS.UI_SET_VALUE, 'windev-helper.uiSetValue');
             assert.strictEqual(COMMANDS.UI_RECORD, 'windev-helper.uiRecord');
+            assert.strictEqual(COMMANDS.CREATE_SPARSE_PACKAGE, 'windev-helper.createSparsePackage');
+            assert.strictEqual(COMMANDS.AZURE_SIGN_PACKAGE, 'windev-helper.azureSignPackage');
+            assert.strictEqual(COMMANDS.FIND_UI, 'windev-helper.findUi');
         });
 
         test('CONFIG should have expected configuration keys', () => {

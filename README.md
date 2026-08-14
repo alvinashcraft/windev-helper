@@ -1,6 +1,6 @@
 # WinDev Helper - A WinUI editor extension
 
-[![Visual Studio Marketplace Version](https://img.shields.io/visual-studio-marketplace/v/alvinashcraft.windev-helper)](https://marketplace.visualstudio.com/items?itemName=alvinashcraft.windev-helper)
+[![Visual Studio Marketplace Version](https://vsmarketplacebadges.dev/version-short/alvinashcraft.windev-helper.svg)](https://marketplace.visualstudio.com/items?itemName=alvinashcraft.windev-helper)
 [![Open VSX Version](https://img.shields.io/open-vsx/v/alvinashcraft/windev-helper)](https://open-vsx.org/extension/alvinashcraft/windev-helper)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
@@ -51,6 +51,9 @@ The editable surface is cross-platform. Native Preview requires Windows and a bu
 - **Run as packaged app** - Launch apps as packaged apps from build output
 - **Unregister dev packages** - Clean up sideloaded packages
 - **Add app execution aliases** - Launch packaged apps by name from the terminal
+- **Project-mode packaged runs** - Build and launch the current WinUI project directly through `winapp run`
+- **Sparse MSIX packages** - Create identity-only packages for external-content workflows
+- **Azure Trusted Signing** - Sign executables, MSIX packages, and bundles with a cloud-managed signing identity
 - **Microsoft Store publishing** - Publish directly to the Microsoft Store from VS Code
 - Check submission status and manage Store apps
 - Create external catalogs for asset management
@@ -63,6 +66,10 @@ The editable surface is cross-platform. Native Preview requires Windows and a bu
 - **Interact with controls** - Hover, click, set values, and send real keyboard input to running WinUI apps
 - **Record app interactions** - Capture timed UI automation sessions as H.264 MP4 videos
 - Enables automated testing and agentic workflows via `winapp ui`
+
+### 🔎 WinUI Discovery
+
+- **Find WinUI controls and samples** - Search WinUI 3 Gallery, Windows Community Toolkit, Reactor Gallery, and offline core patterns from the Command Palette
 
 ### 📝 Project & Item Templates
 
@@ -225,6 +232,9 @@ dotnet new winui-lib -n MyLib
 | `WinDev: Run as Packaged App` | Launch app as a packaged app |
 | `WinDev: Unregister Dev Package` | Remove a sideloaded dev package |
 | `WinDev: Add App Execution Alias` | Add launch alias to manifest |
+| `WinDev: Create Sparse MSIX Package` | Create an identity-only sparse package from an app manifest |
+| `WinDev: Sign with Azure Trusted Signing` | Sign an EXE, MSIX, or bundle with Azure Trusted Signing |
+| `WinDev: Find WinUI Controls & Samples` | Search control and sample sources through winapp CLI |
 | `WinDev: UI: List Windows` | List visible app windows |
 | `WinDev: UI: Inspect App` | Inspect UI Automation tree |
 | `WinDev: UI: Take Screenshot` | Capture app window screenshot |
@@ -278,7 +288,7 @@ This extension integrates with the **Windows App Development CLI (winapp)**, whi
 
 ### App Identity & Debugging
 
-- `winapp package` - Create MSIX packages from directories
+- `winapp package` - Create MSIX packages, bundles, and sparse identity-only packages
 - `winapp create-debug-identity` - Add temporary app identity for debugging
 - `winapp manifest` - Generate and manage AppxManifest.xml files
 
@@ -287,7 +297,7 @@ This extension integrates with the **Windows App Development CLI (winapp)**, whi
 - `winapp cert generate` - Generate development certificates
 - `winapp cert info` - View certificate details (subject, issuer, validity)
 - `winapp cert install` - Install development certificates
-- `winapp sign` - Sign MSIX packages and executables
+- `winapp sign` / `winapp az-sign` - Sign with a local certificate or Azure Trusted Signing
 
 ### Development Tools
 
@@ -296,7 +306,9 @@ This extension integrates with the **Windows App Development CLI (winapp)**, whi
 
 ### Run & Automation (v0.3.0+)
 
-- `winapp run` - Run a build output as a packaged app (v0.3.1+: forward application args after `--`)
+- `winapp run` - Run a build output or `.csproj` as a packaged app (v0.6.0 project mode; v0.3.1+: forward application args after `--`)
+- `winapp find-ui` - Search WinUI controls and sample code across Gallery, Toolkit, Reactor, and core patterns
+- `winapp new` - Scaffold an official WinUI template from the CLI
 - `winapp unregister` - Remove a sideloaded dev package
 - `winapp manifest add-alias` - Add an app execution alias to the manifest
 - `winapp ui` - UI Automation: list windows, inspect trees, click, set values, send keys, screenshot, hover, and record MP4 video

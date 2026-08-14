@@ -377,6 +377,24 @@ function registerCommands(context: vscode.ExtensionContext): void {
         })
     );
 
+    context.subscriptions.push(
+        vscode.commands.registerCommand(COMMANDS.CREATE_SPARSE_PACKAGE, async () => {
+            await services.packageManager.createSparsePackage(services.projectManager.currentProject);
+        })
+    );
+
+    context.subscriptions.push(
+        vscode.commands.registerCommand(COMMANDS.AZURE_SIGN_PACKAGE, async () => {
+            await services.packageManager.azureSignPackage();
+        })
+    );
+
+    context.subscriptions.push(
+        vscode.commands.registerCommand(COMMANDS.FIND_UI, async () => {
+            await services.packageManager.findUi();
+        })
+    );
+
     // UI Automation commands (v0.3.0+)
     context.subscriptions.push(
         vscode.commands.registerCommand(COMMANDS.UI_LIST_WINDOWS, async () => {

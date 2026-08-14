@@ -5,6 +5,23 @@ All notable changes to the WinDev Helper extension will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.2.0] - 2026-08-14
+
+Aligns the extension with [winapp CLI v0.6.0](https://github.com/microsoft/winappCli/releases/tag/v0.6.0), adding project-mode runs, WinUI sample discovery, sparse packaging, and Azure Trusted Signing.
+
+### Added
+
+- **Project-mode run** - **WinDev: Run as Packaged App** can now build and launch the active `.csproj` directly, with configuration, architecture, and build-step selection
+- **Find WinUI controls and samples** - Added **WinDev: Find WinUI Controls & Samples**, which searches the WinUI 3 Gallery, Windows Community Toolkit, Reactor Gallery, or offline core patterns through `winapp find-ui`
+- **Sparse MSIX packaging** - Added **WinDev: Create Sparse MSIX Package** for identity-only packages using an `AllowExternalContent` app manifest
+- **Azure Trusted Signing** - Added **WinDev: Sign with Azure Trusted Signing**, supporting either a prepared `metadata.json` file or an explicitly selected subscription, resource group, signing account, and certificate profile
+
+### Changed
+
+- **Loose-layout output option** - Corrected the `winapp run` wrapper to use `--output-appx-directory`
+- **Dependency maintenance** - Updated compatible development tooling and applied npm audit remediation, leaving zero reported vulnerabilities
+- **v0.6 documentation** - Documented `winapp new`, corrected MSIX bundle version generation, project-mode run, sparse packages, Find UI, and Azure Trusted Signing
+
 ## [4.1.0] - 2026-07-24
 
 Aligns the extension with [winapp CLI v0.5.0](https://github.com/microsoft/winappCli/releases/tag/v0.5.0), expanding UI automation and WinUI crash diagnostics.

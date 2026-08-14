@@ -5,7 +5,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
-import { WinAppCli, CertificateOptions, SignOptions } from './winAppCli';
+import { AzureSignOptions, CertificateOptions, FindUiOptions, SignOptions, WinAppCli } from './winAppCli';
 import { CONFIG, OUTPUT_CHANNELS, DEFAULTS } from './constants';
 
 /**
@@ -142,6 +142,56 @@ export class PackageManager {
     }
 
     /**
+     * Creates a sparse identity-only MSIX package from an app manifest
+     * (winapp CLI v0.6.0+).
+     */
+    public async createSparsePackage(projectUri?: vscode.Uri): Promise<void> {
+        if (!await this.ensureWinAppV060Support('Sparse MSIX packaging')) { return; }
+
+        const projectDir = projectUri ? path.dirname(projectUri.fsPath) :
+            vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+        const manifestDialogOptions: vscode.OpenDialogOptions = {
+            canSelectFiles: true,
+            canSelectFolders: false,
+            canSelectMany: false,
+            filters: {
+                'App manifest': ['xml', 'appxmanifest']
+            },
+            title: 'Select sparse package appxmanifest.xml'
+        };
+        if (projectDir) {
+            manifestDialogOptions.defaultUri = vscode.Uri.file(projectDir);
+        }
+        const manifestUris = await vscode.window.showOpenDialog(manifestDialogOptions);
+        if (!manifestUris || manifestUris.length === 0) { return; }
+
+        const manifestUri = manifestUris[0];
+        const outputUri = await vscode.window.showSaveDialog({
+            defaultUri: vscode.Uri.file(path.join(
+                path.dirname(manifestUri.fsPath),
+                'AppPackages',
+                'SparsePackage.msix'
+            )),
+            filters: {
+                'MSIX Package': ['msix']
+            },
+            title: 'Save Sparse MSIX Package'
+        });
+        if (!outputUri) { return; }
+
+        await vscode.window.withProgress({
+            location: vscode.ProgressLocation.Notification,
+            title: 'Creating sparse MSIX package...',
+            cancellable: false
+        }, async () => {
+            await this.winAppCli.package({
+                inputPaths: [manifestUri.fsPath],
+                outputPath: outputUri.fsPath
+            });
+        });
+    }
+
+    /**
      * Signs an MSIX package
      * @param packagePath - Optional path to the package file
      */
@@ -212,6 +262,77 @@ export class PackageManager {
             } catch (error) {
                 vscode.window.showErrorMessage(`Failed to sign package: ${error}`);
             }
+        });
+    }
+
+    /**
+     * Sign a package or executable with Azure Trusted Signing (v0.6.0+).
+     */
+    public async azureSignPackage(): Promise<void> {
+        if (!await this.ensureWinAppV060Support('Azure Trusted Signing')) { return; }
+
+        const fileUris = await vscode.window.showOpenDialog({
+            canSelectFiles: true,
+            canSelectFolders: false,
+            canSelectMany: false,
+            filters: {
+                'Signable files': ['exe', 'msix', 'msixbundle']
+            },
+            title: 'Select file to sign with Azure Trusted Signing'
+        });
+        if (!fileUris || fileUris.length === 0) { return; }
+
+        type SigningConfigurationPick = vscode.QuickPickItem & {
+            mode: 'metadata' | 'account';
+        };
+        const configuration = await vscode.window.showQuickPick<SigningConfigurationPick>([
+            {
+                label: 'Use metadata file',
+                description: 'Use a prepared Azure Trusted Signing metadata.json file',
+                mode: 'metadata'
+            },
+            {
+                label: 'Specify signing account',
+                description: 'Enter subscription, resource group, account, and certificate profile',
+                mode: 'account'
+            }
+        ], {
+            title: 'Azure Trusted Signing Configuration',
+            placeHolder: 'Select how to identify the signing profile'
+        });
+        if (!configuration) { return; }
+
+        let options: AzureSignOptions;
+        if (configuration.mode === 'metadata') {
+            const metadataUris = await vscode.window.showOpenDialog({
+                canSelectFiles: true,
+                canSelectFolders: false,
+                canSelectMany: false,
+                filters: {
+                    'Trusted Signing metadata': ['json']
+                },
+                title: 'Select Azure Trusted Signing metadata.json'
+            });
+            if (!metadataUris || metadataUris.length === 0) { return; }
+            options = { metadataFile: metadataUris[0].fsPath };
+        } else {
+            const subscription = await this.promptRequiredInput('Enter Azure subscription ID', 'Subscription ID');
+            if (!subscription) { return; }
+            const resourceGroup = await this.promptRequiredInput('Enter Azure resource group name', 'Resource group');
+            if (!resourceGroup) { return; }
+            const account = await this.promptRequiredInput('Enter Azure Trusted Signing account name', 'Signing account');
+            if (!account) { return; }
+            const profile = await this.promptRequiredInput('Enter certificate profile name', 'Certificate profile');
+            if (!profile) { return; }
+            options = { subscription, resourceGroup, account, profile };
+        }
+
+        await vscode.window.withProgress({
+            location: vscode.ProgressLocation.Notification,
+            title: 'Signing with Azure Trusted Signing...',
+            cancellable: false
+        }, async () => {
+            await this.winAppCli.azureSign(fileUris[0].fsPath, options);
         });
     }
 
@@ -611,21 +732,83 @@ export class PackageManager {
             return;
         }
 
-        // Ask for build output folder
-        const folderUris = await vscode.window.showOpenDialog({
-            defaultUri: vscode.Uri.file(projectPath),
-            canSelectFolders: true,
-            canSelectFiles: false,
-            canSelectMany: false,
-            openLabel: 'Select build output folder',
-            title: 'Select the folder containing your built app'
-        });
+        type RunTargetPick = vscode.QuickPickItem & {
+            mode: 'project' | 'folder';
+        };
+        const target = projectUri
+            ? await vscode.window.showQuickPick<RunTargetPick>([
+                {
+                    label: 'Run current WinUI project',
+                    description: 'Build and launch the active .csproj using winapp project mode',
+                    mode: 'project'
+                },
+                {
+                    label: 'Run build output folder',
+                    description: 'Register and launch an existing loose package layout',
+                    mode: 'folder'
+                }
+            ], {
+                title: 'Run Target',
+                placeHolder: 'Choose a project or existing build output'
+            })
+            : { mode: 'folder' as const };
+        if (!target) { return; }
 
-        if (!folderUris || folderUris.length === 0) {
-            return;
+        let inputPath: string;
+        let configuration: string | undefined;
+        let architecture: 'x86' | 'x64' | 'arm64' | undefined;
+        let noBuild = false;
+        if (target.mode === 'project') {
+            inputPath = projectUri!.fsPath;
+            const config = vscode.workspace.getConfiguration(CONFIG.SECTION);
+            const defaultConfiguration = config.get<string>(CONFIG.DEFAULT_CONFIGURATION, DEFAULTS.CONFIGURATION);
+            type ConfigurationPick = vscode.QuickPickItem & { value: 'Debug' | 'Release' };
+            const configurationItems: ConfigurationPick[] = [
+                { label: 'Debug', value: 'Debug' },
+                { label: 'Release', value: 'Release' }
+            ];
+            configurationItems.sort((left, right) => Number(right.value === defaultConfiguration) - Number(left.value === defaultConfiguration));
+            const configurationChoice = await vscode.window.showQuickPick<ConfigurationPick>(configurationItems, {
+                title: 'Project Build Configuration',
+                placeHolder: `Select configuration (configured default listed first: ${defaultConfiguration})`
+            });
+            if (!configurationChoice) { return; }
+            configuration = configurationChoice.value;
+
+            const defaultPlatform = config.get<string>(CONFIG.DEFAULT_PLATFORM, DEFAULTS.PLATFORM);
+            const defaultArchitecture = defaultPlatform === 'ARM64' ? 'arm64' : defaultPlatform;
+            type ArchitecturePick = vscode.QuickPickItem & { value: 'x86' | 'x64' | 'arm64' };
+            const architectureItems: ArchitecturePick[] = [
+                { label: 'x86', value: 'x86' },
+                { label: 'x64', value: 'x64' },
+                { label: 'arm64', value: 'arm64' }
+            ];
+            architectureItems.sort((left, right) => Number(right.value === defaultArchitecture) - Number(left.value === defaultArchitecture));
+            const architectureChoice = await vscode.window.showQuickPick<ArchitecturePick>(architectureItems, {
+                title: 'Project Architecture',
+                placeHolder: `Select architecture (configured default listed first: ${defaultPlatform})`
+            });
+            if (!architectureChoice) { return; }
+            architecture = architectureChoice.value;
+
+            const buildChoice = await vscode.window.showQuickPick(['Build and run', 'Run existing output'], {
+                title: 'Project Build Step',
+                placeHolder: 'Build the project before launching?'
+            });
+            if (!buildChoice) { return; }
+            noBuild = buildChoice === 'Run existing output';
+        } else {
+            const folderUris = await vscode.window.showOpenDialog({
+                defaultUri: vscode.Uri.file(projectPath),
+                canSelectFolders: true,
+                canSelectFiles: false,
+                canSelectMany: false,
+                openLabel: 'Select build output folder',
+                title: 'Select the folder containing your built app'
+            });
+            if (!folderUris || folderUris.length === 0) { return; }
+            inputPath = folderUris[0].fsPath;
         }
-
-        const inputFolder = folderUris[0].fsPath;
 
         // Ask for run options
         type RunModePick = vscode.QuickPickItem & {
@@ -679,11 +862,14 @@ export class PackageManager {
         }, async () => {
             try {
                 await this.winAppCli.run({
-                    inputFolder,
+                    inputPath,
                     detach: runMode.mode === 'detach',
                     debugOutput: runMode.mode === 'debugOutput',
                     symbols,
                     unregisterOnExit: unregisterOnExit === 'Yes',
+                    ...(configuration && { configuration }),
+                    ...(architecture && { architecture }),
+                    ...(noBuild && { noBuild }),
                     ...(appArgs.length > 0 ? { appArgs } : {}),
                 }, projectPath);
             } catch (error) {
@@ -1199,6 +1385,75 @@ export class PackageManager {
         }, async () => {
             await this.winAppCli.uiRecord(appName.trim(), Number(durationInput), outputUri.fsPath);
         });
+    }
+
+    /**
+     * Search the WinUI Gallery, Community Toolkit, Reactor Gallery, or core
+     * patterns for controls and working samples (v0.6.0+).
+     */
+    public async findUi(): Promise<void> {
+        if (!await this.ensureWinAppV060Support('Find WinUI Controls & Samples')) { return; }
+
+        const query = await vscode.window.showInputBox({
+            prompt: 'Describe the WinUI control or sample you need',
+            placeHolder: 'tabbed layout',
+            ignoreFocusOut: true,
+            validateInput: value => value.trim() ? null : 'A search query is required'
+        });
+        if (!query?.trim()) { return; }
+
+        type SourcePick = vscode.QuickPickItem & {
+            source?: FindUiOptions['source'];
+        };
+        const source = await vscode.window.showQuickPick<SourcePick>([
+            { label: 'All WinUI sources', description: 'Search Gallery and Community Toolkit', source: undefined },
+            { label: 'WinUI 3 Gallery', source: 'gallery' },
+            { label: 'Windows Community Toolkit', source: 'toolkit' },
+            { label: 'Core patterns', description: 'Built-in patterns; works offline', source: 'core' },
+            { label: 'Microsoft.UI.Reactor Gallery', description: 'C#-only samples for Reactor/MVU projects', source: 'reactor' }
+        ], {
+            title: 'Find WinUI Controls & Samples',
+            placeHolder: 'Choose a sample source'
+        });
+        if (!source) { return; }
+
+        await vscode.window.withProgress({
+            location: vscode.ProgressLocation.Notification,
+            title: 'Searching WinUI controls and samples...',
+            cancellable: false
+        }, async () => {
+            const result = await this.winAppCli.findUi(query, {
+                ...(source.source && { source: source.source })
+            });
+            if (result) {
+                this.outputChannel.appendLine(`--- Find UI: ${query.trim()} ---`);
+                this.outputChannel.appendLine(result);
+                this.outputChannel.show();
+            }
+        });
+    }
+
+    private async ensureWinAppV060Support(feature: string): Promise<boolean> {
+        const version = await this.winAppCli.getVersion();
+        if (version && ((version.major > 0) || (version.major === 0 && version.minor >= 6))) {
+            return true;
+        }
+
+        const message = version
+            ? `${feature} requires winapp CLI v0.6.0 or newer.`
+            : `Unable to determine winapp CLI version. Ensure winapp CLI v0.6.0 or newer is installed.`;
+        vscode.window.showWarningMessage(message);
+        return false;
+    }
+
+    private async promptRequiredInput(prompt: string, placeHolder: string): Promise<string | undefined> {
+        const value = await vscode.window.showInputBox({
+            prompt,
+            placeHolder,
+            ignoreFocusOut: true,
+            validateInput: input => input.trim() ? null : `${placeHolder} is required`
+        });
+        return value?.trim() || undefined;
     }
 
     private async ensureUiV050Support(): Promise<boolean> {

@@ -81,6 +81,10 @@ export const COMMANDS = {
     RUN_PACKAGED_APP: 'windev-helper.runPackagedApp',
     UNREGISTER_PACKAGE: 'windev-helper.unregisterPackage',
     MANIFEST_ADD_ALIAS: 'windev-helper.manifestAddAlias',
+    // winapp CLI v0.6.0 commands
+    CREATE_SPARSE_PACKAGE: 'windev-helper.createSparsePackage',
+    AZURE_SIGN_PACKAGE: 'windev-helper.azureSignPackage',
+    FIND_UI: 'windev-helper.findUi',
     // UI Automation commands (v0.3.0+)
     UI_LIST_WINDOWS: 'windev-helper.uiListWindows',
     UI_INSPECT: 'windev-helper.uiInspect',

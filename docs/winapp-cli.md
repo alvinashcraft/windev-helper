@@ -64,6 +64,18 @@ winapp init [project-path]
 
 ---
 
+#### winapp new (v0.6.0+)
+
+Create a WinUI app from an official Windows App SDK template. It installs or updates the official template pack as needed.
+
+```bash
+winapp new --template winui-mvvm --name MyWinUIApp --output ./MyWinUIApp --use-defaults
+```
+
+WinDev Helper continues to provide its own **WinDev: Create WinUI Project** workflow because it supports both official and community template sources. Use `winapp new` directly when you want the CLI's official-template-only flow.
+
+---
+
 #### winapp restore
 
 Restore packages and dependencies for the project.
@@ -283,15 +295,48 @@ winapp get-winapp-path
 
 #### winapp run
 
-Launch build output as a packaged app without creating an MSIX.
+Launch build output as a packaged app without creating an MSIX. With winapp CLI v0.6.0+, project mode can build and run a `.csproj`, solution, or directory containing one.
 
 ```bash
 winapp run <build-output> [--debug-output] [--symbols] [-- <app-arguments>]
+# Or build and run a project directly
+winapp run ./MyApp.csproj --configuration Debug --arch x64
 ```
 
 **VS Code command:** WinDev: Run as Packaged App
 
 With winapp CLI v0.5.0+, `--debug-output` automatically runs WinUI stowed-exception triage after a crash when the app loaded `Microsoft.UI.Xaml.dll`. The report includes the originating HRESULT, ErrorContext chain, native XAML dispatch stack, and managed user frame. Select symbol resolution in the VS Code flow to add `--symbols`; the extension only passes it together with `--debug-output`.
+
+Project mode also supports `--no-build`, `--no-restore`, `--framework`, and repeatable `--property Name=Value` options. For folder mode, use `--output-appx-directory` to choose the loose-layout output location.
+
+---
+
+#### winapp find-ui (v0.6.0+)
+
+Search working WinUI controls and samples from the WinUI 3 Gallery, Windows Community Toolkit, Reactor Gallery, or built-in core patterns.
+
+```bash
+winapp find-ui "tabbed layout"
+winapp find-ui "color picker" --source toolkit
+winapp find-ui --source core --list
+```
+
+**VS Code command:** WinDev: Find WinUI Controls & Samples
+
+---
+
+#### Sparse packages and Azure Trusted Signing (v0.6.0+)
+
+`winapp package` accepts a single sparse `appxmanifest.xml` as its input to create an identity-only package for `AllowExternalContent` workflows. The release also fixes generated MSIX bundle versions.
+
+```bash
+winapp package ./appxmanifest.xml --output ./SparsePackage.msix
+winapp az-sign ./MyApp.msix --metadata-file ./metadata.json
+```
+
+**VS Code commands:** WinDev: Create Sparse MSIX Package; WinDev: Sign with Azure Trusted Signing
+
+Azure Trusted Signing requires an authenticated Azure credential. Supply a prepared metadata file, or specify `--subscription`, `--resource-group`, `--account`, and `--profile`.
 
 ---
 
