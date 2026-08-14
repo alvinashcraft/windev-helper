@@ -759,6 +759,8 @@ export class PackageManager {
         let architecture: 'x86' | 'x64' | 'arm64' | undefined;
         let noBuild = false;
         if (target.mode === 'project') {
+            if (!await this.ensureWinAppV060Support('Project-mode run')) { return; }
+
             inputPath = projectUri!.fsPath;
             const config = vscode.workspace.getConfiguration(CONFIG.SECTION);
             const defaultConfiguration = config.get<string>(CONFIG.DEFAULT_CONFIGURATION, DEFAULTS.CONFIGURATION);

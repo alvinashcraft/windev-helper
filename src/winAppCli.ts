@@ -631,6 +631,16 @@ export class WinAppCli {
      */
     public async azureSign(filePath: string, options: AzureSignOptions = {}): Promise<void> {
         try {
+            const hasAccountOptions = Boolean(
+                options.subscription || options.resourceGroup || options.account || options.profile
+            );
+            if (options.metadataFile && hasAccountOptions) {
+                vscode.window.showErrorMessage(
+                    'Use either an Azure Trusted Signing metadata file or account options, not both.'
+                );
+                return;
+            }
+
             const args: string[] = [filePath];
             if (options.subscription) {
                 args.push('--subscription', options.subscription);
@@ -648,7 +658,7 @@ export class WinAppCli {
                 args.push('--metadata-file', options.metadataFile);
             }
             await this.execute('az-sign', args);
-            vscode.window.showInformationMessage('Package signed with Azure Trusted Signing successfully.');
+            vscode.window.showInformationMessage('File signed with Azure Trusted Signing successfully.');
         } catch (error) {
             vscode.window.showErrorMessage(`Failed to sign with Azure Trusted Signing: ${error}`);
         }
