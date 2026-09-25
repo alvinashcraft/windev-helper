@@ -354,9 +354,12 @@ winapp find-api refresh
 
 #### Sparse packages and Azure Trusted Signing (v0.6.0+)
 
-`winapp pack` accepts a single sparse `appxmanifest.xml` as its input to create an identity-only package for `AllowExternalContent` workflows. The v0.6.0 release also fixes generated MSIX bundle versions.
+Sparse packaging accepts a single `appxmanifest.xml` as its input to create an identity-only package for `AllowExternalContent` workflows. Use `winapp package` with winapp CLI v0.6.x; use `winapp pack` with winapp CLI v0.7.0 or newer. The v0.6.0 release also fixes generated MSIX bundle versions.
 
 ```bash
+# winapp CLI v0.6.x
+winapp package ./appxmanifest.xml --output ./SparsePackage.msix
+# winapp CLI v0.7.0+
 winapp pack ./appxmanifest.xml --output ./SparsePackage.msix
 winapp az-sign ./MyApp.msix --metadata-file ./metadata.json
 ```

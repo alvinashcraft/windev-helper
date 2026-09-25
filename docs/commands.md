@@ -584,7 +584,7 @@ Adds a `uap5:AppExecutionAlias` to the manifest so a packaged app can be launche
 
 Creates an identity-only MSIX package from an `AllowExternalContent` app manifest. Prompts for the sparse manifest and output `.msix` location.
 
-**Uses:** `winapp pack <appxmanifest.xml>` CLI command (v0.6.0+ sparse input support)
+**Uses:** `winapp package <appxmanifest.xml>` with winapp CLI v0.6.x; `winapp pack <appxmanifest.xml>` with winapp CLI v0.7.0+
 
 ---
 

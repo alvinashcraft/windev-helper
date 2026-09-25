@@ -889,13 +889,14 @@ export class PackageManager {
             if (!buildChoice) { return; }
             noBuild = buildChoice === 'Run existing output';
 
-            const aotChoice = await vscode.window.showQuickPick(['No', 'Yes'], {
-                title: 'Native AOT',
-                placeHolder: 'Run the project Native AOT configuration? (winapp CLI v0.7.0+)'
-            });
-            if (!aotChoice) { return; }
-            if (aotChoice === 'Yes' && !await this.ensureWinAppV070Support('Native AOT project run')) { return; }
-            aot = aotChoice === 'Yes';
+            if (!noBuild && architecture !== 'x86' && await this.winAppCli.supportsV070Features()) {
+                const aotChoice = await vscode.window.showQuickPick(['No', 'Yes'], {
+                    title: 'Native AOT',
+                    placeHolder: 'Run the project Native AOT configuration?'
+                });
+                if (!aotChoice) { return; }
+                aot = aotChoice === 'Yes';
+            }
         } else {
             const folderUris = await vscode.window.showOpenDialog({
                 defaultUri: vscode.Uri.file(projectPath),
