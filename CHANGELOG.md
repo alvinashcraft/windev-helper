@@ -5,6 +5,23 @@ All notable changes to the WinDev Helper extension will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.3.0] - 2026-09-25
+
+Aligns the extension with [winapp CLI v0.7.0](https://github.com/microsoft/winappCli/releases/tag/v0.7.0) and [Microsoft Store CLI v0.4.3](https://github.com/microsoft/msstore-cli/releases/tag/v0.4.3), adding project packaging and Windows API discovery while keeping C# Dev Kit integration optional for OpenVSX compatibility.
+
+### Added
+
+- **Find Windows APIs** - Added **WinDev: Find Windows APIs** for `winapp find-api` searches, type member lookup, enum lookup, property validation, metadata package listing, index statistics, and index refresh
+- **Project-mode MSIX packaging** - **WinDev: Create MSIX Package** can now package the active `.csproj` directly with configuration, architecture, and build-step prompts when winapp CLI v0.7.0+ is installed
+- **Native AOT packaged runs** - **WinDev: Run as Packaged App** can pass `--aot` for v0.7.0+ project-mode runs
+
+### Changed
+
+- **winapp packaging command alignment** - The wrapper uses `winapp pack` for v0.7.0+ while retaining the legacy packaging command for older installed CLIs
+- **Microsoft Store CLI compatibility** - Documentation notes v0.4.3 stdout routing for human-readable output and base-price preservation during publish
+- **OpenVSX compatibility** - C# Dev Kit remains optional; no hard Marketplace-only dependency was added
+- **v0.7 documentation** - Documented `find-api`, project-mode `pack`, Native AOT runs, sparse package command naming, and Store CLI v0.4.3 behavior
+
 ## [4.2.0] - 2026-08-14
 
 Aligns the extension with [winapp CLI v0.6.0](https://github.com/microsoft/winappCli/releases/tag/v0.6.0), adding project-mode runs, WinUI sample discovery, sparse packaging, and Azure Trusted Signing.

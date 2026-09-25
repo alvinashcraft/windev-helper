@@ -181,6 +181,18 @@ export class WinAppCli {
     }
 
     /**
+     * Returns `true` when the installed winapp CLI supports v0.7.0 features
+     * used by this extension (`pack` project mode, `find-api`, `run --aot`).
+     */
+    public async supportsV070Features(): Promise<boolean> {
+        const v = await this.getVersion();
+        if (!v) {
+            return false;
+        }
+        return (v.major > 0) || (v.major === 0 && v.minor >= 7);
+    }
+
+    /**
      * Executes a winapp CLI command
      * @param command - The CLI command to execute
      * @param args - Arguments to pass to the command
@@ -507,7 +519,30 @@ export class WinAppCli {
             if (options.selfContained) {
                 args.push('--self-contained');
             }
-            await this.execute('package', args);
+            if (options.noSign) {
+                args.push('--no-sign');
+            }
+            if (options.configuration) {
+                args.push('--configuration', options.configuration);
+            }
+            if (options.architecture) {
+                args.push('--arch', options.architecture);
+            }
+            if (options.framework) {
+                args.push('--framework', options.framework);
+            }
+            if (options.noBuild) {
+                args.push('--no-build');
+            }
+            if (options.noRestore) {
+                args.push('--no-restore');
+            }
+            for (const property of options.properties ?? []) {
+                args.push('--property', property);
+            }
+
+            const command = await this.supportsV070Features() ? 'pack' : 'package';
+            await this.execute(command, args);
             vscode.window.showInformationMessage('MSIX package created successfully.');
         } catch (error) {
             vscode.window.showErrorMessage(`Failed to create MSIX package: ${error}`);
@@ -693,6 +728,44 @@ export class WinAppCli {
             return await this.execute('find-ui', args);
         } catch (error) {
             vscode.window.showErrorMessage(`Failed to find WinUI controls and samples: ${error}`);
+            return '';
+        }
+    }
+
+    /**
+     * Search and inspect the Windows/WinRT API surface available to a project
+     * or SDK scope (v0.7.0+).
+     */
+    public async findApi(options: FindApiOptions): Promise<string> {
+        try {
+            const args: string[] = [];
+            if (options.command) {
+                args.push(options.command);
+            }
+            for (const subject of options.subjects) {
+                args.push(subject);
+            }
+            if (options.maxResults !== undefined) {
+                args.push('--max', options.maxResults.toString());
+            }
+            if (options.filter) {
+                args.push('--filter', options.filter);
+            }
+            if (options.all) {
+                args.push('--all');
+            }
+            if (options.scan) {
+                args.push('--scan');
+            }
+            if (options.project) {
+                args.push('--project', options.project);
+            }
+            if (options.projectDir) {
+                args.push('--project-dir', options.projectDir);
+            }
+            return await this.execute('find-api', args);
+        } catch (error) {
+            vscode.window.showErrorMessage(`Failed to find Windows APIs: ${error}`);
             return '';
         }
     }
@@ -924,6 +997,9 @@ export class WinAppCli {
         }
         if (options.noRestore) {
             args.push('--no-restore');
+        }
+        if (options.aot) {
+            args.push('--aot');
         }
         for (const property of options.properties ?? []) {
             args.push('--property', property);
@@ -1219,6 +1295,18 @@ export interface PackageOptions {
     generateCert?: boolean;
     installCert?: boolean;
     selfContained?: boolean;
+    noSign?: boolean;
+    /** Project-mode build configuration (v0.7.0+ when input is a .csproj). */
+    configuration?: 'Debug' | 'Release';
+    /** Project-mode architecture (v0.7.0+ when input is a .csproj). */
+    architecture?: 'x86' | 'x64' | 'arm64';
+    /** Project-mode target framework for multi-targeted projects. */
+    framework?: string;
+    /** Project-mode build controls. */
+    noBuild?: boolean;
+    noRestore?: boolean;
+    /** Project-mode MSBuild properties in Name=Value form. */
+    properties?: string[];
 }
 
 export interface CertificateOptions {
@@ -1249,6 +1337,17 @@ export interface FindUiOptions {
     source?: 'gallery' | 'toolkit' | 'reactor' | 'core';
     maxResults?: number;
     refresh?: boolean;
+}
+
+export interface FindApiOptions {
+    command?: 'members' | 'check-property' | 'enums' | 'packages' | 'stats' | 'refresh';
+    subjects: string[];
+    maxResults?: number;
+    filter?: string;
+    all?: boolean;
+    scan?: boolean;
+    project?: string;
+    projectDir?: string;
 }
 
 // Microsoft Store options (v0.2.0+)
@@ -1308,6 +1407,8 @@ export interface RunOptions {
     /** Project-mode build controls. */
     noBuild?: boolean;
     noRestore?: boolean;
+    /** Build and run a Native AOT project configuration (v0.7.0+). */
+    aot?: boolean;
     /** Project-mode MSBuild properties in Name=Value form. */
     properties?: string[];
     /** Select a project when the input is a solution or multi-project directory. */

@@ -33,6 +33,7 @@ suite('Extension Test Suite', () => {
             assert.strictEqual(COMMANDS.CREATE_SPARSE_PACKAGE, 'windev-helper.createSparsePackage');
             assert.strictEqual(COMMANDS.AZURE_SIGN_PACKAGE, 'windev-helper.azureSignPackage');
             assert.strictEqual(COMMANDS.FIND_UI, 'windev-helper.findUi');
+            assert.strictEqual(COMMANDS.FIND_API, 'windev-helper.findApi');
         });
 
         test('CONFIG should have expected configuration keys', () => {
