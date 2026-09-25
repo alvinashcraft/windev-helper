@@ -70,6 +70,7 @@ The editable surface is cross-platform. Native Preview requires Windows and a bu
 ### 🔎 WinUI Discovery
 
 - **Find WinUI controls and samples** - Search WinUI 3 Gallery, Windows Community Toolkit, Reactor Gallery, and offline core patterns from the Command Palette
+- **Find Windows APIs** - Search and inspect WinRT/Windows API types, members, enum values, metadata packages, and project-specific API availability with `winapp find-api`
 
 ### 📝 Project & Item Templates
 
@@ -232,6 +233,7 @@ dotnet new winui-lib -n MyLib
 | `WinDev: Create Sparse MSIX Package` | Create an identity-only sparse package from an app manifest |
 | `WinDev: Sign with Azure Trusted Signing` | Sign an EXE, MSIX, or bundle with Azure Trusted Signing |
 | `WinDev: Find WinUI Controls & Samples` | Search control and sample sources through winapp CLI |
+| `WinDev: Find Windows APIs` | Search and inspect Windows/WinRT APIs through winapp CLI |
 | `WinDev: UI: List Windows` | List visible app windows |
 | `WinDev: UI: Inspect App` | Inspect UI Automation tree |
 | `WinDev: UI: Take Screenshot` | Capture app window screenshot |
@@ -285,9 +287,10 @@ This extension integrates with the **Windows App Development CLI (winapp)**, whi
 
 ### App Identity & Debugging
 
-- `winapp package` - Create MSIX packages, bundles, and sparse identity-only packages
+- `winapp pack` - Create MSIX packages, bundles, sparse identity-only packages, and project-mode packages with winapp CLI v0.7.0+
 - `winapp create-debug-identity` - Add temporary app identity for debugging
 - `winapp manifest` - Generate and manage AppxManifest.xml files
+- `winapp find-api` - Search Windows APIs, inspect type members and enum values, and validate properties
 
 ### Certificates & Signing
 

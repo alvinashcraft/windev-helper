@@ -2,7 +2,7 @@
 
 This document provides a comprehensive guide to using the Windows App Development CLI (winapp) with the WinDev Helper extension.
 
-> **Note:** This guide covers winapp CLI v0.3.0 and later, including the v0.5.0 UI automation additions. See [Breaking Changes](#breaking-changes) for migration notes.
+> **Note:** This guide covers winapp CLI v0.3.0 and later, including the v0.7.0 project packaging and API discovery additions. See [Breaking Changes](#breaking-changes) for migration notes.
 
 ## Overview
 
@@ -18,6 +18,7 @@ The Windows App Development CLI (winapp) is a command-line tool that simplifies 
 - **External catalog management** (v0.2.0+)
 - **Run packaged apps** from build output (v0.3.0+)
 - **UI Automation** — inspect, interact with, screenshot, and record running apps (v0.3.0+; expanded in v0.5.0)
+- **Windows API discovery** — search WinRT APIs, inspect type members, and validate properties (v0.7.0+)
 - **App execution aliases** — launch packaged apps by name (v0.3.0+)
 - **Shell completion** for all commands (v0.3.0+)
 - **`dotnet run` support** for packaged .NET apps (v0.3.0+)
@@ -142,28 +143,34 @@ winapp manifest validate [manifest-path]
 
 ### MSIX Packaging
 
-#### winapp package
+#### winapp pack
 
-Create MSIX packages from directories.
+Create MSIX packages from directories. With winapp CLI v0.7.0+, `pack` can also build and package a `.csproj` directly.
 
 ```bash
-winapp package -i <input-directory> -o <output-path> -m <manifest-path>
+winapp pack <input-directory> --output <output-path> --manifest <manifest-path>
+winapp pack ./MyApp.csproj --configuration Release --arch x64 --output ./dist/MyApp.msix
 ```
 
 **Options:**
 
 | Option | Description |
 |--------|-------------|
-| `-i, --input` | Input directory containing app files |
-| `-o, --output` | Output path for the MSIX package |
-| `-m, --manifest` | Path to the AppxManifest.xml file |
+| `--output` | Output path for the MSIX package |
+| `--manifest` | Path to the AppxManifest.xml file |
+| `--configuration`, `-c` | Project-mode build configuration |
+| `--arch` | Project-mode target architecture |
+| `--framework`, `-f` | Project-mode target framework |
+| `--no-build` | Package existing project output without rebuilding |
+| `--no-restore` | Skip restore in project mode |
+| `--property`, `-p` | Repeatable MSBuild property in `Name=Value` form |
 
 **VS Code command:** WinUI: Create MSIX Package
 
 **Example:**
 
 ```bash
-winapp package -i ./publish -o ./dist/MyApp.msix -m ./Package.appxmanifest
+winapp pack ./publish --output ./dist/MyApp.msix --manifest ./Package.appxmanifest
 ```
 
 ---
@@ -301,13 +308,15 @@ Launch build output as a packaged app without creating an MSIX. With winapp CLI 
 winapp run <build-output> [--debug-output] [--symbols] [-- <app-arguments>]
 # Or build and run a project directly
 winapp run ./MyApp.csproj --configuration Debug --arch x64
+# Or build and run the Native AOT project configuration (v0.7.0+)
+winapp run ./MyApp.csproj --aot --configuration Release
 ```
 
 **VS Code command:** WinDev: Run as Packaged App
 
 With winapp CLI v0.5.0+, `--debug-output` automatically runs WinUI stowed-exception triage after a crash when the app loaded `Microsoft.UI.Xaml.dll`. The report includes the originating HRESULT, ErrorContext chain, native XAML dispatch stack, and managed user frame. Select symbol resolution in the VS Code flow to add `--symbols`; the extension only passes it together with `--debug-output`.
 
-Project mode also supports `--no-build`, `--no-restore`, `--framework`, and repeatable `--property Name=Value` options. For folder mode, use `--output-appx-directory` to choose the loose-layout output location.
+Project mode also supports `--no-build`, `--no-restore`, `--framework`, repeatable `--property Name=Value`, and v0.7.0+ `--aot` options. For folder mode, use `--output-appx-directory` to choose the loose-layout output location.
 
 ---
 
@@ -325,12 +334,33 @@ winapp find-ui --source core --list
 
 ---
 
-#### Sparse packages and Azure Trusted Signing (v0.6.0+)
+#### winapp find-api (v0.7.0+)
 
-`winapp package` accepts a single sparse `appxmanifest.xml` as its input to create an identity-only package for `AllowExternalContent` workflows. The release also fixes generated MSIX bundle versions.
+Search and inspect the Windows/WinRT API surface available to the SDK or current project.
 
 ```bash
+winapp find-api "acrylic brush"
+winapp find-api members Microsoft.UI.Xaml.Controls.Button --filter Content
+winapp find-api check-property Microsoft.UI.Xaml.Controls.Button Content Background
+winapp find-api enums Microsoft.UI.Xaml.Visibility
+winapp find-api packages
+winapp find-api stats
+winapp find-api refresh
+```
+
+**VS Code command:** WinDev: Find Windows APIs
+
+---
+
+#### Sparse packages and Azure Trusted Signing (v0.6.0+)
+
+Sparse packaging accepts a single `appxmanifest.xml` as its input to create an identity-only package for `AllowExternalContent` workflows. Use `winapp package` with winapp CLI v0.6.x; use `winapp pack` with winapp CLI v0.7.0 or newer. The v0.6.0 release also fixes generated MSIX bundle versions.
+
+```bash
+# winapp CLI v0.6.x
 winapp package ./appxmanifest.xml --output ./SparsePackage.msix
+# winapp CLI v0.7.0+
+winapp pack ./appxmanifest.xml --output ./SparsePackage.msix
 winapp az-sign ./MyApp.msix --metadata-file ./metadata.json
 ```
 
@@ -370,6 +400,8 @@ winapp ui record -a MyApp --duration-sec 10 --output demo.mp4
 ### Microsoft Store Commands (v0.2.0+)
 
 The `winapp store` subcommand provides integrated Microsoft Store Developer CLI functionality.
+
+WinDev Helper is compatible with Microsoft Store CLI v0.4.3 behavior changes: human-readable output can now arrive on stdout, and publishing preserves the existing base price unless you explicitly change it in Partner Center or the CLI workflow.
 
 #### winapp store reconfigure
 
@@ -627,6 +659,7 @@ When `winapp init` detects a `.csproj`, it configures NuGet packages in the proj
 ## Resources
 
 - [Windows App Development CLI Repository](https://github.com/microsoft/WinAppCli)
+- [winapp CLI v0.7.0 Release Notes](https://github.com/microsoft/winappCli/releases/tag/v0.7.0)
 - [winapp CLI v0.5.0 Release Notes](https://github.com/microsoft/winappCli/releases/tag/v0.5.0)
 - [winapp CLI v0.5.0 Announcement](https://devblogs.microsoft.com/ifdef-windows/windows-app-development-cli-v0-5-0-expanded-ui-automation-js-ts-bindings-and-more/)
 - [Announcement Blog Post](https://blogs.windows.com/windowsdeveloper/2026/01/22/announcing-winapp-the-windows-app-development-cli/)

@@ -5,7 +5,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
-import { AzureSignOptions, CertificateOptions, FindUiOptions, SignOptions, WinAppCli } from './winAppCli';
+import { AzureSignOptions, CertificateOptions, FindApiOptions, FindUiOptions, SignOptions, WinAppCli } from './winAppCli';
 import { CONFIG, OUTPUT_CHANNELS, DEFAULTS } from './constants';
 
 /**
@@ -64,6 +64,26 @@ export class PackageManager {
         }
 
         const projectDir = path.dirname(projectUri.fsPath);
+        const supportsProjectPack = await this.winAppCli.supportsV070Features();
+        type PackageModePick = vscode.QuickPickItem & { mode: 'project' | 'layout' };
+        const packageMode = supportsProjectPack
+            ? await vscode.window.showQuickPick<PackageModePick>([
+                {
+                    label: 'Package current project',
+                    description: 'Build and package the active .csproj using winapp pack project mode',
+                    mode: 'project'
+                },
+                {
+                    label: 'Package build output folder',
+                    description: 'Package an existing layout folder or bundle multiple architecture folders',
+                    mode: 'layout'
+                }
+            ], {
+                title: 'MSIX Package Source',
+                placeHolder: 'Choose what winapp should package'
+            })
+            : { mode: 'layout' as const };
+        if (!packageMode) { return; }
 
         // Ask for output path
         const outputUri = await vscode.window.showSaveDialog({
@@ -76,6 +96,74 @@ export class PackageManager {
         });
 
         if (!outputUri) {
+            return;
+        }
+
+        if (packageMode.mode === 'project') {
+            const config = vscode.workspace.getConfiguration(CONFIG.SECTION);
+            const defaultConfiguration = config.get<string>(CONFIG.DEFAULT_CONFIGURATION, DEFAULTS.CONFIGURATION);
+            type ConfigurationPick = vscode.QuickPickItem & { value: 'Debug' | 'Release' };
+            const configurationItems: ConfigurationPick[] = [
+                { label: 'Release', value: 'Release' },
+                { label: 'Debug', value: 'Debug' }
+            ];
+            configurationItems.sort((left, right) => Number(right.value === defaultConfiguration) - Number(left.value === defaultConfiguration));
+            const configurationChoice = await vscode.window.showQuickPick<ConfigurationPick>(configurationItems, {
+                title: 'Package Build Configuration',
+                placeHolder: `Select configuration (configured default listed first: ${defaultConfiguration})`
+            });
+            if (!configurationChoice) { return; }
+
+            const defaultPlatform = config.get<string>(CONFIG.DEFAULT_PLATFORM, DEFAULTS.PLATFORM);
+            const defaultArchitecture = defaultPlatform === 'ARM64' ? 'arm64' : defaultPlatform;
+            type ArchitecturePick = vscode.QuickPickItem & { value: 'x86' | 'x64' | 'arm64' };
+            const architectureItems: ArchitecturePick[] = [
+                { label: 'x86', value: 'x86' },
+                { label: 'x64', value: 'x64' },
+                { label: 'arm64', value: 'arm64' }
+            ];
+            architectureItems.sort((left, right) => Number(right.value === defaultArchitecture) - Number(left.value === defaultArchitecture));
+            const architectureChoice = await vscode.window.showQuickPick<ArchitecturePick>(architectureItems, {
+                title: 'Package Architecture',
+                placeHolder: `Select architecture (configured default listed first: ${defaultPlatform})`
+            });
+            if (!architectureChoice) { return; }
+
+            const buildChoice = await vscode.window.showQuickPick(['Build and package', 'Package existing output'], {
+                title: 'Project Package Build Step',
+                placeHolder: 'Build the project before packaging?'
+            });
+            if (!buildChoice) { return; }
+
+            await vscode.window.withProgress({
+                location: vscode.ProgressLocation.Notification,
+                title: 'Creating MSIX package...',
+                cancellable: false
+            }, async () => {
+                try {
+                    await this.winAppCli.package({
+                        inputPaths: [projectUri.fsPath],
+                        outputPath: outputUri.fsPath,
+                        configuration: configurationChoice.value,
+                        architecture: architectureChoice.value,
+                        noBuild: buildChoice === 'Package existing output'
+                    });
+
+                    const action = await vscode.window.showInformationMessage(
+                        'MSIX package created successfully.',
+                        'Open Location',
+                        'Sign Package'
+                    );
+
+                    if (action === 'Open Location') {
+                        vscode.commands.executeCommand('revealFileInOS', outputUri);
+                    } else if (action === 'Sign Package') {
+                        await this.signPackage(outputUri.fsPath);
+                    }
+                } catch (error) {
+                    vscode.window.showErrorMessage(`Failed to create MSIX package: ${error}`);
+                }
+            });
             return;
         }
 
@@ -758,6 +846,7 @@ export class PackageManager {
         let configuration: string | undefined;
         let architecture: 'x86' | 'x64' | 'arm64' | undefined;
         let noBuild = false;
+        let aot = false;
         if (target.mode === 'project') {
             if (!await this.ensureWinAppV060Support('Project-mode run')) { return; }
 
@@ -799,6 +888,15 @@ export class PackageManager {
             });
             if (!buildChoice) { return; }
             noBuild = buildChoice === 'Run existing output';
+
+            if (!noBuild && architecture !== 'x86' && await this.winAppCli.supportsV070Features()) {
+                const aotChoice = await vscode.window.showQuickPick(['No', 'Yes'], {
+                    title: 'Native AOT',
+                    placeHolder: 'Run the project Native AOT configuration?'
+                });
+                if (!aotChoice) { return; }
+                aot = aotChoice === 'Yes';
+            }
         } else {
             const folderUris = await vscode.window.showOpenDialog({
                 defaultUri: vscode.Uri.file(projectPath),
@@ -872,6 +970,7 @@ export class PackageManager {
                     ...(configuration && { configuration }),
                     ...(architecture && { architecture }),
                     ...(noBuild && { noBuild }),
+                    ...(aot && { aot }),
                     ...(appArgs.length > 0 ? { appArgs } : {}),
                 }, projectPath);
             } catch (error) {
@@ -1435,6 +1534,107 @@ export class PackageManager {
         });
     }
 
+    /**
+     * Search and inspect Windows/WinRT APIs available to the current project
+     * through `winapp find-api` (v0.7.0+).
+     */
+    public async findApi(projectUri?: vscode.Uri): Promise<void> {
+        if (!await this.ensureWinAppV070Support('Find Windows APIs')) { return; }
+
+        type FindApiModePick = vscode.QuickPickItem & {
+            command?: FindApiOptions['command'];
+            needsSubjects: boolean;
+            needsProperty?: boolean;
+            supportsFilter?: boolean;
+            supportsMax?: boolean;
+        };
+        const mode = await vscode.window.showQuickPick<FindApiModePick>([
+            { label: 'Search APIs', description: 'Search types, members, enums, and namespaces', needsSubjects: true, supportsMax: true },
+            { label: 'List type members', description: 'Show properties, events, and methods for one or more types', command: 'members', needsSubjects: true, supportsFilter: true },
+            { label: 'Check properties', description: 'Validate property names on a type', command: 'check-property', needsSubjects: true, needsProperty: true },
+            { label: 'List enum values', description: 'Show enum values for one or more enum types', command: 'enums', needsSubjects: true, supportsFilter: true },
+            { label: 'List metadata packages', command: 'packages', needsSubjects: false },
+            { label: 'Show index statistics', command: 'stats', needsSubjects: false },
+            { label: 'Refresh API index', command: 'refresh', needsSubjects: false }
+        ], {
+            title: 'Find Windows APIs',
+            placeHolder: 'Choose the API lookup mode'
+        });
+        if (!mode) { return; }
+
+        let subjects: string[] = [];
+        if (mode.needsSubjects) {
+            const subjectInput = await vscode.window.showInputBox({
+                prompt: mode.command === 'check-property'
+                    ? 'Enter the type name to validate'
+                    : 'Enter API query or type name(s). Separate multiple entries with semicolons.',
+                placeHolder: mode.command ? 'Microsoft.UI.Xaml.Controls.Button' : 'acrylic brush',
+                ignoreFocusOut: true,
+                validateInput: value => value.trim() ? null : 'A query or type name is required'
+            });
+            if (!subjectInput) { return; }
+            subjects = subjectInput.split(';').map(value => value.trim()).filter(Boolean);
+        }
+
+        if (mode.needsProperty) {
+            const propertyInput = await vscode.window.showInputBox({
+                prompt: 'Enter property name(s) to validate. Separate multiple entries with semicolons.',
+                placeHolder: 'Background;Content',
+                ignoreFocusOut: true,
+                validateInput: value => value.trim() ? null : 'At least one property name is required'
+            });
+            if (!propertyInput) { return; }
+            subjects.push(...propertyInput.split(';').map(value => value.trim()).filter(Boolean));
+        }
+
+        let filter: string | undefined;
+        if (mode.supportsFilter) {
+            const filterInput = await vscode.window.showInputBox({
+                prompt: 'Filter member/value names (optional)',
+                placeHolder: 'background',
+                ignoreFocusOut: true
+            });
+            if (filterInput === undefined) { return; }
+            filter = filterInput.trim() || undefined;
+        }
+
+        let maxResults: number | undefined;
+        if (mode.supportsMax) {
+            type MaxPick = vscode.QuickPickItem & { value?: number };
+            const maxPick = await vscode.window.showQuickPick<MaxPick>([
+                { label: 'Default', description: 'Use winapp default result count' },
+                { label: '5 results', value: 5 },
+                { label: '10 results', value: 10 },
+                { label: '20 results', value: 20 }
+            ], {
+                title: 'Maximum Results',
+                placeHolder: 'Choose maximum search results'
+            });
+            if (!maxPick) { return; }
+            maxResults = maxPick.value;
+        }
+
+        const projectDir = projectUri ? path.dirname(projectUri.fsPath) : vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+        await vscode.window.withProgress({
+            location: vscode.ProgressLocation.Notification,
+            title: 'Searching Windows APIs...',
+            cancellable: false
+        }, async () => {
+            const result = await this.winAppCli.findApi({
+                subjects,
+                ...(mode.command && { command: mode.command }),
+                ...(maxResults !== undefined && { maxResults }),
+                ...(filter && { filter }),
+                ...(projectDir && { projectDir })
+            });
+            if (result) {
+                this.outputChannel.appendLine(`--- Find Windows APIs: ${mode.label} ---`);
+                this.outputChannel.appendLine(result);
+                this.outputChannel.show();
+            }
+        });
+    }
+
     private async ensureWinAppV060Support(feature: string): Promise<boolean> {
         const version = await this.winAppCli.getVersion();
         if (version && ((version.major > 0) || (version.major === 0 && version.minor >= 6))) {
@@ -1444,6 +1644,19 @@ export class PackageManager {
         const message = version
             ? `${feature} requires winapp CLI v0.6.0 or newer.`
             : `Unable to determine winapp CLI version. Ensure winapp CLI v0.6.0 or newer is installed.`;
+        vscode.window.showWarningMessage(message);
+        return false;
+    }
+
+    private async ensureWinAppV070Support(feature: string): Promise<boolean> {
+        const version = await this.winAppCli.getVersion();
+        if (version && ((version.major > 0) || (version.major === 0 && version.minor >= 7))) {
+            return true;
+        }
+
+        const message = version
+            ? `${feature} requires winapp CLI v0.7.0 or newer.`
+            : `Unable to determine winapp CLI version. Ensure winapp CLI v0.7.0 or newer is installed.`;
         vscode.window.showWarningMessage(message);
         return false;
     }

@@ -85,6 +85,7 @@ export const COMMANDS = {
     CREATE_SPARSE_PACKAGE: 'windev-helper.createSparsePackage',
     AZURE_SIGN_PACKAGE: 'windev-helper.azureSignPackage',
     FIND_UI: 'windev-helper.findUi',
+    FIND_API: 'windev-helper.findApi',
     // UI Automation commands (v0.3.0+)
     UI_LIST_WINDOWS: 'windev-helper.uiListWindows',
     UI_INSPECT: 'windev-helper.uiInspect',
@@ -218,4 +219,3 @@ export const TEMPLATE_NAMES = {
         LIBRARY: 'winuilib',
     },
 } as const;
-

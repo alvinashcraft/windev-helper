@@ -395,6 +395,12 @@ function registerCommands(context: vscode.ExtensionContext): void {
         })
     );
 
+    context.subscriptions.push(
+        vscode.commands.registerCommand(COMMANDS.FIND_API, async () => {
+            await services.packageManager.findApi(services.projectManager.currentProject);
+        })
+    );
+
     // UI Automation commands (v0.3.0+)
     context.subscriptions.push(
         vscode.commands.registerCommand(COMMANDS.UI_LIST_WINDOWS, async () => {

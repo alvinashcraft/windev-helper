@@ -376,15 +376,16 @@ Builds and runs the application without the debugger attached.
 
 **Command ID:** `windev-helper.createMsixPackage`
 
-Creates an MSIX package from your project.
+Creates an MSIX package from your project. With winapp CLI v0.7.0 or newer, the command can package the active `.csproj` directly using project mode. Older winapp CLI versions keep the existing layout-folder packaging flow.
 
 **Usage:**
 
 1. Select the output location for the package
-2. The project is published and packaged
-3. Optionally sign the package after creation
+2. On winapp CLI v0.7.0+, choose whether to package the active project or an existing layout folder
+3. Project mode prompts for configuration, architecture, and whether to build before packaging
+4. Optionally sign the package after creation
 
-**Uses:** `winapp package` CLI command
+**Uses:** `winapp pack` CLI command (v0.7.0+ project mode) or the legacy packaging command on older CLI versions
 
 ---
 
@@ -537,7 +538,7 @@ These commands provide packaged app launch and UI automation capabilities. They 
 
 **Command ID:** `windev-helper.runPackagedApp`
 
-Launches an application as a packaged app from a build output folder, or builds and launches the active `.csproj` through v0.6.0 project mode. Project mode prompts for configuration, architecture, and whether to build before launch. Folder mode retains the existing loose-layout flow. Both modes prompt for:
+Launches an application as a packaged app from a build output folder, or builds and launches the active `.csproj` through v0.6.0 project mode. Project mode prompts for configuration, architecture, whether to build before launch, and (with winapp CLI v0.7.0+) whether to run the Native AOT project configuration. Folder mode retains the existing loose-layout flow. Both modes prompt for:
 
 1. Build output folder containing your compiled app
 2. Run mode: normal, detached, or with debug output
@@ -583,7 +584,7 @@ Adds a `uap5:AppExecutionAlias` to the manifest so a packaged app can be launche
 
 Creates an identity-only MSIX package from an `AllowExternalContent` app manifest. Prompts for the sparse manifest and output `.msix` location.
 
-**Uses:** `winapp package <appxmanifest.xml>` CLI command (v0.6.0+)
+**Uses:** `winapp package <appxmanifest.xml>` with winapp CLI v0.6.x; `winapp pack <appxmanifest.xml>` with winapp CLI v0.7.0+
 
 ---
 
@@ -604,6 +605,25 @@ Signs an `.exe`, `.msix`, or `.msixbundle` using Azure Trusted Signing. Use eith
 Searches working control samples in the WinUI 3 Gallery, Windows Community Toolkit, Reactor Gallery, or built-in offline patterns. Results are shown in the WinUI Packaging output channel.
 
 **Uses:** `winapp find-ui` CLI command (v0.6.0+)
+
+---
+
+### WinDev: Find Windows APIs
+
+**Command ID:** `windev-helper.findApi`
+
+Searches and inspects Windows/WinRT API metadata using winapp CLI v0.7.0+. The command can:
+
+- Search APIs by keyword
+- List type members
+- Validate property names on a type
+- List enum values
+- Show metadata packages and index statistics
+- Refresh the API index
+
+Results are shown in the WinUI Packaging output channel.
+
+**Uses:** `winapp find-api` CLI command (v0.7.0+)
 
 ---
 
