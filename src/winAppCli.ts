@@ -6,7 +6,9 @@ import * as vscode from 'vscode';
 import * as cp from 'child_process';
 import * as path from 'path';
 import * as fs from 'fs';
+import * as os from 'os';
 import { CONFIG, OUTPUT_CHANNELS } from './constants';
+import { runCancellableProcess } from './cancellation';
 
 export type RestoreTarget =
     | { kind: 'dotnet'; projectFile: string; workingDir: string }
@@ -102,13 +104,12 @@ export class WinAppCli {
         // `winapp --version` may emit an extra "update available" banner (v0.3.2+)
         // on the first run of the day. Prefer a line that is *only* a version
         // string (optionally prefixed with `v` or suffixed with a prerelease tag)
-        // so the banner's version can't be mistaken for the installed one;
-        // fall back to the first semver found anywhere in the output.
+        // so the banner's version can't be mistaken for the installed one.
         const versionLine = input
             .split(/\r?\n/)
             .map(l => l.trim())
             .find(l => /^v?\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/.test(l));
-        const match = (versionLine ?? input).match(/(\d+)\.(\d+)\.(\d+)/);
+        const match = versionLine?.match(/(\d+)\.(\d+)\.(\d+)/);
         if (!match) {
             return null;
         }
@@ -128,7 +129,8 @@ export class WinAppCli {
             return this.cachedVersion;
         }
         try {
-            const output = await this.execute('--version');
+            const cwd = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? os.tmpdir();
+            const output = await this.execute('--version', [], cwd);
             this.cachedVersion = this.parseSemver(output.trim());
         } catch {
             this.cachedVersion = null;
@@ -147,9 +149,7 @@ export class WinAppCli {
         if (!v) {
             return true;
         }
-        return (v.major > 0) ||
-            (v.major === 0 && v.minor > 3) ||
-            (v.major === 0 && v.minor === 3 && v.patch >= 1);
+        return this.supportsVersion(0, 3, 1);
     }
 
     /**
@@ -159,13 +159,7 @@ export class WinAppCli {
      * that would reject it.
      */
     public async supportsScreenshotFocus(): Promise<boolean> {
-        const v = await this.getVersion();
-        if (!v) {
-            return false;
-        }
-        return (v.major > 0) ||
-            (v.major === 0 && v.minor > 3) ||
-            (v.major === 0 && v.minor === 3 && v.patch >= 2);
+        return this.supportsVersion(0, 3, 2);
     }
 
     /**
@@ -173,11 +167,7 @@ export class WinAppCli {
      * used by this extension (`ui list-windows --show-hidden`, `ui hover`).
      */
     public async supportsUiV040Features(): Promise<boolean> {
-        const v = await this.getVersion();
-        if (!v) {
-            return false;
-        }
-        return (v.major > 0) || (v.major === 0 && v.minor >= 4);
+        return this.supportsVersion(0, 4);
     }
 
     /**
@@ -185,11 +175,17 @@ export class WinAppCli {
      * used by this extension (`pack` project mode, `find-api`, `run --aot`).
      */
     public async supportsV070Features(): Promise<boolean> {
+        return this.supportsVersion(0, 7);
+    }
+
+    /** Checks a minimum CLI version; unknown versions do not enable new features. */
+    public async supportsVersion(major: number, minor: number, patch: number = 0): Promise<boolean> {
         const v = await this.getVersion();
         if (!v) {
             return false;
         }
-        return (v.major > 0) || (v.major === 0 && v.minor >= 7);
+        return v.major > major || (v.major === major &&
+            (v.minor > minor || (v.minor === minor && v.patch >= patch)));
     }
 
     /**
@@ -201,6 +197,11 @@ export class WinAppCli {
      * @throws Error if no workspace folder or command fails
      */
     public async execute(command: string, args: string[] = [], cwd?: string): Promise<string> {
+        return (await this.executeWithResult(command, args, cwd)).stdout;
+    }
+
+    /** Executes a CLI command without mixing human-readable stderr with stdout payloads. */
+    public async executeWithResult(command: string, args: string[] = [], cwd?: string): Promise<CliResult> {
         return new Promise((resolve, reject) => {
             const workingDir = cwd || vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
             
@@ -239,7 +240,7 @@ export class WinAppCli {
 
             process.on('close', (code) => {
                 if (code === 0) {
-                    resolve(stdout);
+                    resolve({ stdout, stderr });
                 } else {
                     const errorMessage = stderr || `Command failed with exit code ${code}`;
                     this.outputChannel.appendLine(`Error: ${errorMessage}`);
@@ -359,7 +360,7 @@ export class WinAppCli {
             if (skipPrompts) {
                 args.push('--no-prompt');
             }
-            await this.execute('init', args);
+            await this.execute('init', args, projectPath);
             
             // Offer to generate a certificate since init no longer does this automatically (v0.2.0+)
             const action = await vscode.window.showInformationMessage(
@@ -369,7 +370,7 @@ export class WinAppCli {
             );
             
             if (action === 'Generate Certificate') {
-                await this.generateCertificate();
+                await this.generateCertificate(undefined, projectPath);
             }
             
             return true;
@@ -473,7 +474,7 @@ export class WinAppCli {
     public async update(projectPath?: string): Promise<void> {
         try {
             const args = projectPath ? [projectPath] : [];
-            await this.execute('update', args);
+            await this.execute('update', args, projectPath);
             vscode.window.showInformationMessage('Packages updated successfully.');
         } catch (error) {
             vscode.window.showErrorMessage(`Failed to update packages: ${error}`);
@@ -581,7 +582,7 @@ export class WinAppCli {
     /**
      * Generate development certificates
      */
-    public async generateCertificate(options?: CertificateOptions): Promise<void> {
+    public async generateCertificate(options?: CertificateOptions, cwd?: string): Promise<void> {
         try {
             const args: string[] = ['generate'];
             if (options?.subjectName) {
@@ -596,7 +597,7 @@ export class WinAppCli {
             if (options?.exportCer) {
                 args.push('--export-cer');
             }
-            await this.execute('cert', args);
+            await this.execute('cert', args, cwd);
             vscode.window.showInformationMessage('Certificate generated successfully.');
         } catch (error) {
             vscode.window.showErrorMessage(`Failed to generate certificate: ${error}`);
@@ -799,46 +800,37 @@ export class WinAppCli {
      * Sets up authentication for Store operations
      */
     public async storeConfigure(options: StoreConfigureOptions): Promise<void> {
-        try {
-            const args: string[] = ['reconfigure'];
-            if (options.tenantId) {
-                args.push('--tenantId', options.tenantId);
-            }
-            if (options.sellerId) {
-                args.push('--sellerId', options.sellerId);
-            }
-            if (options.clientId) {
-                args.push('--clientId', options.clientId);
-            }
-            if (options.clientSecret) {
-                args.push('--clientSecret', options.clientSecret);
-            }
-            if (options.certificateThumbprint) {
-                args.push('--certificateThumbprint', options.certificateThumbprint);
-            }
-            if (options.certificateFilePath) {
-                args.push('--certificateFilePath', options.certificateFilePath);
-            }
-            if (options.certificatePassword) {
-                args.push('--certificatePassword', options.certificatePassword);
-            }
-            await this.execute('store', args);
-            vscode.window.showInformationMessage('Microsoft Store credentials configured successfully.');
-        } catch (error) {
-            vscode.window.showErrorMessage(`Failed to configure Store credentials: ${error}`);
+        const args: string[] = ['reconfigure'];
+        if (options.tenantId) {
+            args.push('--tenantId', options.tenantId);
         }
+        if (options.sellerId) {
+            args.push('--sellerId', options.sellerId);
+        }
+        if (options.clientId) {
+            args.push('--clientId', options.clientId);
+        }
+        if (options.clientSecret) {
+            args.push('--clientSecret', options.clientSecret);
+        }
+        if (options.certificateThumbprint) {
+            args.push('--certificateThumbprint', options.certificateThumbprint);
+        }
+        if (options.certificateFilePath) {
+            args.push('--certificateFilePath', options.certificateFilePath);
+        }
+        if (options.certificatePassword) {
+            args.push('--certificatePassword', options.certificatePassword);
+        }
+        await this.execute('store', args);
     }
 
     /**
      * List all applications in the Microsoft Store account
      */
     public async storeListApps(): Promise<string> {
-        try {
-            return await this.execute('store', ['apps', 'list']);
-        } catch (error) {
-            vscode.window.showErrorMessage(`Failed to list Store apps: ${error}`);
-            return '';
-        }
+        const result = await this.executeWithResult('store', ['apps', 'list']);
+        return this.storeDisplayOutput(result);
     }
 
     /**
@@ -846,12 +838,46 @@ export class WinAppCli {
      * @param productId The Store product ID
      */
     public async storeGetSubmissionStatus(productId: string): Promise<string> {
-        try {
-            return await this.execute('store', ['submission', 'status', productId]);
-        } catch (error) {
-            vscode.window.showErrorMessage(`Failed to get submission status: ${error}`);
-            return '';
-        }
+        const result = await this.executeWithResult('store', ['submission', 'status', productId]);
+        return this.storeDisplayOutput(result);
+    }
+
+    private storeDisplayOutput(result: CliResult): string {
+        return [result.stdout, result.stderr].filter(text => text.length > 0).join('\n');
+    }
+
+    /** Starts interactive Store initialization in a task terminal for Partner Center app selection. */
+    public async storeInit(projectPath: string): Promise<void> {
+        const task = new vscode.Task(
+            { type: 'windev-helper-store-init' },
+            vscode.workspace.getWorkspaceFolder(vscode.Uri.file(projectPath)) ?? vscode.TaskScope.Workspace,
+            'Initialize Microsoft Store', 'WinDev',
+            new vscode.ProcessExecution(this.winAppPath, ['store', 'init', projectPath], { cwd: projectPath })
+        );
+        task.presentationOptions = { reveal: vscode.TaskRevealKind.Always, focus: true };
+        await vscode.tasks.executeTask(task);
+    }
+
+    /** Gets machine-readable app or submission metadata on stdout. */
+    public async storeGetDetails(productId: string, kind: 'apps' | 'submission'): Promise<string> {
+        return this.execute('store', [kind, 'get', productId]);
+    }
+
+    /** Polls a submission until complete; returns false if the user cancels. */
+    public async storePoll(productId: string, token: vscode.CancellationToken): Promise<boolean> {
+        const cwd = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+        if (!cwd) { throw new Error('Open a workspace before polling a Store submission.'); }
+        const result = await runCancellableProcess({
+            command: this.winAppPath, args: ['store', 'submission', 'poll', productId],
+            cwd, token, outputChannel: this.outputChannel, showOutput: true
+        });
+        if (result.error) { throw result.error; }
+        return !result.cancelled;
+    }
+
+    /** Embeds a sparse package identity into an executable or side-by-side manifest. */
+    public async embedIdentity(target: string, manifest: string): Promise<void> {
+        await this.execute('embed-identity', [target, '--manifest', manifest], path.dirname(target));
     }
 
     /**
@@ -859,31 +885,26 @@ export class WinAppCli {
      * @param options Publishing options
      */
     public async storePublish(options: StorePublishOptions): Promise<void> {
-        try {
-            const args: string[] = ['publish'];
-            if (options.projectPath) {
-                args.push(options.projectPath);
-            }
-            if (options.inputFile) {
-                args.push('--inputFile', options.inputFile);
-            }
-            if (options.appId) {
-                args.push('--appId', options.appId);
-            }
-            if (options.flightId) {
-                args.push('--flightId', options.flightId);
-            }
-            if (options.noCommit) {
-                args.push('--noCommit');
-            }
-            if (options.rolloutPercentage !== undefined) {
-                args.push('--packageRolloutPercentage', options.rolloutPercentage.toString());
-            }
-            await this.execute('store', args);
-            vscode.window.showInformationMessage('Application published to Microsoft Store successfully.');
-        } catch (error) {
-            vscode.window.showErrorMessage(`Failed to publish to Store: ${error}`);
+        const args: string[] = ['publish'];
+        if (options.projectPath) {
+            args.push(options.projectPath);
         }
+        if (options.inputFile) {
+            args.push('--inputFile', options.inputFile);
+        }
+        if (options.appId) {
+            args.push('--appId', options.appId);
+        }
+        if (options.flightId) {
+            args.push('--flightId', options.flightId);
+        }
+        if (options.noCommit) {
+            args.push('--noCommit');
+        }
+        if (options.rolloutPercentage !== undefined) {
+            args.push('--packageRolloutPercentage', options.rolloutPercentage.toString());
+        }
+        await this.execute('store', args, options.projectPath);
     }
 
     /**
@@ -892,22 +913,17 @@ export class WinAppCli {
      * @param options Packaging options
      */
     public async storePackage(projectPath: string, options?: StorePackageOptions): Promise<void> {
-        try {
-            const args: string[] = ['package', projectPath];
-            if (options?.output) {
-                args.push('--output', options.output);
-            }
-            if (options?.arch) {
-                args.push('--arch', options.arch.join(','));
-            }
-            if (options?.version) {
-                args.push('--version', options.version);
-            }
-            await this.execute('store', args);
-            vscode.window.showInformationMessage('Application packaged for Store submission.');
-        } catch (error) {
-            vscode.window.showErrorMessage(`Failed to package for Store: ${error}`);
+        const args: string[] = ['package', projectPath];
+        if (options?.output) {
+            args.push('--output', options.output);
         }
+        if (options?.arch) {
+            args.push('--arch', options.arch.join(','));
+        }
+        if (options?.version) {
+            args.push('--version', options.version);
+        }
+        await this.execute('store', args, projectPath);
     }
 
     // ============================================
@@ -950,6 +966,38 @@ export class WinAppCli {
      * @param cwd Optional working directory for the command
      */
     public async run(options: RunOptions, cwd?: string): Promise<void> {
+        await this.executeRun(options, cwd);
+        vscode.window.showInformationMessage('Packaged app launched successfully.');
+    }
+
+    /** Launches for IDE debugging and returns the exact process ID emitted by the CLI. */
+    public async runForDebug(options: RunOptions, cwd: string): Promise<number> {
+        if (!await this.supportsVersion(0, 6)) {
+            throw new Error('Project-aware debugging requires winapp CLI v0.6.0 or newer.');
+        }
+        const supportsV070 = await this.supportsV070Features();
+        if (options.aot && !supportsV070) {
+            throw new Error('Native AOT debugging requires winapp CLI v0.7.0 or newer.');
+        }
+        const output = await this.executeRun({
+            ...options, detach: true, withoutAlias: supportsV070, withAlias: false,
+            debugOutput: false, symbols: false, noLaunch: false
+        }, cwd, true);
+        const result: unknown = JSON.parse(output);
+        if (typeof result !== 'object' || result === null) {
+            throw new Error('winapp run returned an invalid launch result.');
+        }
+        if ('Error' in result && result.Error) {
+            throw new Error(String(result.Error));
+        }
+        if (!('ProcessId' in result) || typeof result.ProcessId !== 'number' ||
+            !Number.isInteger(result.ProcessId) || result.ProcessId <= 0) {
+            throw new Error('winapp run did not return a valid process ID. The app may not have launched.');
+        }
+        return result.ProcessId;
+    }
+
+    private async executeRun(options: RunOptions, cwd?: string, json: boolean = false): Promise<string> {
         const inputPath = options.inputPath.trim();
         if (!inputPath) {
             throw new Error('An input path is required to run an app.');
@@ -983,6 +1031,15 @@ export class WinAppCli {
         if (options.withAlias) {
             args.push('--with-alias');
         }
+        if (options.withoutAlias) {
+            args.push('--without-alias');
+        }
+        if (options.runtime) {
+            args.push('--runtime', options.runtime);
+        }
+        if (options.executable) {
+            args.push('--executable', options.executable);
+        }
         if (options.configuration) {
             args.push('--configuration', options.configuration);
         }
@@ -1007,13 +1064,15 @@ export class WinAppCli {
         if (options.project) {
             args.push('--project', options.project);
         }
+        if (json) {
+            args.push('--json');
+        }
         // v0.3.1+: pass application arguments after `--` so the CLI forwards them
         // verbatim to the launched app without requiring quote escaping.
         if (options.appArgs && options.appArgs.length > 0) {
             args.push('--', ...options.appArgs);
         }
-        await this.execute('run', args, cwd);
-        vscode.window.showInformationMessage('Packaged app launched successfully.');
+        return this.execute('run', args, cwd);
     }
 
     /**
@@ -1309,6 +1368,12 @@ export interface PackageOptions {
     properties?: string[];
 }
 
+/** Captured CLI streams; stderr can contain progress even when the command succeeds. */
+export interface CliResult {
+    stdout: string;
+    stderr: string;
+}
+
 export interface CertificateOptions {
     subjectName?: string;
     outputPath?: string;
@@ -1398,6 +1463,9 @@ export interface RunOptions {
     noLaunch?: boolean;
     /** Launch through an App Execution Alias rather than AUMID activation. */
     withAlias?: boolean;
+    withoutAlias?: boolean;
+    runtime?: string;
+    executable?: string;
     /** Project-mode build configuration. */
     configuration?: string;
     /** Project-mode architecture. */

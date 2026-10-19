@@ -7,6 +7,7 @@ import * as path from 'path';
 import * as cp from 'child_process';
 import * as fs from 'fs';
 import { CONFIG, EXTERNAL_URLS, OUTPUT_CHANNELS, TEMPLATE_NAMES, TEMPLATE_PACKAGES } from './constants';
+import { WinAppCli } from './winAppCli';
 
 /**
  * Identifies which dotnet template package should provide a given template.
@@ -21,7 +22,7 @@ type ItemCategory = 'page' | 'window' | 'dialog' | 'control' | 'resourceDictiona
 export class TemplateManager {
     private readonly outputChannel: vscode.OutputChannel;
 
-    constructor() {
+    constructor(private readonly winAppCli?: WinAppCli) {
         this.outputChannel = vscode.window.createOutputChannel(OUTPUT_CHANNELS.TEMPLATES);
     }
 
@@ -997,27 +998,31 @@ public partial class ${viewModelName} : BaseViewModel
 `;
     }
 
-    /**
-     * Helps users install the WinUI agent + skills plugin from the Microsoft
-     * `win-dev-skills` repository (https://github.com/microsoft/win-dev-skills).
-     * The plugin ships the `winui-dev` agent plus the WinUI dev-workflow,
-     * design, packaging, UI-testing, code-review, and WPF-migration skills for
-     * GitHub Copilot CLI, Claude Code, and OpenAI Codex.
-     *
-     * Installation is two `copilot plugin` shell subcommands (add the
-     * marketplace, then install the plugin), after which the user starts a new
-     * Copilot session and runs the `/winui-setup` skill. This command opens a
-     * terminal and runs the two install commands directly, then surfaces the
-     * `/winui-setup` next step through the output channel and a notification.
-     */
+    /** Offers explicit installation or copyable commands for the upstream Windows skills catalog. */
     public async installCopilotPlugin(): Promise<void> {
+        const host = await vscode.window.showQuickPick([
+            { label: 'GitHub Copilot CLI', value: 'copilot' },
+            { label: 'Claude Code', value: 'claude' },
+            { label: 'OpenAI Codex', value: 'codex' }
+        ], { placeHolder: 'Select your skills host (no AI extension is required)' });
+        if (!host) { return; }
+        const plugin = await vscode.window.showQuickPick([
+            { label: 'WinUI development', value: 'winui', description: 'Scaffold, design, build, and test WinUI apps' },
+            { label: 'WinApp packaging and distribution', value: 'winappcli', description: 'Identity, signing, SDKs, and Store workflows' },
+            { label: 'WinDbg diagnostics', value: 'windbg', description: 'Advanced application and driver diagnostics' }
+        ], { placeHolder: 'Select a plugin; install each plugin from only one catalog to avoid duplicates' });
+        if (!plugin) { return; }
         const docsUrl = EXTERNAL_URLS.WIN_DEV_SKILLS_REPO;
-        const marketplaceCommand = 'copilot plugin marketplace add microsoft/win-dev-skills';
-        const installCommand = 'copilot plugin install winui@win-dev-skills';
-        const setupCommand = '/winui-setup';
-
+        const marketplaceCommand = `${host.value} plugin marketplace add microsoft/win-dev-skills`;
+        const installCommand = `${host.value} plugin ${host.value === 'codex' ? 'add' : 'install'} ${plugin.value}@win-dev-skills`;
+        const updateCommand = host.value === 'codex'
+            ? 'codex plugin marketplace upgrade win-dev-skills'
+            : `${host.value} plugin marketplace update win-dev-skills; ${host.value} plugin update ${plugin.value}@win-dev-skills`;
+        const nextStep = host.value === 'codex'
+            ? 'Codex loads skills, not agents. Start a new session and invoke the relevant skill by name.'
+            : `Start a new ${host.label} session${plugin.value === 'winui' ? ' and run /winui-setup' : ' to load the plugin'}.`;
         const choice = await vscode.window.showInformationMessage(
-            'Install the WinUI agent + skills plugin from microsoft/win-dev-skills? This opens a terminal and runs the GitHub Copilot CLI plugin install commands.',
+            `Install ${plugin.value} for ${host.label}? Do not install a duplicate from another catalog. ${nextStep}`,
             { modal: false },
             'Install in Terminal',
             'Copy Commands',
@@ -1033,36 +1038,21 @@ public partial class ${viewModelName} : BaseViewModel
 
         if (choice === 'Copy Commands') {
             await vscode.env.clipboard.writeText(`${marketplaceCommand}\n${installCommand}`);
-            vscode.window.showInformationMessage(
-                `Plugin install commands copied to clipboard. Run them in a shell with the Copilot CLI on PATH, then start a new Copilot session and run '${setupCommand}'.`
-            );
+            void vscode.window.showInformationMessage(`Plugin commands copied. ${nextStep}`);
             return;
         }
 
-        // Run the two install commands directly in a terminal. Unlike the
-        // older `/plugin install` slash-command flow, `copilot plugin
-        // marketplace add` and `copilot plugin install` are real shell
-        // subcommands, so they can be sent straight to the terminal and run
-        // identically across PowerShell, bash, and zsh (the `copilot`
-        // executable resolves on PATH for each).
         this.outputChannel.show(true);
-        this.outputChannel.appendLine('');
-        this.outputChannel.appendLine('=== WinUI Agent + Skills Plugin (microsoft/win-dev-skills) ===');
-        this.outputChannel.appendLine('Running the Copilot CLI plugin install commands in a new terminal:');
-        this.outputChannel.appendLine(`    ${marketplaceCommand}`);
-        this.outputChannel.appendLine(`    ${installCommand}`);
-        this.outputChannel.appendLine('When they finish, start a NEW Copilot session and run the setup skill:');
-        this.outputChannel.appendLine(`    ${setupCommand}`);
-        this.outputChannel.appendLine('');
+        this.outputChannel.appendLine(`${marketplaceCommand}\n${installCommand}\n${nextStep}`);
+        this.outputChannel.appendLine(`To update later: ${updateCommand}`);
+        this.outputChannel.appendLine('If an old microsoft-winui catalog is installed, follow the migration instructions in the upstream README before updating.');
 
-        const terminal = vscode.window.createTerminal({ name: 'WinUI Skills Plugin' });
+        const terminal = vscode.window.createTerminal({ name: 'Windows Skills Plugin' });
         terminal.show();
         terminal.sendText(marketplaceCommand);
         terminal.sendText(installCommand);
 
-        vscode.window.showInformationMessage(
-            `Installing the winui plugin from microsoft/win-dev-skills. Once it finishes, start a new Copilot session and run '${setupCommand}'.`
-        );
+        void vscode.window.showInformationMessage(`Install commands sent to the terminal; check their results. ${nextStep}`);
     }
 
     /**
@@ -1075,7 +1065,7 @@ public partial class ${viewModelName} : BaseViewModel
     /**
      * Verifies the Windows app development prerequisites that the
      * `win-dev-skills` `winui-setup` skill installs: the .NET SDK (>= 8),
-     * the WinApp CLI (>= 0.3), the official WinUI 3 `dotnet new` templates,
+     * the WinApp CLI (>= 0.7), the official WinUI 3 `dotnet new` templates,
      * and Windows Developer Mode. All checks are read-only — nothing is
      * installed or modified. Results, with the exact remediation command for
      * anything missing, are written to a dedicated output channel and a
@@ -1109,26 +1099,26 @@ public partial class ${viewModelName} : BaseViewModel
         // .NET SDK >= 8
         const dotnet = await this.checkDotnetSdk();
         results.push({ ok: dotnet.ok, label: '.NET SDK' });
-        channel.appendLine(`${dotnet.ok ? '[ OK ]' : '[MISS]'} .NET SDK (>= 8.0): ${dotnet.detail}`);
+        channel.appendLine(`${dotnet.ok ? '[ OK ]' : '[MISS]'} .NET SDK (>= 8.0.100): ${dotnet.detail}`);
         if (!dotnet.ok) {
             channel.appendLine('       Fix: winget install --id Microsoft.DotNet.SDK.10 --exact');
         }
 
-        // WinApp CLI >= 0.3
+        // WinApp CLI >= 0.7
         const winapp = await this.checkWinAppCliVersion();
         results.push({ ok: winapp.ok, label: 'WinApp CLI' });
-        channel.appendLine(`${winapp.ok ? '[ OK ]' : '[MISS]'} WinApp CLI (>= 0.3): ${winapp.detail}`);
+        channel.appendLine(`${winapp.ok ? '[ OK ]' : '[MISS]'} WinApp CLI (>= 0.7.0; 0.7.1 recommended): ${winapp.detail}`);
         if (!winapp.ok) {
-            channel.appendLine('       Fix: winget install --id Microsoft.WinAppCLI');
+            channel.appendLine('       Fix: winget install --id Microsoft.WinAppCli (or winget upgrade --id Microsoft.WinAppCli if already installed)');
         }
 
         // WinUI 3 templates
         const templates = await this.isPackageInstalled(TEMPLATE_PACKAGES.OFFICIAL);
-        results.push({ ok: templates, label: 'WinUI templates' });
-        channel.appendLine(`${templates ? '[ OK ]' : '[MISS]'} WinUI 3 templates (${TEMPLATE_PACKAGES.OFFICIAL}): ${templates ? 'installed' : 'not installed'}`);
+        channel.appendLine(`[INFO] WinUI 3 templates (${TEMPLATE_PACKAGES.OFFICIAL}): ${templates ? 'installed' : 'installed on demand by winapp new'}`);
         if (!templates) {
-            channel.appendLine(`       Fix: dotnet new install ${TEMPLATE_PACKAGES.OFFICIAL}`);
+            channel.appendLine('       Use winapp new for official templates; manual/community template workflows remain available.');
         }
+        channel.appendLine('[INFO] Windows Sandbox and Native AOT are optional. Sandbox requires a supported Windows edition and enabled feature; AOT requires the native C++ toolchain. No Windows features are changed by this check.');
 
         // Developer Mode (Windows only)
         const devMode = await this.checkDeveloperMode();
@@ -1166,23 +1156,30 @@ public partial class ${viewModelName} : BaseViewModel
             const output = await this.executeCommand('dotnet --list-sdks', undefined, true);
             const versions = output
                 .split(/\r?\n/)
-                .map(line => /^(\d+)\.\d+\.\d+/.exec(line.trim()))
+                .map(line => /^(\d+)\.(\d+)\.(\d+)\s/.exec(line.trim()))
                 .filter((m): m is RegExpExecArray => m !== null)
-                .map(m => parseInt(m[1], 10));
+                .map(m => ({ major: Number(m[1]), minor: Number(m[2]), patch: Number(m[3]) }));
             if (versions.length === 0) {
                 return { ok: false, detail: 'no SDKs reported by `dotnet --list-sdks`' };
             }
-            const max = Math.max(...versions);
-            return { ok: max >= 8, detail: `highest installed major version ${max}` };
+            const ok = versions.some(v => v.major > 8 || (v.major === 8 && (v.minor > 0 || v.patch >= 100)));
+            return { ok, detail: versions.map(v => `${v.major}.${v.minor}.${v.patch}`).join(', ') };
         } catch {
             return { ok: false, detail: '`dotnet` not found on PATH' };
         }
     }
 
     /**
-     * Checks for the WinApp CLI at version 0.3 or newer via `winapp --version`.
+     * Checks the release baseline without mistaking an update banner for the installed version.
      */
     private async checkWinAppCliVersion(): Promise<{ ok: boolean; detail: string }> {
+        if (this.winAppCli) {
+            const version = await this.winAppCli.getVersion();
+            return {
+                ok: await this.winAppCli.supportsV070Features(),
+                detail: version ? `${version.major}.${version.minor}.${version.patch}` : 'configured winapp CLI unavailable or version unknown'
+            };
+        }
         try {
             const output = await this.executeCommand('winapp --version', undefined, true);
             // v0.3.2+ may prepend an "update available" banner on the first run of
@@ -1192,13 +1189,13 @@ public partial class ${viewModelName} : BaseViewModel
                 .split(/\r?\n/)
                 .map(l => l.trim())
                 .find(l => /^v?\d+\.\d+(?:\.\d+)?(?:[-+][0-9A-Za-z.-]+)?$/.test(l));
-            const match = /(\d+)\.(\d+)(?:\.(\d+))?/.exec(versionLine ?? output);
+            const match = versionLine?.match(/(\d+)\.(\d+)(?:\.(\d+))?/);
             if (!match) {
                 return { ok: false, detail: 'could not parse `winapp --version` output' };
             }
             const major = parseInt(match[1], 10);
             const minor = parseInt(match[2], 10);
-            const ok = major > 0 || (major === 0 && minor >= 3);
+            const ok = major > 0 || (major === 0 && minor >= 7);
             return { ok, detail: `version ${match[0]}` };
         } catch {
             return { ok: false, detail: '`winapp` not found on PATH' };

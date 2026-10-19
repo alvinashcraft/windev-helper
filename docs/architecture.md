@@ -136,6 +136,11 @@ Provides a TypeScript interface to the Windows App Development CLI:
 
 ```typescript
 class WinAppCli {
+    // Execution contracts
+    execute(command: string, args?: string[], cwd?: string): Promise<string>
+    executeWithResult(command: string, args?: string[], cwd?: string): Promise<CliResult>
+    supportsVersion(major: number, minor: number, patch?: number): Promise<boolean>
+
     // Setup commands
     init(): Promise<void>
     restore(): Promise<void>
@@ -155,6 +160,8 @@ class WinAppCli {
 }
 ```
 
+`execute` returns stdout only. `executeWithResult` returns separate `stdout` and `stderr` strings; both streams are also displayed in the CLI output channel. Both methods reject nonzero exits and process startup failures. Store list/status methods combine streams only for human display; other consumers can retain clean JSON stdout. Store operations propagate errors to the package-manager UI, which owns failure and completion notifications.
+
 ### Project Manager (`projectManager.ts`)
 
 Handles project detection and workspace management:
@@ -163,13 +170,14 @@ Handles project detection and workspace management:
 class WinUIProjectManager {
     // Properties
     isWinUIProject: boolean
-    currentProject: vscode.Uri
+    currentProject: vscode.Uri | undefined
     
     // Methods
     detectWinUIProject(): Promise<boolean>
-    getProjectInfo(): Promise<ProjectInfo>
+    getProjectInfo(project?: vscode.Uri): Promise<ProjectInfo | undefined>
     getAllProjects(): Promise<vscode.Uri[]>
-    openManifest(): Promise<void>
+    selectProject(resource?: vscode.Uri): Promise<vscode.Uri | undefined>
+    openManifest(project?: vscode.Uri): Promise<void>
 }
 ```
 
@@ -180,6 +188,8 @@ class WinUIProjectManager {
    - `<UseWinUI>true</UseWinUI>`
    - `Microsoft.WindowsAppSDK` reference
    - Windows target framework
+
+Discovery excludes generated and dependency directories. Background detection preserves a valid selection or selects the sole available project; it leaves multiple projects unselected. Command handlers resolve explicit resources or the active text file to the nearest project and otherwise prompt with project paths. Project metadata and manifest lookup use the resolved project, without relying on C# Dev Kit APIs.
 
 ### Build Manager (`buildManager.ts`)
 
@@ -369,9 +379,11 @@ class DebugConfigurationProvider implements vscode.DebugConfigurationProvider {
 
 1. User presses F5
 2. Provider creates/resolves configuration
-3. Builds the project via BuildManager
-4. For packaged apps: deploys MSIX and launches via package identity, returns undefined (no debug session)
-5. For unpackaged apps: converts `winui` type to `coreclr`, VS Code launches the debugger
+3. The Debug Project command uses the `winapp` provider: the CLI restores/builds/deploys the explicit project and returns launch JSON
+4. The provider attaches a child debugger to `ProcessId`; managed projects use `coreclr`, Native AOT uses `cppvsdbg`
+5. Legacy packaged `winui` configurations delegate to the same provider without a second build. Legacy unpackaged configurations retain BuildManager + `coreclr` launch
+
+Store payload JSON stays on stdout, separate from human-readable stderr. Store initialization runs as an interactive process task. Submission polling uses cancellable process execution, including Windows process-tree termination for the CLI wrapper and its Store CLI child.
 
 ---
 

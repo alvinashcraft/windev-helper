@@ -8,18 +8,20 @@ import * as fs from 'fs';
 import { WinAppCli } from './winAppCli';
 import { CONTEXT_KEYS, FILE_PATTERNS, PROJECT_INDICATORS } from './constants';
 
+const projectExcludes = '**/{bin,obj,node_modules,.git,.vs,.winapp,packages}/**';
+
 /**
  * Manages WinUI project detection and operations
  */
 export class WinUIProjectManager {
-    private context: vscode.ExtensionContext;
+    private context: Pick<vscode.ExtensionContext, 'subscriptions'>;
     private winAppCli: WinAppCli;
     private _isWinUIProject: boolean = false;
     private _isReactorProject: boolean = false;
     private _currentProject: vscode.Uri | undefined;
     private fileWatcher: vscode.FileSystemWatcher | undefined;
 
-    constructor(context: vscode.ExtensionContext, winAppCli: WinAppCli) {
+    constructor(context: Pick<vscode.ExtensionContext, 'subscriptions'>, winAppCli: WinAppCli) {
         this.context = context;
         this.winAppCli = winAppCli;
         this.setupFileWatcher();
@@ -53,15 +55,17 @@ export class WinUIProjectManager {
     public async detectWinUIProject(): Promise<boolean> {
         const workspaceFolders = vscode.workspace.workspaceFolders;
         if (!workspaceFolders) {
+            this._currentProject = undefined;
+            this.setIsReactorProject(false);
             this.setIsWinUIProject(false);
             return false;
         }
 
         // Look for .csproj files
-        const csprojFiles = await vscode.workspace.findFiles(FILE_PATTERNS.CSPROJ, '**/bin/**');
+        const csprojFiles = await vscode.workspace.findFiles(FILE_PATTERNS.CSPROJ, projectExcludes);
         
         let reactorDetected = false;
-        let winUIDetected = false;
+        const projects: vscode.Uri[] = [];
         for (const csprojFile of csprojFiles) {
             const content = await this.readProjectFile(csprojFile);
             if (content === undefined) {
@@ -70,15 +74,16 @@ export class WinUIProjectManager {
             if (!reactorDetected && content.includes(PROJECT_INDICATORS.REACTOR_REFERENCE)) {
                 reactorDetected = true;
             }
-            if (!winUIDetected && this.matchesWinUIIndicators(content)) {
-                this._currentProject = csprojFile;
-                winUIDetected = true;
+            if (this.matchesWinUIIndicators(content)) {
+                projects.push(csprojFile);
             }
         }
 
+        this._currentProject = projects.find(project => project.toString() === this._currentProject?.toString())
+            ?? (projects.length === 1 ? projects[0] : undefined);
         this.setIsReactorProject(reactorDetected);
-        this.setIsWinUIProject(winUIDetected);
-        return winUIDetected;
+        this.setIsWinUIProject(projects.length > 0);
+        return projects.length > 0;
     }
 
     /**
@@ -182,8 +187,8 @@ export class WinUIProjectManager {
     /**
      * Opens the Package.appxmanifest file
      */
-    public async openManifest(): Promise<void> {
-        const projectDir = this.getProjectDirectory();
+    public async openManifest(projectUri?: vscode.Uri): Promise<void> {
+        const projectDir = projectUri ? path.dirname(projectUri.fsPath) : this.getProjectDirectory();
         if (!projectDir) {
             vscode.window.showErrorMessage('No WinUI project found.');
             return;
@@ -192,11 +197,13 @@ export class WinUIProjectManager {
         // Look for manifest file
         const manifestPatterns = [
             'Package.appxmanifest',
+            '[Aa]ppx[Mm]anifest.xml',
             '**/*.appxmanifest'
         ];
 
         for (const pattern of manifestPatterns) {
-            const files = await vscode.workspace.findFiles(pattern, '**/bin/**', 1);
+            const files = await vscode.workspace.findFiles(
+                new vscode.RelativePattern(projectDir, pattern), projectExcludes, 1);
             if (files.length > 0) {
                 const doc = await vscode.workspace.openTextDocument(files[0]);
                 await vscode.window.showTextDocument(doc);
@@ -217,13 +224,13 @@ export class WinUIProjectManager {
      * Gets project information from the .csproj file
      * @returns Promise<ProjectInfo | undefined> - The project info or undefined if not available
      */
-    public async getProjectInfo(): Promise<ProjectInfo | undefined> {
-        if (!this._currentProject) {
+    public async getProjectInfo(projectUri = this._currentProject): Promise<ProjectInfo | undefined> {
+        if (!projectUri) {
             return undefined;
         }
 
         try {
-            const content = await fs.promises.readFile(this._currentProject.fsPath, 'utf8');
+            const content = await fs.promises.readFile(projectUri.fsPath, 'utf8');
             
             const targetFramework = this.extractXmlValue(content, 'TargetFramework');
             const windowsAppSdkVersion = this.extractPackageVersion(content, 'Microsoft.WindowsAppSDK');
@@ -231,8 +238,8 @@ export class WinUIProjectManager {
             const windowsPackageType = this.extractXmlValue(content, 'WindowsPackageType');
             
             const info: ProjectInfo = {
-                path: this._currentProject.fsPath,
-                name: this.getProjectName() || 'Unknown',
+                path: projectUri.fsPath,
+                name: path.basename(projectUri.fsPath, '.csproj'),
                 platforms: this.extractXmlValue(content, 'Platforms')?.split(';') || ['x64'],
                 runtimeIdentifiers: this.extractXmlValue(content, 'RuntimeIdentifiers')?.split(';') || [],
                 ...(targetFramework && { targetFramework }),
@@ -242,7 +249,8 @@ export class WinUIProjectManager {
             };
 
             return info;
-        } catch {
+        } catch (error) {
+            console.error(`Failed to read project information for ${projectUri.fsPath}:`, error);
             return undefined;
         }
     }
@@ -270,7 +278,7 @@ export class WinUIProjectManager {
      */
     public async getAllProjects(): Promise<vscode.Uri[]> {
         const projects: vscode.Uri[] = [];
-        const csprojFiles = await vscode.workspace.findFiles('**/*.csproj', '**/bin/**');
+        const csprojFiles = await vscode.workspace.findFiles(FILE_PATTERNS.CSPROJ, projectExcludes);
         
         for (const csprojFile of csprojFiles) {
             if (await this.isWinUIProjectFile(csprojFile)) {
@@ -278,21 +286,36 @@ export class WinUIProjectManager {
             }
         }
 
-        return projects;
+        return projects.sort((left, right) => left.fsPath.localeCompare(right.fsPath));
     }
 
     /**
-     * Selects a project from multiple available projects
+     * Resolves an explicit resource or the active file to its nearest project.
+     * Prompts when the resource or workspace contains multiple candidate projects.
      */
-    public async selectProject(): Promise<vscode.Uri | undefined> {
-        const projects = await this.getAllProjects();
+    public async selectProject(resource?: vscode.Uri): Promise<vscode.Uri | undefined> {
+        let projects = await this.getAllProjects();
+        const target = resource ?? vscode.window.activeTextEditor?.document.uri;
+        if (target?.scheme === 'file') {
+            const exact = projects.find(project => path.relative(project.fsPath, target.fsPath) === '');
+            const containing = exact ? [exact] : projects.filter(project => this.containsPath(path.dirname(project.fsPath), target.fsPath));
+            if (containing.length > 0) {
+                const nearestLength = Math.max(...containing.map(project => path.dirname(project.fsPath).length));
+                projects = containing.filter(project => path.dirname(project.fsPath).length === nearestLength);
+            } else if (resource) {
+                projects = projects.filter(project => this.containsPath(resource.fsPath, project.fsPath));
+            }
+        }
         
         if (projects.length === 0) {
-            vscode.window.showWarningMessage('No WinUI projects found in the workspace.');
+            vscode.window.showWarningMessage(resource
+                ? 'No WinUI projects found for the selected resource.'
+                : 'No WinUI projects found in the workspace.');
             return undefined;
         }
 
         if (projects.length === 1) {
+            this._currentProject = projects[0];
             return projects[0];
         }
 
@@ -312,6 +335,11 @@ export class WinUIProjectManager {
         }
 
         return undefined;
+    }
+
+    private containsPath(directory: string, target: string): boolean {
+        const relative = path.relative(directory, target);
+        return relative === '' || (relative !== '..' && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative));
     }
 }
 

@@ -8,6 +8,7 @@ import * as fs from 'fs';
 import { WinUIProjectManager } from './projectManager';
 import { BuildManager } from './buildManager';
 import { DEBUG_TYPES } from './constants';
+import { WinAppDebugConfigurationProvider } from './winAppDebugProvider';
 
 /**
  * Provides debug configurations for WinUI applications
@@ -15,10 +16,13 @@ import { DEBUG_TYPES } from './constants';
 export class DebugConfigurationProvider implements vscode.DebugConfigurationProvider {
     private readonly projectManager: WinUIProjectManager;
     private readonly buildManager: BuildManager;
+    private readonly winAppDebugProvider: WinAppDebugConfigurationProvider | undefined;
 
-    constructor(projectManager: WinUIProjectManager, buildManager: BuildManager) {
+    constructor(projectManager: WinUIProjectManager, buildManager: BuildManager,
+        winAppDebugProvider?: WinAppDebugConfigurationProvider) {
         this.projectManager = projectManager;
         this.buildManager = buildManager;
+        this.winAppDebugProvider = winAppDebugProvider;
     }
 
     /**
@@ -35,9 +39,8 @@ export class DebugConfigurationProvider implements vscode.DebugConfigurationProv
     ): Promise<vscode.DebugConfiguration | undefined> {
         // If no configuration provided, create a default one
         if (!config.type && !config.request && !config.name) {
-            const project = this.projectManager.currentProject;
+            const project = await this.projectManager.selectProject();
             if (!project) {
-                vscode.window.showErrorMessage('No WinUI project found to debug.');
                 return undefined;
             }
 
@@ -68,46 +71,35 @@ export class DebugConfigurationProvider implements vscode.DebugConfigurationProv
     ): Promise<vscode.DebugConfiguration | undefined> {
         // For winui type, convert to coreclr
         if (config.type === DEBUG_TYPES.WINUI) {
-            const projectPath = config.project || this.projectManager.currentProject?.fsPath;
+            const projectPath = config.project || (await this.projectManager.selectProject())?.fsPath;
             
             if (!projectPath) {
-                vscode.window.showErrorMessage('No project specified for debugging.');
                 return undefined;
             }
 
-            // Build the project first
+            const projectInfo = await this.projectManager.getProjectInfo(vscode.Uri.file(projectPath));
+            if (!projectInfo) {
+                vscode.window.showErrorMessage('Cannot debug the application: failed to read project information.');
+                return undefined;
+            }
+            const isUnpackaged = projectInfo?.windowsPackageType?.toLowerCase() === 'none';
+            if (!isUnpackaged) {
+                if (this.winAppDebugProvider) {
+                    return this.winAppDebugProvider.resolveDebugConfigurationWithSubstitutedVariables(
+                        vscode.workspace.getWorkspaceFolder(vscode.Uri.file(projectPath)), {
+                            type: DEBUG_TYPES.WINAPP, request: 'launch', name: config.name,
+                            input: projectPath, configuration: config.configuration ?? this.buildManager.currentConfiguration,
+                            arch: (config.platform ?? this.buildManager.currentPlatform).toLowerCase(),
+                            args: config.args ?? []
+                        }, _token);
+                }
+                vscode.window.showErrorMessage('Packaged debugging requires the WinApp debug provider. Use a winapp launch configuration.');
+                return undefined;
+            }
+
             const buildSuccess = await this.buildManager.build(vscode.Uri.file(projectPath));
             if (!buildSuccess) {
                 vscode.window.showErrorMessage('Build failed. Cannot start debugging.');
-                return undefined;
-            }
-
-            // For MSIX-packaged apps, deploy to register COM classes before launch.
-            // Without deployment, WinUI apps fail with COMException 0x80040154 (Class not registered).
-            // Packaged apps must also be launched through their package identity, so we deploy,
-            // launch via shell:AppsFolder, and skip direct exe debugging.
-            const projectInfo = await this.projectManager.getProjectInfo();
-            const isUnpackaged = projectInfo?.windowsPackageType?.toLowerCase() === 'none';
-            if (!isUnpackaged) {
-                const deploySuccess = await this.buildManager.deploy(
-                    vscode.Uri.file(projectPath), projectInfo?.targetFramework);
-                if (!deploySuccess) {
-                    vscode.window.showErrorMessage('MSIX deployment failed. Cannot start debugging.');
-                    return undefined;
-                }
-
-                // Launch the packaged app through its MSIX identity
-                const launched = await this.buildManager.launchPackagedApp(
-                    vscode.Uri.file(projectPath), projectInfo?.targetFramework);
-                if (!launched) {
-                    vscode.window.showErrorMessage('Failed to launch packaged application.');
-                    return undefined;
-                }
-
-                vscode.window.showInformationMessage(
-                    'Packaged WinUI app launched. Debugger attachment is not yet supported for MSIX-packaged apps — ' +
-                    'the app is running without a debugger. Set WindowsPackageType to None in your .csproj for full debug support.'
-                );
                 return undefined;
             }
 
@@ -162,7 +154,7 @@ export class DebugConfigurationProvider implements vscode.DebugConfigurationProv
      * @returns The full path to the executable
      */
     private async getExecutablePath(projectUri: vscode.Uri): Promise<string> {
-        const projectInfo = await this.projectManager.getProjectInfo();
+        const projectInfo = await this.projectManager.getProjectInfo(projectUri);
         const projectName = path.basename(projectUri.fsPath, '.csproj');
         const targetFramework = projectInfo?.targetFramework;
         const exeName = `${projectName}.exe`;

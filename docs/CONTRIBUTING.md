@@ -53,6 +53,15 @@ Please be respectful and constructive in all interactions. We welcome contributo
 npm test
 ```
 
+For the release-foundation regression tests:
+
+```bash
+npm run compile-tests
+npx vscode-test --grep "Release foundation" --timeout 15000
+```
+
+These cover CLI version gates, stdout/stderr separation, Store failure and submission notifications, resource-based project selection, and the absence of hard extension dependencies. They do not publish Store submissions or install development tools.
+
 ---
 
 ## Project Structure

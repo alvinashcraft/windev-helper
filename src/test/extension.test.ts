@@ -163,7 +163,7 @@ public sealed partial class MainWindow
     <Grid><ct:MarkdownTextBlock /></Grid>
 </Window>`);
 
-            assert.ok(!result.xaml.includes('ct:MarkdownTextBlock'));
+            assert.ok(!/<\/?ct:MarkdownTextBlock\b/.test(result.xaml));
             assert.ok(result.xaml.includes('Tag="ct:MarkdownTextBlock"'));
             assert.ok(result.warnings.some(warning => warning.includes("Third-party namespace 'ct'")));
         });
