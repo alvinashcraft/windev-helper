@@ -32,6 +32,7 @@ The editable surface is cross-platform. Native Preview requires Windows and a bu
 - Debug your WinUI app on any supported Windows device
 - Run your app without debugging
 - **MSIX packaged app support** - Automatic deployment and launch through package identity
+- **Project/solution F5** - Build through winapp and attach to its exact process ID; Native AOT selects the native debugger
 - Write your WinUI C# and XAML anywhere VS Code runs
 
 ### 🔨 Build & Configuration
@@ -39,6 +40,7 @@ The editable surface is cross-platform. Native Preview requires Windows and a bu
 - Easily change Debug/Release build configurations
 - Switch between x86, x64, and ARM64 platforms
 - Build, rebuild, and clean projects from the command palette
+- Project-aware build, run, packaging, and manifest commands resolve the selected resource or active file, with a project picker for ambiguous multi-project workspaces
 - Status bar indicators for current build configuration and platform
 
 ### 📦 Packaging & Deployment
@@ -56,6 +58,9 @@ The editable surface is cross-platform. Native Preview requires Windows and a bu
 - **Azure Trusted Signing** - Sign executables, MSIX packages, and bundles with a cloud-managed signing identity
 - **Microsoft Store publishing** - Publish directly to the Microsoft Store from VS Code
 - Check submission status and manage Store apps
+- Initialize Store identity, package multiple architectures, view details, and poll submissions with cancellation
+- Submit existing packages to production or a flight, with a final confirmation and certificate-based authentication
+- Embed sparse package identity into executables or side-by-side manifests
 - Create external catalogs for asset management
 
 ### 🧪 UI Automation
@@ -83,7 +88,7 @@ The editable surface is cross-platform. Native Preview requires Windows and a bu
 
 ### 🤖 WinUI Agent Skills
 
-- **Install WinUI Agent + Skills Plugin** - One-click helper to set up the [WinUI agent plugin](https://devblogs.microsoft.com/ifdef-windows/build-native-windows-apps-with-ai-agents-for-winui-and-windows-app-sdk/) from the [microsoft/win-dev-skills](https://github.com/microsoft/win-dev-skills) marketplace for the GitHub Copilot CLI and Claude Code
+- **Install Windows Development Skills Plugin** - Choose `winui`, `winappcli`, or `windbg` from [microsoft/win-dev-skills](https://github.com/microsoft/win-dev-skills) for Copilot CLI, Claude Code, or Codex; copy commands or run them with consent
 - **Open WinUI Agent Skills Repository** - Jump to the win-dev-skills repo to browse the available agents and skills
 - **Check Windows Dev Environment** - Diagnose your local toolchain (.NET SDK, WinApp CLI, WinUI templates, Developer Mode) with fix-up commands
 - Pairs naturally with this extension: the agent scaffolds and iterates on your WinUI app while VS Code handles building, debugging, packaging, and signing
@@ -219,7 +224,7 @@ dotnet new winui-lib -n MyLib
 | `WinUI: Select Build Configuration` | Switch Debug/Release |
 | `WinUI: Select Target Platform` | Switch x86/x64/ARM64 |
 | `WinUI: Install WinUI Templates` | Install dotnet templates |
-| `WinUI: Install WinUI Agent + Skills Plugin` | Install the WinUI agent plugin (win-dev-skills) for the GitHub Copilot CLI |
+| `WinDev: Install Windows Development Skills Plugin` | Install Windows skills for Copilot CLI, Claude Code, or Codex |
 | `WinUI: Open WinUI Agent Skills Repository` | Open the microsoft/win-dev-skills repo |
 | `WinUI: Check Windows Dev Environment` | Diagnose the local WinUI toolchain |
 | `WinUI: Create Reactor App` | Scaffold a Microsoft.UI.Reactor app |
@@ -342,7 +347,7 @@ MyApp/
 
 ## Known Issues
 
-- **MSIX Packaged Apps**: Debugger attachment is not yet supported for packaged apps. They launch without a debugger; set `<WindowsPackageType>None</WindowsPackageType>` in your .csproj for full F5 debug support
+- **Debugger availability**: Project-aware debugging requires winapp CLI 0.6.0+ (0.7.0+ for AOT) and a compatible debugger. Debugger availability and licensing vary by editor; C# Dev Kit is not required. Attach-based debugging may miss code that runs before attachment.
 - **Designer fidelity**: The editable canvas approximates WinUI in HTML/CSS; use Windows native Preview to verify final rendering
 - **Custom controls**: Third-party controls appear as generic placeholders and do not receive full metadata-driven property editors
 - **Layout editing**: Direct movement currently applies to Canvas children; use attached properties for Grid and RelativePanel placement

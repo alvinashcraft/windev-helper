@@ -305,7 +305,7 @@ The WinDev Helper extension provides integrated Microsoft Store publishing via t
 
 **Using VS Code:**
 
-Run **WinDev: Configure Microsoft Store Credentials** and enter your credentials.
+Run **WinDev: Configure Microsoft Store Credentials** and choose client-secret, certificate-file, or certificate-thumbprint authentication. Secrets/passwords are masked in prompts and CLI command logs; they are not stored in workspace settings.
 
 **Using CLI:**
 
@@ -315,6 +315,8 @@ winapp store reconfigure --tenantId <tenant-id> --sellerId <seller-id> --clientI
 
 #### Initialize Project for Store
 
+Run **WinDev: Initialize Project for Microsoft Store**. This intentionally starts an interactive task terminal because the CLI prompts you to select the Partner Center app. Check the task result before continuing.
+
 ```bash
 winapp store init ./my-app
 ```
@@ -322,6 +324,8 @@ winapp store init ./my-app
 This associates your project with a Store app and sets up the required identity.
 
 #### Package for Store
+
+Run **WinDev: Package for Microsoft Store**, select one or more architectures, and choose the output directory.
 
 ```bash
 winapp store package ./my-app --arch x64,arm64
@@ -333,10 +337,16 @@ winapp store package ./my-app --arch x64,arm64
 
 1. Run **WinDev: Publish to Microsoft Store**
 2. Optionally enter an App ID (if not previously initialized)
-3. Choose release type:
+3. Choose a project build or existing package, and production or a package flight (enter its ID)
+4. Choose release type:
    - **Full release** - 100% rollout
    - **Gradual rollout** - Specify percentage
    - **Draft only** - Don't commit submission
+5. Confirm the app, package/project, destination, and release mode in the final modal prompt
+
+Cancelling the App ID prompt stops the command; submitting an empty value continues without an explicit App ID. Gradual rollout requires a whole percentage from 1 to 100.
+
+A successful command does not imply that the app is already available in the Store. Draft submissions are reported as drafts; committed submissions are reported as sent to the Store, with submission status used to track certification and availability. Failures are shown as errors, not successful publication notifications.
 
 **Using CLI:**
 
@@ -359,6 +369,10 @@ winapp store publish ./my-app --flightId <flight-id>
 **Using VS Code:**
 
 Run **WinDev: Check Store Submission Status** and enter the Product ID.
+
+Use **WinDev: View Microsoft Store App or Submission Details** for JSON metadata, or **WinDev: Poll Microsoft Store Submission** to wait for a final status. Cancelling polling stops local polling, not the submission.
+
+Store CLI human-readable output may be written to stderr, including app-list tables in v0.4.3. The extension displays both streams for app lists and status without treating stderr alone as a failure. A nonzero exit code is a failure. Machine-readable CLI stdout remains separate from stderr for JSON consumers.
 
 **Using CLI:**
 

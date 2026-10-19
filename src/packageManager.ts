@@ -5,7 +5,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
-import { AzureSignOptions, CertificateOptions, FindApiOptions, FindUiOptions, SignOptions, WinAppCli } from './winAppCli';
+import { AzureSignOptions, CertificateOptions, FindApiOptions, FindUiOptions, SignOptions, StoreConfigureOptions, WinAppCli } from './winAppCli';
 import { CONFIG, OUTPUT_CHANNELS, DEFAULTS } from './constants';
 
 /**
@@ -40,14 +40,16 @@ export class PackageManager {
     /**
      * Updates NuGet packages to latest versions
      */
-    public async updatePackages(): Promise<void> {
+    public async updatePackages(projectUri?: vscode.Uri): Promise<void> {
         await vscode.window.withProgress({
             location: vscode.ProgressLocation.Notification,
             title: 'Updating NuGet packages...',
             cancellable: false
         }, async () => {
             try {
-                await this.winAppCli.update();
+                await this.winAppCli.update(projectUri
+                    ? (projectUri.fsPath.toLowerCase().endsWith('.csproj') ? path.dirname(projectUri.fsPath) : projectUri.fsPath)
+                    : undefined);
             } catch (error) {
                 vscode.window.showErrorMessage(`Failed to update packages: ${error}`);
             }
@@ -647,24 +649,44 @@ export class PackageManager {
         });
         if (!clientId) { return; }
 
-        const clientSecret = await vscode.window.showInputBox({
-            prompt: 'Enter your Client Secret',
-            password: true,
-            ignoreFocusOut: true
-        });
-        if (!clientSecret) { return; }
+        const method = await vscode.window.showQuickPick(['Client secret', 'Certificate file', 'Certificate thumbprint'],
+            { placeHolder: 'Select Store authentication method' });
+        if (!method) { return; }
+        const options: StoreConfigureOptions = { tenantId, sellerId, clientId };
+        if (method === 'Client secret') {
+            const secret = await vscode.window.showInputBox({
+                prompt: 'Enter your Client Secret', password: true, ignoreFocusOut: true
+            });
+            if (!secret) { return; }
+            options.clientSecret = secret;
+        } else if (method === 'Certificate file') {
+            const file = await vscode.window.showOpenDialog({
+                canSelectMany: false, filters: { Certificate: ['pfx', 'p12'] }, title: 'Select Store authentication certificate'
+            });
+            if (!file?.[0]) { return; }
+            const password = await vscode.window.showInputBox({
+                prompt: 'Certificate password (leave empty if none)', password: true, ignoreFocusOut: true
+            });
+            if (password === undefined) { return; }
+            options.certificateFilePath = file[0].fsPath;
+            if (password) { options.certificatePassword = password; }
+        } else {
+            const thumbprint = await this.promptRequiredInput('Certificate thumbprint', 'Thumbprint');
+            if (!thumbprint) { return; }
+            options.certificateThumbprint = thumbprint;
+        }
 
         await vscode.window.withProgress({
             location: vscode.ProgressLocation.Notification,
             title: 'Configuring Microsoft Store credentials...',
             cancellable: false
         }, async () => {
-            await this.winAppCli.storeConfigure({
-                tenantId,
-                sellerId,
-                clientId,
-                clientSecret
-            });
+            try {
+                await this.winAppCli.storeConfigure(options);
+                vscode.window.showInformationMessage('Microsoft Store credentials configured successfully.');
+            } catch (error) {
+                vscode.window.showErrorMessage(`Failed to configure Store credentials: ${error}`);
+            }
         });
     }
 
@@ -677,11 +699,13 @@ export class PackageManager {
             title: 'Fetching Microsoft Store apps...',
             cancellable: false
         }, async () => {
-            const result = await this.winAppCli.storeListApps();
-            if (result) {
+            try {
+                const result = await this.winAppCli.storeListApps();
                 this.outputChannel.appendLine('--- Microsoft Store Apps ---');
                 this.outputChannel.appendLine(result);
                 this.outputChannel.show();
+            } catch (error) {
+                vscode.window.showErrorMessage(`Failed to list Store apps: ${error}`);
             }
         });
     }
@@ -702,11 +726,13 @@ export class PackageManager {
             title: 'Checking submission status...',
             cancellable: false
         }, async () => {
-            const result = await this.winAppCli.storeGetSubmissionStatus(productId);
-            if (result) {
+            try {
+                const result = await this.winAppCli.storeGetSubmissionStatus(productId);
                 this.outputChannel.appendLine(`--- Submission Status for ${productId} ---`);
                 this.outputChannel.appendLine(result);
                 this.outputChannel.show();
+            } catch (error) {
+                vscode.window.showErrorMessage(`Failed to get submission status: ${error}`);
             }
         });
     }
@@ -729,6 +755,28 @@ export class PackageManager {
             placeHolder: '9NXXXXXXXX (optional)',
             ignoreFocusOut: true
         });
+        if (appId === undefined) { return; }
+
+        const source = await vscode.window.showQuickPick(['Build project package', 'Use existing package'],
+            { placeHolder: 'Choose the Store submission source' });
+        if (!source) { return; }
+        let inputFile: string | undefined;
+        if (source === 'Use existing package') {
+            const files = await vscode.window.showOpenDialog({
+                canSelectMany: false, filters: { 'Store packages': ['msix', 'msixbundle', 'msixupload', 'appxupload'] },
+                title: 'Select the package to submit'
+            });
+            if (!files?.[0]) { return; }
+            inputFile = files[0].fsPath;
+        }
+        const destination = await vscode.window.showQuickPick(['Production', 'Package flight'],
+            { placeHolder: 'Select the Store destination' });
+        if (!destination) { return; }
+        let flightId: string | undefined;
+        if (destination === 'Package flight') {
+            flightId = await this.promptRequiredInput('Enter the package flight ID', 'Flight ID');
+            if (!flightId) { return; }
+        }
 
         // Ask about rollout
         const rolloutChoice = await vscode.window.showQuickPick(
@@ -746,18 +794,24 @@ export class PackageManager {
                 placeHolder: '10',
                 ignoreFocusOut: true,
                 validateInput: (value) => {
-                    const num = parseInt(value);
-                    if (isNaN(num) || num < 1 || num > 100) {
-                        return 'Please enter a number between 1 and 100';
+                    const num = Number(value);
+                    if (!Number.isInteger(num) || num < 1 || num > 100) {
+                        return 'Please enter a whole percentage between 1 and 100';
                     }
                     return null;
                 }
             });
             if (!percentStr) { return; }
-            rolloutPercentage = parseInt(percentStr);
+            rolloutPercentage = Number(percentStr);
         } else if (rolloutChoice.includes('Draft')) {
             noCommit = true;
         }
+
+        const confirmed = await vscode.window.showWarningMessage(
+            `Submit ${inputFile ?? projectPath} to ${flightId ? `flight ${flightId}` : 'production'} ` +
+            `(${appId || 'project-associated app'}), ${noCommit ? 'draft only' : `${rolloutPercentage ?? 100}% rollout`}?`,
+            { modal: true }, 'Submit');
+        if (confirmed !== 'Submit') { return; }
 
         await vscode.window.withProgress({
             location: vscode.ProgressLocation.Notification,
@@ -768,13 +822,115 @@ export class PackageManager {
                 await this.winAppCli.storePublish({
                     projectPath,
                     ...(appId && { appId }),
+                    ...(inputFile && { inputFile }),
+                    ...(flightId && { flightId }),
                     noCommit,
                     ...(rolloutPercentage !== undefined && { rolloutPercentage })
                 });
+                vscode.window.showInformationMessage(noCommit
+                    ? 'Microsoft Store submission saved as a draft. It has not been submitted for publication.'
+                    : 'Submission sent to Microsoft Store. Check submission status for certification and availability.');
             } catch (error) {
                 vscode.window.showErrorMessage(`Failed to publish to Store: ${error}`);
             }
         });
+    }
+
+    /** Initializes the selected project with its Store identity. */
+    public async initializeStore(projectUri?: vscode.Uri): Promise<void> {
+        const directory = projectUri ? path.dirname(projectUri.fsPath) : vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+        if (!directory) {
+            void vscode.window.showErrorMessage('Open a project before initializing Store publishing.');
+            return;
+        }
+        if (await vscode.window.showWarningMessage(
+            'Store initialization can change the project manifest and identity. Continue?',
+            { modal: true }, 'Initialize') !== 'Initialize') { return; }
+        try {
+            await this.winAppCli.storeInit(directory);
+            void vscode.window.showInformationMessage('Store initialization task started. Complete app selection in the terminal and check its result.');
+        } catch (error) {
+            void vscode.window.showErrorMessage(`Store initialization failed: ${error}`);
+        }
+    }
+
+    /** Creates a Store package for explicitly selected architectures. */
+    public async packageForStore(projectUri?: vscode.Uri): Promise<void> {
+        const directory = projectUri ? path.dirname(projectUri.fsPath) : vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+        if (!directory) {
+            void vscode.window.showErrorMessage('Open a project before packaging for Store.');
+            return;
+        }
+        const architectures = await vscode.window.showQuickPick(
+            [{ label: 'x64', value: 'x64' as const }, { label: 'arm64', value: 'arm64' as const }, { label: 'x86', value: 'x86' as const }],
+            { canPickMany: true, placeHolder: 'Select package architectures' });
+        if (!architectures?.length) { return; }
+        const output = await vscode.window.showOpenDialog({
+            canSelectFiles: false, canSelectFolders: true, canSelectMany: false, title: 'Store package output directory'
+        });
+        if (!output?.[0]) { return; }
+        try {
+            await this.winAppCli.storePackage(directory, { arch: architectures.map(item => item.value), output: output[0].fsPath });
+            void vscode.window.showInformationMessage('Store package created. It has not been submitted.');
+        } catch (error) {
+            void vscode.window.showErrorMessage(`Store packaging failed: ${error}`);
+        }
+    }
+
+    /** Displays app or submission JSON in an untitled document. */
+    public async storeDetails(): Promise<void> {
+        const kind = await vscode.window.showQuickPick(['App details', 'Submission details'], { placeHolder: 'Select Store details' });
+        if (!kind) { return; }
+        const id = await this.promptRequiredInput('Enter Store Product ID', 'Product ID');
+        if (!id) { return; }
+        try {
+            const output = await this.winAppCli.storeGetDetails(id, kind === 'App details' ? 'apps' : 'submission');
+            const document = await vscode.workspace.openTextDocument({ content: output, language: 'json' });
+            await vscode.window.showTextDocument(document);
+        } catch (error) {
+            void vscode.window.showErrorMessage(`Failed to get Store details: ${error}`);
+        }
+    }
+
+    /** Polls a submission while allowing the user to stop waiting. */
+    public async pollStoreSubmission(): Promise<void> {
+        const id = await this.promptRequiredInput('Enter Store Product ID', 'Product ID');
+        if (!id) { return; }
+        await vscode.window.withProgress({
+            location: vscode.ProgressLocation.Notification, title: 'Polling Store submission...', cancellable: true
+        }, async (_progress, token) => {
+            try {
+                const complete = await this.winAppCli.storePoll(id, token);
+                void vscode.window.showInformationMessage(complete
+                    ? 'Store polling finished. See CLI output for the final submission status.'
+                    : 'Stopped polling. The Store submission itself was not cancelled.');
+            } catch (error) {
+                void vscode.window.showErrorMessage(`Store polling failed: ${error}`);
+            }
+        });
+    }
+
+    /** Connects an executable to a sparse package without creating a new package. */
+    public async embedIdentity(): Promise<void> {
+        if (!await this.ensureWinAppV070Support('Embedding sparse identity')) { return; }
+        const target = await vscode.window.showOpenDialog({
+            canSelectMany: false, filters: { 'Executable or side-by-side manifest': ['exe', 'manifest'] },
+            title: 'Select target for sparse identity'
+        });
+        if (!target?.[0]) { return; }
+        const manifest = await vscode.window.showOpenDialog({
+            canSelectMany: false, filters: { 'Package manifest': ['appxmanifest', 'xml'] }, title: 'Select sparse package manifest'
+        });
+        if (!manifest?.[0]) { return; }
+        if (await vscode.window.showWarningMessage(
+            'Embedding identity modifies the target. Re-sign executable targets afterwards.',
+            { modal: true }, 'Embed Identity') !== 'Embed Identity') { return; }
+        try {
+            await this.winAppCli.embedIdentity(target[0].fsPath, manifest[0].fsPath);
+            void vscode.window.showInformationMessage('Sparse identity embedded. Rebuild side-by-side manifest targets or re-sign modified executables.');
+        } catch (error) {
+            void vscode.window.showErrorMessage(`Failed to embed identity: ${error}`);
+        }
     }
 
     /**
@@ -1236,7 +1392,7 @@ export class PackageManager {
             vscode.window.showWarningMessage('Unable to determine winapp CLI version. Ensure winapp CLI is installed and v0.4.0 or newer is available.');
             return;
         }
-        if (v.major === 0 && v.minor < 4) {
+        if (!await this.winAppCli.supportsUiV040Features()) {
             vscode.window.showWarningMessage('UI hover requires winapp CLI v0.4.0 or newer.');
             return;
         }
@@ -1637,7 +1793,7 @@ export class PackageManager {
 
     private async ensureWinAppV060Support(feature: string): Promise<boolean> {
         const version = await this.winAppCli.getVersion();
-        if (version && ((version.major > 0) || (version.major === 0 && version.minor >= 6))) {
+        if (await this.winAppCli.supportsVersion(0, 6)) {
             return true;
         }
 
@@ -1650,7 +1806,7 @@ export class PackageManager {
 
     private async ensureWinAppV070Support(feature: string): Promise<boolean> {
         const version = await this.winAppCli.getVersion();
-        if (version && ((version.major > 0) || (version.major === 0 && version.minor >= 7))) {
+        if (await this.winAppCli.supportsV070Features()) {
             return true;
         }
 
@@ -1673,7 +1829,7 @@ export class PackageManager {
 
     private async ensureUiV050Support(): Promise<boolean> {
         const version = await this.winAppCli.getVersion();
-        if (version && ((version.major > 0) || (version.major === 0 && version.minor >= 5))) {
+        if (await this.winAppCli.supportsVersion(0, 5)) {
             return true;
         }
 
@@ -1819,12 +1975,17 @@ export class PackageManager {
 
         const buildTaskLabel = 'winapp: build';
 
-        const buildTask = this.buildTaskForKind(projectKindPick.value, buildTaskLabel);
+        const projectMode = projectKindPick.value === 'dotnet' && projectUri !== undefined;
+        const buildTask = projectMode ? undefined : this.buildTaskForKind(projectKindPick.value, buildTaskLabel);
 
         const launchConfig: Record<string, unknown> = {
             type: 'winapp',
             request: 'launch',
             name: 'WinApp: Launch and Attach',
+            ...(projectMode && {
+                input: projectUri.fsPath,
+                configuration: vscode.workspace.getConfiguration(CONFIG.SECTION).get<string>(CONFIG.DEFAULT_CONFIGURATION, DEFAULTS.CONFIGURATION)
+            }),
         };
 
         if (buildTask) {

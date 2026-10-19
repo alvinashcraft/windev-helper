@@ -2,7 +2,7 @@
   "name": "windev-helper",
   "displayName": "WinDev Helper",
   "description": "Build beautiful, performant WinUI apps with VS Code. Debug, build, package, and deploy Windows apps powered by the Windows App SDK.",
-  "version": "4.3.0",
+  "version": "4.4.0",
   "publisher": "alvinashcraft",
   "icon": "images/icon.png",
   "license": "MIT",
@@ -199,7 +199,7 @@
       },
       {
         "command": "windev-helper.installCopilotPlugin",
-        "title": "Install WinUI Agent + Skills Plugin",
+        "title": "Install Windows Development Skills Plugin",
         "category": "WinDev"
       },
       {
@@ -255,6 +255,31 @@
       {
         "command": "windev-helper.storeConfigure",
         "title": "Configure Microsoft Store Credentials",
+        "category": "WinDev"
+      },
+      {
+        "command": "windev-helper.storeInit",
+        "title": "Initialize Project for Microsoft Store",
+        "category": "WinDev"
+      },
+      {
+        "command": "windev-helper.storePackage",
+        "title": "Package for Microsoft Store",
+        "category": "WinDev"
+      },
+      {
+        "command": "windev-helper.storeDetails",
+        "title": "View Microsoft Store App or Submission Details",
+        "category": "WinDev"
+      },
+      {
+        "command": "windev-helper.storePoll",
+        "title": "Poll Microsoft Store Submission",
+        "category": "WinDev"
+      },
+      {
+        "command": "windev-helper.embedIdentity",
+        "title": "Embed Sparse Package Identity",
         "category": "WinDev"
       },
       {
@@ -722,7 +747,57 @@
             "properties": {
               "inputFolder": {
                 "type": "string",
-                "description": "Path to the build output folder containing your app binaries (e.g., ${workspaceFolder}/bin/Debug/net8.0-windows10.0.22621). If not set, you will be prompted to select a folder."
+                "description": "Legacy alias for input. Existing build-output folder configurations remain supported."
+              },
+              "input": {
+                "type": "string",
+                "description": "Project (.csproj), solution (.sln/.slnx), project directory, or build output folder. Prompts when omitted."
+              },
+              "project": {
+                "type": "string",
+                "description": "Project name or path to select within a solution or directory."
+              },
+              "configuration": {
+                "type": "string",
+                "default": "Debug"
+              },
+              "arch": {
+                "type": "string",
+                "enum": ["x86", "x64", "arm64"]
+              },
+              "framework": {
+                "type": "string"
+              },
+              "runtime": {
+                "type": "string",
+                "description": "Windows runtime identifier; overrides arch."
+              },
+              "properties": {
+                "type": "object",
+                "additionalProperties": { "type": "string" },
+                "description": "MSBuild property name/value pairs."
+              },
+              "noBuild": {
+                "type": "boolean",
+                "default": false
+              },
+              "noRestore": {
+                "type": "boolean",
+                "default": false
+              },
+              "aot": {
+                "type": "boolean",
+                "default": false,
+                "description": "Use the project's Native AOT publish. Requires PublishAot=true and cppvsdbg."
+              },
+              "clean": {
+                "type": "boolean",
+                "default": false,
+                "description": "Clear app data before deployment."
+              },
+              "executable": {
+                "type": "string",
+                "description": "Executable relative to the input folder, when disambiguation is needed."
               },
               "manifest": {
                 "type": "string",
@@ -735,8 +810,7 @@
                   "cppvsdbg",
                   "node"
                 ],
-                "default": "coreclr",
-                "description": "Underlying debugger to use after the app is launched with package identity."
+                "description": "Underlying debugger. Defaults to coreclr, or cppvsdbg for Native AOT. C# Dev Kit is not required."
               },
               "workingDirectory": {
                 "type": "string",
@@ -809,13 +883,13 @@
     "@types/vscode": "1.108.1",
     "@vscode/test-cli": "^0.0.15",
     "@vscode/test-electron": "^3.1.0",
-    "@vscode/vsce": "^3.9.2",
+    "@vscode/vsce": "^4.0.0",
     "esbuild": "^0.28.2",
-    "eslint": "^10.8.1",
+    "eslint": "^10.13.0",
     "npm-run-all": "^4.1.5",
-    "ovsx": "^1.1.1",
+    "ovsx": "^1.3.0",
     "typescript": "6.0.3",
-    "typescript-eslint": "^8.67.0"
+    "typescript-eslint": "^8.72.0"
   },
   "overrides": {
     "diff": "9.0.0",

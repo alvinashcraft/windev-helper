@@ -128,7 +128,7 @@ export class ServiceLocator {
      */
     public get templateManager(): TemplateManager {
         if (!this._templateManager) {
-            this._templateManager = new TemplateManager();
+            this._templateManager = new TemplateManager(this.winAppCli);
         }
         return this._templateManager;
     }

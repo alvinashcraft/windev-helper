@@ -72,9 +72,19 @@ export async function runCancellableProcess(
 
         // Handle cancellation
         const cancellationListener = token.onCancellationRequested(() => {
-            childProcess.kill('SIGTERM');
+            if (process.platform === 'win32' && childProcess.pid) {
+                cp.execFile('taskkill', ['/PID', String(childProcess.pid), '/T', '/F'], (error) => {
+                    if (error && childProcess.exitCode === null) {
+                        cancellationListener.dispose();
+                        outputChannel?.appendLine(`Failed to terminate process tree: ${error.message}`);
+                        resolve({ cancelled: false, error });
+                    }
+                });
+            } else {
+                childProcess.kill('SIGTERM');
+            }
             if (outputChannel) {
-                outputChannel.appendLine('Operation cancelled by user.');
+                outputChannel.appendLine('Cancellation requested by user.');
             }
         });
 

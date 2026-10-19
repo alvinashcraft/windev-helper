@@ -9,11 +9,51 @@ This guide covers debugging WinUI applications using the WinDev Helper extension
 3. Press `F5` to start debugging
 4. Your app launches with the debugger attached
 
-> **Note:** Full debugger attachment requires an **unpackaged** app (set `<WindowsPackageType>None</WindowsPackageType>` in your .csproj). For MSIX-packaged apps, the extension will build, deploy, and launch the app without a debugger. See [Packaged vs. Unpackaged Apps](#packaged-vs-unpackaged-apps) below.
+> **Requirements:** Project-aware F5 requires winapp CLI 0.6.0+ (0.7.0+ for Native AOT) on Windows and a compatible C# or native debugger. C# Dev Kit is optional. Debugger licensing/availability varies by editor; publishing to Open VSX does not guarantee Microsoft debugger availability in every editor.
+
+## Project-Aware WinApp Debugging
+
+**WinDev: Debug Project** launches the selected project through `winapp run`, which restores/builds and launches it, then attaches to the exact `ProcessId` returned by `--json`. No executable-name polling or first-match process selection is used.
+
+```json
+{
+  "version": "0.2.0",
+  "configurations": [{
+    "type": "winapp",
+    "request": "launch",
+    "name": "My App",
+    "input": "${workspaceFolder}/MyApp.csproj",
+    "configuration": "Debug",
+    "arch": "x64",
+    "args": ["--example", "two words"]
+  }]
+}
+```
+
+`input` accepts a `.csproj`, `.sln`, `.slnx`, project directory, or existing build-output folder. Existing `inputFolder` configurations remain valid; `input` wins if both are present. Missing configured paths produce an error rather than silently choosing another app. When no input is configured, the extension discovers projects/solutions or offers to browse for a target.
+
+Optional properties:
+
+| Property | Purpose |
+|---|---|
+| `project` | Project name/path to select inside a solution or multi-project directory |
+| `configuration`, `arch`, `framework` | Build configuration, architecture, and target framework |
+| `runtime` | Windows RID; overrides `arch` |
+| `properties` | MSBuild property name/string-value pairs |
+| `noBuild`, `noRestore` | Use existing output or skip restore |
+| `aot` | Use the project's configured Native AOT publish; requires effective `PublishAot=true` |
+| `manifest`, `executable`, `outputAppxDirectory` | Manifest override, folder executable disambiguation, and layout output |
+| `clean` | Clear app data before deployment |
+| `debuggerType` | `coreclr` (default), `cppvsdbg` (automatic for AOT), or `node` |
+| `workingDirectory`, `args` | CLI working directory and app arguments; arrays preserve argument boundaries |
+
+Missing C#/C++ debuggers prompt for installation **before** app launch, and installation requires consent. Native AOT rejects a managed debugger override. IDE debugging does not enable CLI `--debug-output` or `--symbols`, because only one debugger can attach. Console apps launch without an execution alias to keep launch JSON separate from app output; use Run as Packaged App for console stream forwarding.
+
+This is launch-then-attach debugging, so code executed before attachment may not hit breakpoints. No debugger or AI extension is installed silently.
 
 ## Debug Configuration
 
-### Debug Flow
+### Legacy WinUI Debug Flow
 
 The extension automatically creates a debug configuration when you press F5. It:
 
@@ -22,7 +62,7 @@ The extension automatically creates a debug configuration when you press F5. It:
 3. Uses the current platform (x86/x64/ARM64)
 4. Builds the project if needed
 5. **For unpackaged apps:** Launches the app with the debugger attached
-6. **For packaged apps:** Deploys the MSIX package and launches through the package identity (without debugger)
+6. **For packaged apps:** Delegates to the project-aware WinApp debugger, including build and PID-based attachment
 
 ### Packaged vs. Unpackaged Apps
 
@@ -31,11 +71,11 @@ WinUI apps can be either MSIX-packaged (the default) or unpackaged:
 | | Unpackaged | Packaged (MSIX) |
 |---|---|---|
 | **WindowsPackageType** | `None` | (default, not set) |
-| **F5 Debugging** | Full debugger support | Launches without debugger |
+| **F5 Debugging** | Debugger support | WinApp launch + debugger attach |
 | **Ctrl+F5 Run** | `dotnet run` | Deploy + launch via package identity |
 | **COM Registration** | Auto-initialized | Requires MSIX deployment |
 
-**To enable full F5 debugging**, add this to your .csproj:
+**To choose unpackaged deployment**, add this to your .csproj (not required for packaged debugging):
 
 ```xml
 <PropertyGroup>
@@ -45,10 +85,10 @@ WinUI apps can be either MSIX-packaged (the default) or unpackaged:
 
 **Packaged app launch flow:**
 
-1. Project is built with `dotnet build`
-2. MSIX package is registered via `Add-AppxPackage -Register` (using AppxManifest.xml from build output)
-3. App is launched through `shell:AppsFolder` using the package family name
-4. An informational message suggests using unpackaged mode for full debug support
+1. The CLI builds the selected project
+2. `winapp run` supplies package identity and launches the app
+3. The CLI returns machine-readable launch information
+4. A child debugger attaches to the returned PID
 
 ### Custom Launch Configuration
 

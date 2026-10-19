@@ -5,6 +5,30 @@ All notable changes to the WinDev Helper extension will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.4.0] - 2026-10-19
+
+### Added
+
+- **Project-aware F5** - The `winapp` debugger accepts projects, solutions, or existing layouts, builds through the CLI, and attaches to the exact process ID from JSON output instead of matching executable names. Supports build configuration, architecture, framework, runtime, properties, build controls, and Native AOT with the native debugger.
+- **Store workflows** - Added Store initialization in an interactive task terminal, multi-architecture packaging, app/submission details, and cancellable submission polling. Publishing offers existing packages, flight IDs, and a final destination/release-mode confirmation. Authentication supports certificate files and thumbprints.
+- **Sparse identity embedding** - Added **WinDev: Embed Sparse Package Identity** with explicit confirmation and re-signing guidance.
+- **Skills host selection** - The existing skills installer now offers `winui`, `winappcli`, and `windbg` for Copilot CLI, Claude Code, and Codex, with host-specific install commands and duplicate-catalog guidance.
+
+### Changed
+
+- **Packaged debugging** - Debug Project uses project-mode WinApp debugging. Existing packaged `winui` launch configurations delegate to the same PID-based debugger; `inputFolder` configurations remain supported.
+- **Environment checks** - Checks .NET SDK 8.0.100+ and the configured winapp CLI 0.7.0+ (0.7.1 recommended), and treats official templates as installable on demand through `winapp new`.
+- **Dependency uplift** - Updated VSCE to 4.0.0, ESLint to 10.13.0, Open VSX CLI to 1.3.0, and typescript-eslint to 8.72.0; refreshed compatible transitive dependencies. Retained TypeScript 6, Node 22 types, and the VS Code 1.108.1 API floor. npm audit reports zero vulnerabilities.
+- **Project targeting** - Build, run, packaging, manifest, and package-management commands resolve the selected resource or active file to its nearest WinUI project, prompting with project paths when ambiguous. Background detection no longer chooses the first project in a multi-project workspace, and generated project directories are excluded.
+- **CLI capability checks** - Shared minimum-version comparison keeps feature gates consistent while retaining older-CLI compatibility.
+- **Microsoft Store results** - Human-readable app lists and submission status retain stderr output without mixing it into machine-readable stdout. Store failures propagate to the command UI, and successful submissions distinguish drafts from submissions awaiting certification.
+
+### Fixed
+
+- **XAML preprocessing regression test** - Corrected the contradictory third-party-control assertion to reject actual XML elements while allowing their names in placeholder diagnostics. Preprocessor output is unchanged.
+- **Multi-project debugging metadata** - Debugging reads framework and packaging information from the requested project rather than another selected project.
+- **Store publishing cancellation** - Cancelling the App ID prompt stops publishing. Gradual rollout input requires a whole percentage.
+
 ## [4.3.0] - 2026-09-25
 
 Aligns the extension with [winapp CLI v0.7.0](https://github.com/microsoft/winappCli/releases/tag/v0.7.0) and [Microsoft Store CLI v0.4.3](https://github.com/microsoft/msstore-cli/releases/tag/v0.4.3), adding project packaging and Windows API discovery while keeping C# Dev Kit integration optional for OpenVSX compatibility.

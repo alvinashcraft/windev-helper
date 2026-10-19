@@ -5,417 +5,178 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
-import * as cp from 'child_process';
-import { WinAppCli } from './winAppCli';
+import { RunOptions, WinAppCli } from './winAppCli';
 import { DEBUG_TYPES, OUTPUT_CHANNELS } from './constants';
 
-/**
- * Shape of a `winapp` launch configuration. Mirrors the configuration
- * properties exposed by the official Microsoft WinApp VS Code extension.
- */
 interface WinAppDebugConfiguration extends vscode.DebugConfiguration {
-    type: 'winapp';
-    request: 'launch';
-    /** Build output folder containing the app's `.exe`. */
+    input?: string;
     inputFolder?: string;
-    /** Path to the AppxManifest.xml. Auto-detected when omitted. */
     manifest?: string;
-    /** Underlying debugger to use. */
     debuggerType?: 'coreclr' | 'cppvsdbg' | 'node';
-    /** Working directory for the launched application. */
     workingDirectory?: string;
-    /** Arguments forwarded to the launched application. */
     args?: string | string[];
-    /** Output directory for the loose-layout package. */
     outputAppxDirectory?: string;
+    project?: string;
+    configuration?: string;
+    arch?: 'x86' | 'x64' | 'arm64';
+    framework?: string;
+    runtime?: string;
+    properties?: Record<string, string>;
+    noBuild?: boolean;
+    noRestore?: boolean;
+    aot?: boolean;
+    clean?: boolean;
+    executable?: string;
 }
 
-/**
- * Provides resolution and launch handling for the `winapp` debug type.
- *
- * Flow on F5:
- *   1. Resolve / prompt for the build output folder.
- *   2. Locate the application executable inside that folder.
- *   3. Launch via `winapp run --detach` so the app starts with package
- *      identity but our debug session keeps control.
- *   4. Start a child debug session that attaches the requested debugger
- *      (coreclr / cppvsdbg / node) to the running process.
- */
+/** Launches projects or existing layouts with identity, then attaches to the CLI-reported PID. */
 export class WinAppDebugConfigurationProvider implements vscode.DebugConfigurationProvider {
-    /** Executables that can appear in build output but are never the app itself. */
-    private static readonly EXE_BLOCKLIST = new Set<string>([
-        'createdump.exe',
-        'apphost.exe',
-        'singlefilehost.exe',
-    ]);
+    private readonly outputChannel = vscode.window.createOutputChannel(OUTPUT_CHANNELS.WINAPP_DEBUG);
 
-    private readonly winAppCli: WinAppCli;
-    private readonly outputChannel: vscode.OutputChannel;
+    constructor(private readonly winAppCli: WinAppCli) {}
 
-    constructor(winAppCli: WinAppCli) {
-        this.winAppCli = winAppCli;
-        this.outputChannel = vscode.window.createOutputChannel(OUTPUT_CHANNELS.WINAPP_DEBUG);
+    /** Provides an F5 configuration without requiring a launch.json file. */
+    public provideDebugConfigurations(): vscode.DebugConfiguration[] {
+        return [{ type: DEBUG_TYPES.WINAPP, request: 'launch', name: 'WinApp: Launch and Attach' }];
     }
 
-    /**
-     * Provides the initial `winapp` configuration shown when a user has no
-     * launch.json yet and selects the WinApp debugger.
-     */
-    public provideDebugConfigurations(
-        _folder: vscode.WorkspaceFolder | undefined,
-        _token?: vscode.CancellationToken
-    ): vscode.ProviderResult<vscode.DebugConfiguration[]> {
-        return [
-            {
-                type: DEBUG_TYPES.WINAPP,
-                request: 'launch',
-                name: 'WinApp: Launch and Attach',
-            },
-        ];
-    }
-
-    /**
-     * Fills in defaults when an empty config is supplied (e.g. via the F5
-     * prompt before any launch.json exists). Detailed work is deferred to
-     * `resolveDebugConfigurationWithSubstitutedVariables` so the user's
-     * `${workspaceFolder}` style tokens are already expanded.
-     */
+    /** Supplies defaults before VS Code substitutes workspace variables. */
     public resolveDebugConfiguration(
-        _folder: vscode.WorkspaceFolder | undefined,
-        config: vscode.DebugConfiguration,
-        _token?: vscode.CancellationToken
-    ): vscode.ProviderResult<vscode.DebugConfiguration> {
+        _folder: vscode.WorkspaceFolder | undefined, config: vscode.DebugConfiguration
+    ): vscode.DebugConfiguration {
         if (!config.type && !config.request && !config.name) {
-            config.type = DEBUG_TYPES.WINAPP;
-            config.request = 'launch';
-            config.name = 'WinApp: Launch and Attach';
+            Object.assign(config, this.provideDebugConfigurations()[0]);
         }
         return config;
     }
 
-    /**
-     * Performs the actual launch + attach. Returning `undefined` cancels the
-     * top-level debug session, which is what we want once the child session
-     * has been started successfully (the user only sees the child).
-     */
+    /** Builds and launches via winapp; the child session owns the actual debugger. */
     public async resolveDebugConfigurationWithSubstitutedVariables(
         folder: vscode.WorkspaceFolder | undefined,
         config: vscode.DebugConfiguration,
-        _token?: vscode.CancellationToken
-    ): Promise<vscode.DebugConfiguration | undefined | null> {
-        if (config.type !== DEBUG_TYPES.WINAPP) {
-            return config;
-        }
-
-        const winAppConfig = config as WinAppDebugConfiguration;
-        const workspaceFolder = folder ?? vscode.workspace.workspaceFolders?.[0];
-
-        const inputFolder = await this.resolveInputFolder(winAppConfig, workspaceFolder);
-        if (!inputFolder) {
-            return undefined;
-        }
-
-        const exePath = this.findAppExecutable(inputFolder, winAppConfig.manifest);
-        if (!exePath) {
-            vscode.window.showErrorMessage(
-                `No application .exe found under '${inputFolder}'. Build the project first or set 'inputFolder' in launch.json.`
-            );
-            return undefined;
-        }
-
-        this.outputChannel.appendLine(`Launching ${exePath} with package identity via 'winapp run'.`);
-        this.outputChannel.show(true);
-
-        try {
-            await this.winAppCli.run({
-                inputPath: inputFolder,
-                ...(winAppConfig.manifest ? { manifest: winAppConfig.manifest } : {}),
-                ...(winAppConfig.outputAppxDirectory ? { outputAppxDirectory: winAppConfig.outputAppxDirectory } : {}),
-                detach: true,
-                ...(this.normalizeArgs(winAppConfig.args).length > 0
-                    ? { appArgs: this.normalizeArgs(winAppConfig.args) }
-                    : {}),
-            }, workspaceFolder?.uri.fsPath);
-        } catch (error) {
-            vscode.window.showErrorMessage(`Failed to launch app via winapp run: ${error}`);
-            return undefined;
-        }
-
-        const debuggerType = winAppConfig.debuggerType ?? 'coreclr';
-        const exeName = path.basename(exePath);
-        const childConfig = await this.buildChildAttachConfig(
-            debuggerType,
-            exeName,
-            inputFolder,
-            winAppConfig
-        );
-
-        if (!childConfig) {
-            // We launched the app but cannot attach a debugger — keep the
-            // user informed instead of silently exiting the session.
-            vscode.window.showWarningMessage(
-                `App launched, but no PID could be resolved for '${exeName}'. Install the matching debugger extension and try again.`
-            );
-            return undefined;
-        }
-
-        const started = await vscode.debug.startDebugging(workspaceFolder, childConfig);
-        if (!started) {
-            vscode.window.showErrorMessage(
-                `App launched, but the '${debuggerType}' debugger failed to attach. Verify the debugger extension is installed.`
-            );
-        }
-
-        // Returning undefined ends the top-level winapp session; only the
-        // child attach session remains visible in the Debug view.
-        return undefined;
-    }
-
-    /**
-     * Returns the build output folder configured in launch.json or prompts
-     * the user to pick one. Auto-detects when there is exactly one candidate
-     * folder containing an `.exe` under the workspace.
-     */
-    private async resolveInputFolder(
-        config: WinAppDebugConfiguration,
-        workspaceFolder: vscode.WorkspaceFolder | undefined
-    ): Promise<string | undefined> {
-        if (config.inputFolder) {
-            const resolved = path.isAbsolute(config.inputFolder)
-                ? config.inputFolder
-                : path.join(workspaceFolder?.uri.fsPath ?? '', config.inputFolder);
-            if (fs.existsSync(resolved)) {
-                return resolved;
-            }
-            vscode.window.showWarningMessage(
-                `Configured inputFolder '${resolved}' does not exist; prompting for a folder instead.`
-            );
-        }
-
-        if (workspaceFolder) {
-            const candidates = this.discoverBuildOutputFolders(workspaceFolder.uri.fsPath);
-            if (candidates.length === 1) {
-                return candidates[0];
-            }
-            if (candidates.length > 1) {
-                const pick = await vscode.window.showQuickPick(
-                    candidates.map(c => ({
-                        label: path.relative(workspaceFolder.uri.fsPath, c) || c,
-                        description: c,
-                        value: c,
-                    })),
-                    { placeHolder: 'Select the build output folder containing your .exe' }
-                );
-                return pick?.value;
-            }
-        }
-
-        const picked = await vscode.window.showOpenDialog({
-            canSelectFolders: true,
-            canSelectFiles: false,
-            canSelectMany: false,
-            openLabel: 'Select build output folder',
-            title: 'Select the folder containing your built app',
-            ...(workspaceFolder ? { defaultUri: workspaceFolder.uri } : {}),
-        });
-        return picked?.[0]?.fsPath;
-    }
-
-    /**
-     * Walks the workspace looking for folders that directly contain a
-     * non-blocklisted `.exe`. Skips common noise (node_modules, .git, etc.)
-     * and caps recursion depth so initialization stays cheap.
-     */
-    private discoverBuildOutputFolders(root: string): string[] {
-        const skip = new Set<string>(['node_modules', '.git', '.vs', '.vscode', '.winapp', 'obj', 'packages']);
-        const found: string[] = [];
-
-        const walk = (dir: string, depth: number): void => {
-            if (depth > 8) { return; }
-
-            let entries: fs.Dirent[];
-            try {
-                entries = fs.readdirSync(dir, { withFileTypes: true });
-            } catch {
-                return;
-            }
-
-            const hasAppExe = entries.some(e =>
-                e.isFile() &&
-                e.name.toLowerCase().endsWith('.exe') &&
-                !WinAppDebugConfigurationProvider.EXE_BLOCKLIST.has(e.name.toLowerCase())
-            );
-            if (hasAppExe) {
-                found.push(dir);
-            }
-
-            for (const entry of entries) {
-                if (entry.isDirectory() && !skip.has(entry.name)) {
-                    walk(path.join(dir, entry.name), depth + 1);
-                }
-            }
-        };
-
-        walk(root, 0);
-        return found;
-    }
-
-    /**
-     * Picks the most likely application executable inside `inputFolder`.
-     * If a manifest is supplied, prefer the executable referenced by it.
-     */
-    private findAppExecutable(inputFolder: string, manifestPath?: string): string | undefined {
-        const exes = this.listAppExecutables(inputFolder);
-        if (exes.length === 0) {
-            return undefined;
-        }
-
-        const manifestExe = manifestPath ? this.readExecutableFromManifest(manifestPath) : undefined;
-        if (manifestExe) {
-            const match = exes.find(e => path.basename(e).toLowerCase() === manifestExe.toLowerCase());
-            if (match) {
-                return match;
-            }
-        }
-
-        return exes[0];
-    }
-
-    /**
-     * Lists candidate application executables in a folder, excluding
-     * known runtime helpers (createdump, apphost, etc.).
-     */
-    private listAppExecutables(folder: string): string[] {
-        let entries: fs.Dirent[];
-        try {
-            entries = fs.readdirSync(folder, { withFileTypes: true });
-        } catch {
-            return [];
-        }
-        return entries
-            .filter(e =>
-                e.isFile() &&
-                e.name.toLowerCase().endsWith('.exe') &&
-                !WinAppDebugConfigurationProvider.EXE_BLOCKLIST.has(e.name.toLowerCase())
-            )
-            .map(e => path.join(folder, e.name));
-    }
-
-    /**
-     * Best-effort regex parse of `<Application ... Executable="..."/>` from
-     * an AppxManifest.xml. Returns `undefined` if the file cannot be read or
-     * the attribute is missing — full XML parsing isn't worth the dependency.
-     */
-    private readExecutableFromManifest(manifestPath: string): string | undefined {
-        try {
-            const content = fs.readFileSync(manifestPath, 'utf-8');
-            const match = content.match(/<Application[^>]*\bExecutable\s*=\s*"([^"]+)"/i);
-            if (match) {
-                return path.basename(match[1]);
-            }
-        } catch {
-            // ignore
-        }
-        return undefined;
-    }
-
-    /**
-     * Returns a child attach configuration for the requested debugger.
-     * For `coreclr` we use `processName` (most reliable post-launch).
-     * For `cppvsdbg` and `node` we resolve the PID by polling `tasklist`
-     * because those debuggers don't accept process names.
-     */
-    private async buildChildAttachConfig(
-        debuggerType: 'coreclr' | 'cppvsdbg' | 'node',
-        exeName: string,
-        inputFolder: string,
-        config: WinAppDebugConfiguration
+        token?: vscode.CancellationToken
     ): Promise<vscode.DebugConfiguration | undefined> {
-        const sessionName = `WinApp: Attach (${exeName})`;
-        const cwd = config.workingDirectory || inputFolder;
-
-        if (debuggerType === 'coreclr') {
-            return {
-                type: 'coreclr',
-                request: 'attach',
-                name: sessionName,
-                processName: exeName,
-                cwd,
-            };
-        }
-
-        const pid = await this.waitForProcessId(exeName);
-        if (!pid) {
+        if (config.type !== DEBUG_TYPES.WINAPP) { return config; }
+        if (process.platform !== 'win32') {
+            void vscode.window.showErrorMessage('WinApp debugging requires Windows.');
             return undefined;
         }
-
-        if (debuggerType === 'cppvsdbg') {
-            return {
-                type: 'cppvsdbg',
-                request: 'attach',
-                name: sessionName,
-                processId: pid,
-            };
-        }
-
-        // node
-        return {
-            type: 'pwa-node',
-            request: 'attach',
-            name: sessionName,
-            processId: String(pid),
-        };
-    }
-
-    /**
-     * Polls `tasklist` for up to ~10 seconds waiting for the launched app
-     * to appear, then returns its PID.
-     */
-    private async waitForProcessId(exeName: string): Promise<number | undefined> {
-        const deadline = Date.now() + 10_000;
-        while (Date.now() < deadline) {
-            const pid = this.queryProcessId(exeName);
-            if (pid) {
-                return pid;
-            }
-            await new Promise(resolve => setTimeout(resolve, 250));
-        }
-        return undefined;
-    }
-
-    /**
-     * Synchronously asks Windows for the PID of the given image name. Returns
-     * `undefined` on any failure or when the process is not yet running.
-     */
-    private queryProcessId(exeName: string): number | undefined {
+        const launch: WinAppDebugConfiguration = config;
         try {
-            const output = cp.execSync(`tasklist /FI "IMAGENAME eq ${exeName}" /NH /FO CSV`, {
-                windowsHide: true,
-                encoding: 'utf-8',
-            });
-            // Lines look like: "AppName.exe","12345","Console","1","12,345 K"
-            const match = output.match(/"[^"]+","(\d+)"/);
-            if (match) {
-                return parseInt(match[1], 10);
+            if (launch.detach || launch.noLaunch || launch.debugOutput || launch.symbols ||
+                launch.unregisterOnExit || launch.withAlias) {
+                throw new Error('IDE debugging cannot use detach, noLaunch, debugOutput, symbols, unregisterOnExit, or withAlias. Use Run as Packaged App instead.');
             }
-        } catch {
-            // tasklist returns non-zero when no matching process exists
+            if (launch.aot && launch.debuggerType && launch.debuggerType !== 'cppvsdbg') {
+                throw new Error('Native AOT has no managed CLR. Select the cppvsdbg debugger.');
+            }
+            const input = await this.resolveInput(launch, folder);
+            if (!input || token?.isCancellationRequested) { return undefined; }
+            const workspace = vscode.workspace.getWorkspaceFolder(vscode.Uri.file(input)) ?? folder;
+            const cwd = launch.workingDirectory ?? workspace?.uri.fsPath ??
+                (fs.statSync(input).isDirectory() ? input : path.dirname(input));
+            const debuggerType = launch.aot ? 'cppvsdbg' : launch.debuggerType ?? 'coreclr';
+            if (!await this.ensureDebugger(debuggerType) || token?.isCancellationRequested) { return undefined; }
+            const options: RunOptions = {
+                inputPath: input,
+                ...(launch.manifest && { manifest: launch.manifest }),
+                ...(launch.outputAppxDirectory && { outputAppxDirectory: launch.outputAppxDirectory }),
+                ...(launch.project && { project: launch.project }),
+                ...(launch.configuration && { configuration: launch.configuration }),
+                ...(launch.arch && { architecture: launch.arch }),
+                ...(launch.framework && { framework: launch.framework }),
+                ...(launch.runtime && { runtime: launch.runtime }),
+                ...(launch.executable && { executable: launch.executable }),
+                ...(launch.properties && { properties: Object.entries(launch.properties).map(([key, value]) => `${key}=${value}`) }),
+                noBuild: launch.noBuild ?? false,
+                noRestore: launch.noRestore ?? false,
+                aot: launch.aot ?? false,
+                clean: launch.clean ?? false,
+                appArgs: typeof launch.args === 'string' ? [launch.args] : launch.args ?? []
+            };
+            this.outputChannel.appendLine(`Launching ${input} via winapp run.`);
+            const pid = await this.winAppCli.runForDebug(options, cwd);
+            if (token?.isCancellationRequested) {
+                void vscode.window.showWarningMessage(`Debugging cancelled after launch. The app (PID ${pid}) is still running.`);
+                return undefined;
+            }
+            const child: vscode.DebugConfiguration = {
+                type: debuggerType === 'node' ? 'pwa-node' : debuggerType,
+                request: 'attach',
+                name: `${config.name}: Attach (${pid})`,
+                processId: debuggerType === 'node' ? String(pid) : pid,
+                ...(debuggerType === 'coreclr' && { cwd })
+            };
+            if (!await vscode.debug.startDebugging(workspace, child)) {
+                throw new Error(`App launched (PID ${pid}), but ${debuggerType} failed to attach. Check debugger availability and editor licensing restrictions.`);
+            }
+        } catch (error) {
+            this.outputChannel.appendLine(`Debug launch failed: ${error}`);
+            void vscode.window.showErrorMessage(`Failed to debug via winapp: ${error}`);
         }
         return undefined;
     }
 
-    /**
-     * Coerces the `args` configuration option into a string array. Accepts
-     * either a string (which is forwarded as-is) or a pre-split array.
-     */
-    private normalizeArgs(value: string | string[] | undefined): string[] {
-        if (!value) { return []; }
-        if (Array.isArray(value)) { return value; }
-        const trimmed = value.trim();
-        return trimmed ? [trimmed] : [];
+    private async ensureDebugger(type: 'coreclr' | 'cppvsdbg' | 'node'): Promise<boolean> {
+        if (type === 'node') { return true; }
+        const extensionId = type === 'cppvsdbg' ? 'ms-vscode.cpptools' : 'ms-dotnettools.csharp';
+        if (vscode.extensions.getExtension(extensionId)) { return true; }
+        const choice = await vscode.window.showWarningMessage(
+            `${type} requires a debugger extension (${extensionId}). Its availability and license depend on your editor. C# Dev Kit is not required.`,
+            'Install Debugger', 'Cancel');
+        if (choice !== 'Install Debugger') { return false; }
+        await vscode.commands.executeCommand('workbench.extensions.installExtension', extensionId);
+        if (!vscode.extensions.getExtension(extensionId)) {
+            throw new Error('Debugger installation did not become available. Install a compatible debugger and retry.');
+        }
+        return true;
     }
 
-    public dispose(): void {
-        this.outputChannel.dispose();
+    private async resolveInput(
+        config: WinAppDebugConfiguration, folder?: vscode.WorkspaceFolder
+    ): Promise<string | undefined> {
+        const configured = config.input ?? config.inputFolder;
+        if (configured) {
+            const resolved = path.resolve(folder?.uri.fsPath ?? process.cwd(), configured);
+            if (!fs.existsSync(resolved)) {
+                throw new Error(`Configured input does not exist: ${resolved}`);
+            }
+            return resolved;
+        }
+        const files = await vscode.workspace.findFiles('**/*.{csproj,sln,slnx}',
+            '**/{bin,obj,node_modules,.git,.vs,.winapp,packages}/**');
+        const candidates: vscode.Uri[] = [];
+        for (const file of files) {
+            if (folder && vscode.workspace.getWorkspaceFolder(file)?.uri.toString() !== folder.uri.toString()) {
+                continue;
+            }
+            if (!file.fsPath.toLowerCase().endsWith('.csproj') ||
+                /<OutputType>\s*(?:WinExe|Exe|AppContainerExe)\s*<\/OutputType>/i.test(
+                    await fs.promises.readFile(file.fsPath, 'utf8'))) {
+                candidates.push(file);
+            }
+        }
+        if (candidates.length === 1) { return candidates[0]!.fsPath; }
+        if (candidates.length > 1) {
+            const pick = await vscode.window.showQuickPick([
+                ...candidates.map(uri => ({ label: path.basename(uri.fsPath),
+                    description: vscode.workspace.asRelativePath(uri), uri })),
+                { label: 'Browse...', description: 'Choose a project, solution, or build output folder', uri: undefined }
+            ], { placeHolder: 'Select the app to debug' });
+            if (!pick) { return undefined; }
+            if (pick.uri) { return pick.uri.fsPath; }
+        }
+        const kind = await vscode.window.showQuickPick(['Project or solution', 'Build output folder'],
+            { placeHolder: 'Choose the debug input type' });
+        if (!kind) { return undefined; }
+        const selected = await vscode.window.showOpenDialog({
+            canSelectFiles: kind === 'Project or solution', canSelectFolders: kind === 'Build output folder',
+            canSelectMany: false, title: 'Select WinApp debug input',
+            ...(kind === 'Project or solution' && { filters: { 'Projects and solutions': ['csproj', 'sln', 'slnx'] } })
+        });
+        return selected?.[0]?.fsPath;
     }
+
+    /** Releases the debug output channel. */
+    public dispose(): void { this.outputChannel.dispose(); }
 }

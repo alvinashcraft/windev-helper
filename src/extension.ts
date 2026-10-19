@@ -3,6 +3,7 @@
 // Licensed under the MIT License.
 
 import * as vscode from 'vscode';
+import * as path from 'path';
 import { DebugConfigurationProvider } from './debugConfigurationProvider';
 import { WinAppDebugConfigurationProvider } from './winAppDebugProvider';
 import { ServiceLocator } from './serviceLocator';
@@ -26,9 +27,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     context.subscriptions.push(XamlDesignerEditorProvider.register(context, previewController));
 
     // Register debug configuration provider
+    winAppDebugProvider = new WinAppDebugConfigurationProvider(services.winAppCli);
     const debugProvider = new DebugConfigurationProvider(
         services.projectManager, 
-        services.buildManager
+        services.buildManager,
+        winAppDebugProvider
     );
     context.subscriptions.push(
         vscode.debug.registerDebugConfigurationProvider(DEBUG_TYPES.WINUI, debugProvider)
@@ -43,7 +46,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     // package.json, so a `Dynamic` registration is unnecessary and would
     // cause `resolveDebugConfiguration*` to fire twice (launching / attaching
     // the app twice).
-    winAppDebugProvider = new WinAppDebugConfigurationProvider(services.winAppCli);
     context.subscriptions.push(
         vscode.debug.registerDebugConfigurationProvider(DEBUG_TYPES.WINAPP, winAppDebugProvider)
     );
@@ -70,7 +72,7 @@ function initializeInBackground(): void {
         .then(async (isWinUI) => {
             if (isWinUI) {
                 const config = vscode.workspace.getConfiguration(CONFIG.SECTION);
-                if (config.get<boolean>(CONFIG.AUTO_RESTORE_ON_OPEN)) {
+                if (config.get<boolean>(CONFIG.AUTO_RESTORE_ON_OPEN) && services.projectManager.currentProject) {
                     try {
                         await services.packageManager.restorePackages(services.projectManager.currentProject);
                     } catch (err) {
@@ -85,6 +87,27 @@ function initializeInBackground(): void {
 }
 
 function registerCommands(context: vscode.ExtensionContext): void {
+    const registerProjectCommand = (command: string, run: (project: vscode.Uri) => Promise<unknown>): void => {
+        context.subscriptions.push(vscode.commands.registerCommand(command, async (resource?: vscode.Uri) => {
+            const project = await services.projectManager.selectProject(resource);
+            if (project) {
+                await run(project);
+            }
+        }));
+    };
+    const registerWorkspaceCommand = (command: string, run: (project?: vscode.Uri) => Promise<unknown>): void => {
+        context.subscriptions.push(vscode.commands.registerCommand(command, async (resource?: vscode.Uri) => {
+            if ((await services.projectManager.getAllProjects()).length === 0) {
+                await run();
+                return;
+            }
+            const project = await services.projectManager.selectProject(resource);
+            if (project) {
+                await run(project);
+            }
+        }));
+    };
+
     // Project creation commands
     context.subscriptions.push(
         vscode.commands.registerCommand(COMMANDS.CREATE_PROJECT, async () => {
@@ -142,56 +165,36 @@ function registerCommands(context: vscode.ExtensionContext): void {
     );
 
     // Build commands
-    context.subscriptions.push(
-        vscode.commands.registerCommand(COMMANDS.BUILD_PROJECT, async () => {
-            await services.buildManager.build(services.projectManager.currentProject);
-        })
-    );
+    registerProjectCommand(COMMANDS.BUILD_PROJECT, project => services.buildManager.build(project));
 
-    context.subscriptions.push(
-        vscode.commands.registerCommand(COMMANDS.REBUILD_PROJECT, async () => {
-            await services.buildManager.rebuild(services.projectManager.currentProject);
-        })
-    );
+    registerProjectCommand(COMMANDS.REBUILD_PROJECT, project => services.buildManager.rebuild(project));
 
-    context.subscriptions.push(
-        vscode.commands.registerCommand(COMMANDS.CLEAN_PROJECT, async () => {
-            await services.buildManager.clean(services.projectManager.currentProject);
-        })
-    );
+    registerProjectCommand(COMMANDS.CLEAN_PROJECT, project => services.buildManager.clean(project));
 
     // Debug commands
-    context.subscriptions.push(
-        vscode.commands.registerCommand(COMMANDS.DEBUG_PROJECT, async () => {
-            await vscode.debug.startDebugging(undefined, {
-                type: DEBUG_TYPES.WINUI,
-                name: 'WinUI: Debug',
-                request: 'launch',
-                project: services.projectManager.currentProject?.fsPath,
-                configuration: services.buildManager.currentConfiguration,
-                platform: services.buildManager.currentPlatform
-            });
-        })
-    );
+    registerProjectCommand(COMMANDS.DEBUG_PROJECT, async project => {
+        await vscode.debug.startDebugging(vscode.workspace.getWorkspaceFolder(project), {
+            type: DEBUG_TYPES.WINAPP,
+            name: 'WinUI: Debug',
+            request: 'launch',
+            input: project.fsPath,
+            configuration: services.buildManager.currentConfiguration,
+            arch: services.buildManager.currentPlatform.toLowerCase()
+        });
+    });
 
-    context.subscriptions.push(
-        vscode.commands.registerCommand(COMMANDS.RUN_WITHOUT_DEBUGGING, async () => {
-            const projectInfo = await services.projectManager.getProjectInfo();
-            const isPackaged = projectInfo?.windowsPackageType?.toLowerCase() !== 'none';
-            await services.buildManager.runWithoutDebugging(
-                services.projectManager.currentProject,
-                projectInfo?.targetFramework,
-                isPackaged
-            );
-        })
-    );
+    registerProjectCommand(COMMANDS.RUN_WITHOUT_DEBUGGING, async project => {
+        const projectInfo = await services.projectManager.getProjectInfo(project);
+        if (!projectInfo) {
+            void vscode.window.showErrorMessage('Cannot run the application: failed to read project information.');
+            return;
+        }
+        const isPackaged = projectInfo.windowsPackageType?.toLowerCase() !== 'none';
+        await services.buildManager.runWithoutDebugging(project, projectInfo.targetFramework, isPackaged);
+    });
 
     // Package commands
-    context.subscriptions.push(
-        vscode.commands.registerCommand(COMMANDS.CREATE_MSIX_PACKAGE, async () => {
-            await services.packageManager.createMsixPackage(services.projectManager.currentProject);
-        })
-    );
+    registerProjectCommand(COMMANDS.CREATE_MSIX_PACKAGE, project => services.packageManager.createMsixPackage(project));
 
     context.subscriptions.push(
         vscode.commands.registerCommand(COMMANDS.SIGN_PACKAGE, async () => {
@@ -218,43 +221,20 @@ function registerCommands(context: vscode.ExtensionContext): void {
     );
 
     // Identity and manifest commands
-    context.subscriptions.push(
-        vscode.commands.registerCommand(COMMANDS.CREATE_DEBUG_IDENTITY, async () => {
-            await services.packageManager.createDebugIdentity(services.projectManager.currentProject);
-        })
-    );
+    registerWorkspaceCommand(COMMANDS.CREATE_DEBUG_IDENTITY, project => services.packageManager.createDebugIdentity(project));
 
-    context.subscriptions.push(
-        vscode.commands.registerCommand(COMMANDS.GENERATE_MANIFEST, async () => {
-            await services.packageManager.generateManifest(services.projectManager.currentProject);
-        })
-    );
+    registerWorkspaceCommand(COMMANDS.GENERATE_MANIFEST, project => services.packageManager.generateManifest(project));
 
-    context.subscriptions.push(
-        vscode.commands.registerCommand(COMMANDS.OPEN_MANIFEST, async () => {
-            await services.projectManager.openManifest();
-        })
-    );
+    registerWorkspaceCommand(COMMANDS.OPEN_MANIFEST, project => services.projectManager.openManifest(project));
 
     // Package management commands
-    context.subscriptions.push(
-        vscode.commands.registerCommand(COMMANDS.RESTORE_PACKAGES, async () => {
-            await services.packageManager.restorePackages(services.projectManager.currentProject);
-        })
-    );
+    registerWorkspaceCommand(COMMANDS.RESTORE_PACKAGES, project => services.packageManager.restorePackages(project));
 
-    context.subscriptions.push(
-        vscode.commands.registerCommand(COMMANDS.UPDATE_PACKAGES, async () => {
-            await services.packageManager.updatePackages();
-        })
-    );
+    registerWorkspaceCommand(COMMANDS.UPDATE_PACKAGES, project => services.packageManager.updatePackages(project));
 
     // Initialization commands
-    context.subscriptions.push(
-        vscode.commands.registerCommand(COMMANDS.INITIALIZE_PROJECT, async () => {
-            await services.winAppCli.init();
-        })
-    );
+    registerWorkspaceCommand(COMMANDS.INITIALIZE_PROJECT, project => services.winAppCli.init(
+        project?.fsPath.toLowerCase().endsWith('.csproj') ? path.dirname(project.fsPath) : project?.fsPath));
 
     // Configuration commands
     context.subscriptions.push(
@@ -345,10 +325,13 @@ function registerCommands(context: vscode.ExtensionContext): void {
         })
     );
 
+    registerWorkspaceCommand(COMMANDS.STORE_PUBLISH, project => services.packageManager.publishToStore(project));
+    registerWorkspaceCommand(COMMANDS.STORE_INIT, project => services.packageManager.initializeStore(project));
+    registerWorkspaceCommand(COMMANDS.STORE_PACKAGE, project => services.packageManager.packageForStore(project));
     context.subscriptions.push(
-        vscode.commands.registerCommand(COMMANDS.STORE_PUBLISH, async () => {
-            await services.packageManager.publishToStore(services.projectManager.currentProject);
-        })
+        vscode.commands.registerCommand(COMMANDS.STORE_DETAILS, () => services.packageManager.storeDetails()),
+        vscode.commands.registerCommand(COMMANDS.STORE_POLL, () => services.packageManager.pollStoreSubmission()),
+        vscode.commands.registerCommand(COMMANDS.EMBED_IDENTITY, () => services.packageManager.embedIdentity())
     );
 
     // External catalog command (v0.2.0+)
@@ -359,29 +342,13 @@ function registerCommands(context: vscode.ExtensionContext): void {
     );
 
     // Run & manage commands (v0.3.0+)
-    context.subscriptions.push(
-        vscode.commands.registerCommand(COMMANDS.RUN_PACKAGED_APP, async () => {
-            await services.packageManager.runPackagedApp(services.projectManager.currentProject);
-        })
-    );
+    registerWorkspaceCommand(COMMANDS.RUN_PACKAGED_APP, project => services.packageManager.runPackagedApp(project));
 
-    context.subscriptions.push(
-        vscode.commands.registerCommand(COMMANDS.UNREGISTER_PACKAGE, async () => {
-            await services.packageManager.unregisterPackage(services.projectManager.currentProject);
-        })
-    );
+    registerWorkspaceCommand(COMMANDS.UNREGISTER_PACKAGE, project => services.packageManager.unregisterPackage(project));
 
-    context.subscriptions.push(
-        vscode.commands.registerCommand(COMMANDS.MANIFEST_ADD_ALIAS, async () => {
-            await services.packageManager.addManifestAlias(services.projectManager.currentProject);
-        })
-    );
+    registerWorkspaceCommand(COMMANDS.MANIFEST_ADD_ALIAS, project => services.packageManager.addManifestAlias(project));
 
-    context.subscriptions.push(
-        vscode.commands.registerCommand(COMMANDS.CREATE_SPARSE_PACKAGE, async () => {
-            await services.packageManager.createSparsePackage(services.projectManager.currentProject);
-        })
-    );
+    registerWorkspaceCommand(COMMANDS.CREATE_SPARSE_PACKAGE, project => services.packageManager.createSparsePackage(project));
 
     context.subscriptions.push(
         vscode.commands.registerCommand(COMMANDS.AZURE_SIGN_PACKAGE, async () => {
@@ -395,11 +362,7 @@ function registerCommands(context: vscode.ExtensionContext): void {
         })
     );
 
-    context.subscriptions.push(
-        vscode.commands.registerCommand(COMMANDS.FIND_API, async () => {
-            await services.packageManager.findApi(services.projectManager.currentProject);
-        })
-    );
+    registerWorkspaceCommand(COMMANDS.FIND_API, project => services.packageManager.findApi(project));
 
     // UI Automation commands (v0.3.0+)
     context.subscriptions.push(
@@ -451,11 +414,7 @@ function registerCommands(context: vscode.ExtensionContext): void {
     );
 
     // Parity commands with the official Microsoft WinApp VS Code extension
-    context.subscriptions.push(
-        vscode.commands.registerCommand(COMMANDS.MANIFEST_UPDATE_ASSETS, async () => {
-            await services.packageManager.manifestUpdateAssets(services.projectManager.currentProject);
-        })
-    );
+    registerWorkspaceCommand(COMMANDS.MANIFEST_UPDATE_ASSETS, project => services.packageManager.manifestUpdateAssets(project));
 
     context.subscriptions.push(
         vscode.commands.registerCommand(COMMANDS.RUN_SDK_TOOL, async () => {
@@ -469,11 +428,7 @@ function registerCommands(context: vscode.ExtensionContext): void {
         })
     );
 
-    context.subscriptions.push(
-        vscode.commands.registerCommand(COMMANDS.CONFIGURE_WINAPP_DEBUG, async () => {
-            await services.packageManager.configureWinAppDebug(services.projectManager.currentProject);
-        })
-    );
+    registerWorkspaceCommand(COMMANDS.CONFIGURE_WINAPP_DEBUG, project => services.packageManager.configureWinAppDebug(project));
 
     // XAML designer commands
     context.subscriptions.push(

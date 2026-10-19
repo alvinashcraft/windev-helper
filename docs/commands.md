@@ -2,6 +2,19 @@
 
 This document provides a complete reference for all commands available in the WinDev Helper extension.
 
+## Project Targeting
+
+Build, rebuild, clean, debug, run, MSIX packaging, manifest, and package-management commands share WinUI project selection:
+
+1. An explicitly supplied project file wins. Other file resources resolve to the nearest containing project.
+2. Without an explicit resource, the active text editor's file resolves to its nearest project.
+3. If the target is ambiguous, a picker shows project names and workspace-relative paths, including workspace folder names in multi-root workspaces.
+4. A single candidate is selected automatically. Cancelling the picker does not run a command against another project.
+
+Generated directories such as `bin`, `obj`, and `node_modules` are excluded from discovery. Opening a workspace with multiple projects does not automatically choose or restore the first one.
+
+Commands that already support non-WinUI workspaces (such as initialization, YAML package restore/update, folder-based packaged runs, and manifest tooling) retain their workspace fallback when no WinUI project is found. Item-template commands retain their existing folder-selection workflow. None of this requires C# Dev Kit or its Solution Explorer.
+
 ## Project Creation Commands
 
 ### WinUI: Create WinUI Project
@@ -173,16 +186,16 @@ dotnet new winui-resourcedictionary -n DictionaryName
 
 ---
 
-### WinUI: Install WinUI Agent + Skills Plugin
+### WinDev: Install Windows Development Skills Plugin
 
 **Command ID:** `windev-helper.installCopilotPlugin`
 
-Helper that sets up the [WinUI agent plugin](https://devblogs.microsoft.com/ifdef-windows/build-native-windows-apps-with-ai-agents-for-winui-and-windows-app-sdk/) from the [microsoft/win-dev-skills](https://github.com/microsoft/win-dev-skills) marketplace for the GitHub Copilot CLI and Claude Code.
+Installs `winui`, `winappcli`, or `windbg` from [microsoft/win-dev-skills](https://github.com/microsoft/win-dev-skills) for Copilot CLI, Claude Code, or Codex. The existing command ID is retained for compatibility.
 
 **Usage:**
 
 1. Run from the Command Palette
-2. Pick **Install in Terminal** to open a new terminal that runs the marketplace add + install commands, **Copy Commands** to just copy them, or **Open Docs** to read the win-dev-skills repository
+2. Choose your host and plugin, then pick **Install in Terminal**, **Copy Commands**, or **Open Docs**
 3. The commands that run are:
 
    ```text
@@ -190,7 +203,9 @@ Helper that sets up the [WinUI agent plugin](https://devblogs.microsoft.com/ifde
    copilot plugin install winui@win-dev-skills
    ```
 
-4. Start a new Copilot session and run `/winui-setup` to configure your environment
+4. Start a new session. The WinUI plugin offers `/winui-setup`. Codex loads skills, not agents. Claude uses `claude plugin install`; Codex uses `codex plugin add`.
+
+Install a plugin from only one catalog. Update commands are shown in the output channel for terminal installations. For old `microsoft-winui` catalogs, follow the upstream migration instructions; do not install a duplicate blindly. No AI extension is required by WinDev Helper.
 
 ---
 
@@ -210,9 +225,9 @@ Runs a diagnostic check of your local Windows development toolchain and reports 
 
 **Checks:**
 
-- **.NET SDK** — verifies a version ≥ 8 is installed (target 10)
-- **WinApp CLI** — verifies version ≥ 0.3
-- **WinUI templates** — verifies the `Microsoft.WindowsAppSDK.WinUI.CSharp.Templates` package is installed
+- **.NET SDK** — verifies a stable version >= 8.0.100 is installed
+- **WinApp CLI** — verifies the configured CLI is >= 0.7.0; recommends 0.7.1
+- **WinUI templates** — reports installation status without failing when official templates can be installed on demand by `winapp new`
 - **Developer Mode** — verifies Windows Developer Mode is enabled (Windows only)
 
 Each failed check includes the command needed to fix it.
@@ -350,8 +365,8 @@ Builds the project (if necessary) and starts debugging.
 
 - Builds with current configuration and platform
 - For unpackaged apps: attaches the debugger with full breakpoint support
-- For MSIX-packaged apps: deploys the package and launches through the package identity (without debugger attachment)
-- Supports breakpoints and step debugging (unpackaged apps only)
+- For packaged and unpackaged apps: uses project-aware `winapp run` and attaches to the returned PID
+- Supports managed and Native AOT debugger selection; see [debugging](debugging.md) for requirements and attach-time limitations
 
 ---
 
@@ -480,7 +495,7 @@ Configures authentication for Microsoft Store operations. Prompts for:
 - Azure AD Tenant ID
 - Partner Center Seller ID
 - Azure AD Application (Client) ID
-- Client Secret
+- Client secret, certificate file (and optional password), or certificate thumbprint
 
 **Uses:** `winapp store reconfigure` CLI command
 
@@ -505,6 +520,8 @@ Publishes an application to the Microsoft Store. Supports:
 - **Full release** - 100% rollout to all users
 - **Gradual rollout** - Specify a percentage (1-100%) of users
 - **Draft only** - Create submission without committing
+- Existing package files and package-flight IDs
+- A final confirmation naming the package/project, app, destination, and release mode
 
 **Uses:** `winapp store publish` CLI command
 
@@ -517,6 +534,18 @@ Publishes an application to the Microsoft Store. Supports:
 Checks the current status of a Store submission. Prompts for the Store Product ID.
 
 **Uses:** `winapp store submission status` CLI command
+
+---
+
+### Additional Store Workflows
+
+| Command | ID | Behavior |
+|---|---|---|
+| Initialize Project for Microsoft Store | `windev-helper.storeInit` | Starts `winapp store init` in an interactive process task; complete app selection in its terminal |
+| Package for Microsoft Store | `windev-helper.storePackage` | Select architectures and an output directory; creates a package without submission |
+| View Microsoft Store App or Submission Details | `windev-helper.storeDetails` | Opens CLI stdout as a JSON document |
+| Poll Microsoft Store Submission | `windev-helper.storePoll` | Waits for completion with cancellation; stopping polling does not delete/cancel the submission |
+| Embed Sparse Package Identity | `windev-helper.embedIdentity` | Modifies a selected executable or side-by-side manifest using a sparse package manifest; requires confirmation and subsequent re-signing/rebuild |
 
 ---
 

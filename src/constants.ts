@@ -73,6 +73,11 @@ export const COMMANDS = {
     STORE_PUBLISH: 'windev-helper.storePublish',
     STORE_SUBMISSION_STATUS: 'windev-helper.storeSubmissionStatus',
     STORE_CONFIGURE: 'windev-helper.storeConfigure',
+    STORE_INIT: 'windev-helper.storeInit',
+    STORE_PACKAGE: 'windev-helper.storePackage',
+    STORE_DETAILS: 'windev-helper.storeDetails',
+    STORE_POLL: 'windev-helper.storePoll',
+    EMBED_IDENTITY: 'windev-helper.embedIdentity',
     // External catalog command
     CREATE_EXTERNAL_CATALOG: 'windev-helper.createExternalCatalog',
     // Certificate info command (v0.2.1+)
