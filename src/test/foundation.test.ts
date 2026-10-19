@@ -42,6 +42,33 @@ suite('Release foundation', () => {
     });
 
     suite('CLI capability checks', () => {
+        test('probes the configured executable without a workspace and caches its version', async () => {
+            const nodePath = cp.execFileSync('node', ['-p', 'process.execPath'], { encoding: 'utf8' }).trim();
+            const nodeVersion = cp.execFileSync(nodePath, ['--version'], { encoding: 'utf8' }).trim();
+            mock.getter(vscode.workspace, 'workspaceFolders', () => undefined);
+            mock.method(vscode.workspace, 'getConfiguration', () => ({ get: () => nodePath }));
+            const realCli = new WinAppCli();
+            const execute = mock.method(realCli, 'execute');
+            try {
+                const [major, minor, patch] = nodeVersion.slice(1).split('.').map(Number);
+                assert.deepStrictEqual(await realCli.getVersion(), { major, minor, patch });
+                assert.strictEqual(await realCli.supportsV070Features(), true);
+                assert.strictEqual(execute.mock.callCount(), 1);
+                assert.deepStrictEqual(execute.mock.calls[0]?.arguments, ['--version', [], os.tmpdir()]);
+                await assert.rejects(realCli.execute('store', ['apps', 'list']), /No workspace folder found/);
+            } finally {
+                realCli.dispose();
+            }
+        });
+
+        test('uses the workspace directory for version probing when available', async () => {
+            const workspace = vscode.Uri.file(os.tmpdir());
+            mock.getter(vscode.workspace, 'workspaceFolders', () => [{ uri: workspace, name: 'Test', index: 0 }]);
+            cli.result.stdout = '0.7.1';
+            await cli.getVersion();
+            assert.strictEqual(cli.calls[0]?.cwd, workspace.fsPath);
+        });
+
         test('uses the installed standalone version rather than an update banner and caches it', async () => {
             cli.result.stdout = 'Update available: 0.8.0\n0.7.1\n';
             assert.deepStrictEqual(await cli.getVersion(), { major: 0, minor: 7, patch: 1 });

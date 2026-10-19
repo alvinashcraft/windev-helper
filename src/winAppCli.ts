@@ -6,6 +6,7 @@ import * as vscode from 'vscode';
 import * as cp from 'child_process';
 import * as path from 'path';
 import * as fs from 'fs';
+import * as os from 'os';
 import { CONFIG, OUTPUT_CHANNELS } from './constants';
 import { runCancellableProcess } from './cancellation';
 
@@ -128,7 +129,8 @@ export class WinAppCli {
             return this.cachedVersion;
         }
         try {
-            const output = await this.execute('--version');
+            const cwd = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? os.tmpdir();
+            const output = await this.execute('--version', [], cwd);
             this.cachedVersion = this.parseSemver(output.trim());
         } catch {
             this.cachedVersion = null;

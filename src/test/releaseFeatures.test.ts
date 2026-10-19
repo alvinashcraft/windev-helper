@@ -15,6 +15,8 @@ import { WinUIProjectManager } from '../projectManager';
 import { BuildManager } from '../buildManager';
 import { DebugConfigurationProvider } from '../debugConfigurationProvider';
 
+const windowsTest = process.platform === 'win32' ? test : test.skip;
+
 class TestCli extends WinAppCli {
     public version = '0.7.1';
     public output = '{"ProcessId":4321}';
@@ -94,7 +96,7 @@ suite('Release 4.4 workflows', () => {
     });
 
     for (const aot of [false, true]) {
-        test(`F5 attaches ${aot ? 'native' : 'managed'} debugger to the returned PID`, async () => {
+        windowsTest(`F5 attaches ${aot ? 'native' : 'managed'} debugger to the returned PID`, async () => {
             mock.method(vscode.extensions, 'getExtension', () => ({ id: 'debugger' }));
             const attach = mock.method(vscode.debug, 'startDebugging', async () => true);
             const provider = new WinAppDebugConfigurationProvider(cli);
@@ -118,7 +120,7 @@ suite('Release 4.4 workflows', () => {
         });
     }
 
-    test('keeps inputFolder compatibility and gives input precedence', async () => {
+    windowsTest('keeps inputFolder compatibility and gives input precedence', async () => {
         mock.method(vscode.extensions, 'getExtension', () => ({ id: 'debugger' }));
         mock.method(vscode.debug, 'startDebugging', async () => true);
         const provider = new WinAppDebugConfigurationProvider(cli);
@@ -138,7 +140,7 @@ suite('Release 4.4 workflows', () => {
         }
     });
 
-    test('does not launch if debugger consent is declined', async () => {
+    windowsTest('does not launch if debugger consent is declined', async () => {
         mock.method(vscode.extensions, 'getExtension', () => undefined);
         mock.method(vscode.window, 'showWarningMessage', async () => 'Cancel');
         const provider = new WinAppDebugConfigurationProvider(cli);
@@ -152,7 +154,7 @@ suite('Release 4.4 workflows', () => {
         }
     });
 
-    test('rejects competing debuggers and invalid AOT combinations before launch', async () => {
+    windowsTest('rejects competing debuggers and invalid AOT combinations before launch', async () => {
         const provider = new WinAppDebugConfigurationProvider(cli);
         try {
             for (const options of [{ debugOutput: true }, { noLaunch: true }, { aot: true, debuggerType: 'coreclr' }]) {
@@ -167,7 +169,7 @@ suite('Release 4.4 workflows', () => {
         }
     });
 
-    test('does not attach on CLI failure and reports attach failures explicitly', async () => {
+    windowsTest('does not attach on CLI failure and reports attach failures explicitly', async () => {
         mock.method(vscode.extensions, 'getExtension', () => ({ id: 'debugger' }));
         const attach = mock.method(vscode.debug, 'startDebugging', async () => false);
         const provider = new WinAppDebugConfigurationProvider(cli);
@@ -188,7 +190,7 @@ suite('Release 4.4 workflows', () => {
         }
     });
 
-    test('passes solution inputs and project selection through to the CLI', async () => {
+    windowsTest('passes solution inputs and project selection through to the CLI', async () => {
         mock.method(vscode.extensions, 'getExtension', () => ({ id: 'debugger' }));
         mock.method(vscode.debug, 'startDebugging', async () => true);
         const solution = path.join(directory, 'Apps.slnx');
@@ -273,7 +275,7 @@ suite('Release 4.4 workflows', () => {
         assert.strictEqual(cli.calls.length, 0);
     });
 
-    test('legacy packaged debugging delegates without a second build', async () => {
+    windowsTest('legacy packaged debugging delegates without a second build', async () => {
         const subscriptions: vscode.Disposable[] = [];
         const projects = new WinUIProjectManager({ subscriptions }, cli);
         const build = new BuildManager(cli);

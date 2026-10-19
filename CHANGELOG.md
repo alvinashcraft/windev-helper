@@ -25,6 +25,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Workspace-free environment checks** - Probe the configured winapp version even when no workspace is open, without relaxing workspace requirements for other commands.
+- **Cross-platform tests** - Skip Windows-only debugger provider cases on Linux and macOS while retaining portable CLI and Store coverage.
 - **XAML preprocessing regression test** - Corrected the contradictory third-party-control assertion to reject actual XML elements while allowing their names in placeholder diagnostics. Preprocessor output is unchanged.
 - **Multi-project debugging metadata** - Debugging reads framework and packaging information from the requested project rather than another selected project.
 - **Store publishing cancellation** - Cancelling the App ID prompt stops publishing. Gradual rollout input requires a whole percentage.
