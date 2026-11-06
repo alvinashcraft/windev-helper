@@ -229,6 +229,24 @@ These settings apply to the Windows-only Preview mode integrated into the XAML D
 
 ---
 
+### windevHelper.xaml.intelliSense.enabled
+
+**Type:** `boolean`
+
+**Default:** `false`
+
+**Description:** Enables experimental metadata-based XAML completions and hover in the XAML text editor. It does not provide project-aware diagnostics or custom-control symbols.
+
+```json
+{
+  "windevHelper.xaml.intelliSense.enabled": true
+}
+```
+
+See [XAML Designer: Experimental XAML IntelliSense](xaml-designer.md#experimental-xaml-intellisense) for current coverage and limitations.
+
+---
+
 ## Workspace Configuration
 
 You can set project-specific configurations in your workspace settings (`.vscode/settings.json`):

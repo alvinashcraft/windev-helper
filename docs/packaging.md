@@ -372,7 +372,9 @@ Run **WinDev: Check Store Submission Status** and enter the Product ID.
 
 Use **WinDev: View Microsoft Store App or Submission Details** for JSON metadata, or **WinDev: Poll Microsoft Store Submission** to wait for a final status. Cancelling polling stops local polling, not the submission.
 
-Store CLI human-readable output may be written to stderr, including app-list tables in v0.4.3. The extension displays both streams for app lists and status without treating stderr alone as a failure. A nonzero exit code is a failure. Machine-readable CLI stdout remains separate from stderr for JSON consumers.
+Store CLI human-readable output may be written to either stream; app-list tables moved to stderr in v0.4.3. The extension displays both streams for app lists and status without treating stderr alone as a failure. A nonzero exit code is a failure. Machine-readable CLI stdout remains separate from stderr for JSON consumers.
+
+Microsoft Store CLI v0.4.4 does not change the command contracts used above; its SSRF fix applies to listing-image downloads. WinDev Helper calls it through `winapp store`, which is responsible for acquiring the Store CLI. WinApp CLI v0.7.1 downloads and verifies the latest Store CLI when no cached copy exists, but does not refresh a copy that is already present. The extension does not pin or independently update `msstore`; see [WinApp CLI Store compatibility](winapp-cli.md#microsoft-store-commands-v020).
 
 **Using CLI:**
 

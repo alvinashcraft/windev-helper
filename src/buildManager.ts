@@ -12,6 +12,11 @@ import { CONFIG, OUTPUT_CHANNELS, DEFAULTS } from './constants';
 export type BuildConfiguration = 'Debug' | 'Release';
 export type BuildPlatform = 'x86' | 'x64' | 'ARM64';
 
+export interface BuildOptions {
+    configuration?: BuildConfiguration;
+    platform?: BuildPlatform;
+}
+
 /**
  * Manages build operations for WinUI projects
  */
@@ -108,8 +113,12 @@ export class BuildManager {
      * @param token - Optional cancellation token
      * @returns Promise<boolean> - True if the build succeeded
      */
-    public async build(projectUri?: vscode.Uri, token?: vscode.CancellationToken): Promise<boolean> {
-        return this.runDotnetCommand('build', projectUri, true, [], token);
+    public async build(
+        projectUri?: vscode.Uri,
+        token?: vscode.CancellationToken,
+        options: BuildOptions = {}
+    ): Promise<boolean> {
+        return this.runDotnetCommand('build', projectUri, true, [], token, options);
     }
 
     /**
@@ -448,7 +457,8 @@ export class BuildManager {
         projectUri?: vscode.Uri, 
         showOutput: boolean = true,
         additionalArgs: string[] = [],
-        token?: vscode.CancellationToken
+        token?: vscode.CancellationToken,
+        options: BuildOptions = {}
     ): Promise<boolean> {
         return new Promise((resolve) => {
             // Check if already cancelled
@@ -471,8 +481,8 @@ export class BuildManager {
             if (projectPath) {
                 args.push(projectPath);
             }
-            args.push('-c', this._currentConfiguration);
-            args.push(`-p:Platform=${this._currentPlatform}`);
+            args.push('-c', options.configuration ?? this._currentConfiguration);
+            args.push(`-p:Platform=${options.platform ?? this._currentPlatform}`);
             args.push(...additionalArgs);
 
             const displayCommand = `dotnet ${args.join(' ')}`;
@@ -592,8 +602,8 @@ export class BuildManager {
     /**
      * Gets the runtime identifier for the current platform
      */
-    public getRuntimeIdentifier(): string {
-        switch (this._currentPlatform) {
+    public getRuntimeIdentifier(platform: BuildPlatform = this._currentPlatform): string {
+        switch (platform) {
             case 'x86':
                 return 'win-x86';
             case 'x64':
@@ -612,12 +622,18 @@ export class BuildManager {
      * @param includeRid - Whether to include the RuntimeIdentifier subfolder (default: true)
      * @returns The full path to the build output directory
      */
-    public getOutputPath(projectPath: string, targetFramework?: string, includeRid: boolean = true): string {
+    public getOutputPath(
+        projectPath: string,
+        targetFramework?: string,
+        includeRid: boolean = true,
+        platform: BuildPlatform = this._currentPlatform,
+        configuration: BuildConfiguration = this._currentConfiguration
+    ): string {
         const projectDir = path.dirname(projectPath);
         const tfm = targetFramework || DEFAULTS.TARGET_FRAMEWORK;
-        const segments = [projectDir, 'bin', this._currentPlatform, this._currentConfiguration, tfm];
+        const segments = [projectDir, 'bin', platform, configuration, tfm];
         if (includeRid) {
-            segments.push(this.getRuntimeIdentifier());
+            segments.push(this.getRuntimeIdentifier(platform));
         }
         return path.join(...segments);
     }

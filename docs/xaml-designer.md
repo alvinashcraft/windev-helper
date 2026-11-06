@@ -54,4 +54,18 @@ Preview is disabled when the current platform or architecture has no matching na
 
 The text document is authoritative. Each visual change includes the exact source revision from which it was produced. If the source changed before the edit is applied, the extension rejects the stale edit and reloads the latest XAML instead of overwriting it. Messages are processed in order so rapid drag and resize operations cannot apply out of sequence.
 
+## Experimental XAML IntelliSense
+
+The optional text-editor provider offers metadata-based completions for WinUI controls, known properties, attached properties, selected events, XAML directives, and a curated set of enum/boolean/markup-extension values. Hover shows locally bundled control/property metadata. It runs only in the XAML text editor; it does not change the visual designer or require C# Dev Kit, a language server, or a .NET SDK.
+
+Enable it with:
+
+```json
+{
+  "windevHelper.xaml.intelliSense.enabled": true
+}
+```
+
+This is not project-aware semantic IntelliSense: custom types, project resources, C# `x:Bind` symbols, diagnostics, quick fixes, definition, and rename are not resolved. Metadata coverage is intentionally partial. If the Microsoft WinApp extension's XAML IntelliSense is also enabled, disable one provider to avoid duplicate suggestions. The default is off so existing XAML editing and other providers are unchanged.
+
 The interaction and synchronization approach was informed by the MIT-licensed [WinForm-GUI-Maker](https://github.com/coolshrimp/WinForm-GUI-Maker) project. Full attribution is included in [THIRD-PARTY-NOTICES.md](../THIRD-PARTY-NOTICES.md).

@@ -2,7 +2,7 @@
   "name": "windev-helper",
   "displayName": "WinDev Helper",
   "description": "Build beautiful, performant WinUI apps with VS Code. Debug, build, package, and deploy Windows apps powered by the Windows App SDK.",
-  "version": "4.4.0",
+  "version": "4.5.0",
   "publisher": "alvinashcraft",
   "icon": "images/icon.png",
   "license": "MIT",
@@ -583,6 +583,11 @@
           "default": "auto",
           "description": "Theme for XAML preview. 'auto' follows VS Code theme or project's App.xaml RequestedTheme."
         },
+        "windevHelper.xaml.intelliSense.enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable experimental metadata-based XAML completions and hover. Does not provide project-aware diagnostics or custom-control symbols."
+        },
         "windevHelper.designer.gridSize": {
           "type": "number",
           "default": 8,
@@ -893,6 +898,6 @@
   },
   "overrides": {
     "diff": "9.0.0",
-    "serialize-javascript": "7.0.7"
+    "serialize-javascript": "7.1.4"
   }
 }
