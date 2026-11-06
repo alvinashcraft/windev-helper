@@ -14,9 +14,9 @@ import {
 } from './propertyPane/controlMetadata';
 
 type CompletionContext =
-    | { kind: 'element'; token: string; tokenStart: number; prefix?: string }
-    | { kind: 'attribute'; tagName: string; token: string; tokenStart: number; used: Set<string> }
-    | { kind: 'value'; tagName: string; attributeName: string; token: string; tokenStart: number };
+    | { kind: 'element'; token: string; tokenStart: number; tokenEnd: number; prefix?: string }
+    | { kind: 'attribute'; tagName: string; token: string; tokenStart: number; tokenEnd: number; used: Set<string>; hasAssignment: boolean }
+    | { kind: 'value'; tagName: string; attributeName: string; token: string; tokenStart: number; tokenEnd: number };
 
 interface OpenTag {
     text: string;
@@ -34,8 +34,7 @@ const xamlDirectives = [
     { name: 'x:Key', description: 'Defines a key for a resource dictionary entry.' },
     { name: 'x:Uid', description: 'Associates the element with a localization resource.' },
     { name: 'x:Class', description: 'Specifies the code-behind class for a XAML root element.' },
-    { name: 'x:DataType', description: 'Declares the compiled binding data type.' },
-    { name: 'x:Bind', description: 'Creates a compiled binding expression.' }
+    { name: 'x:DataType', description: 'Declares the compiled binding data type.' }
 ];
 
 const enumValues: Record<string, string[]> = {
@@ -51,7 +50,8 @@ const enumValues: Record<string, string[]> = {
     ScrollBarVisibility: ['Disabled', 'Auto', 'Hidden', 'Visible'],
     ScrollingScrollBarVisibility: ['Auto', 'Visible', 'Hidden'],
     ScrollMode: ['Disabled', 'Enabled', 'Auto'],
-    SelectionMode: ['None', 'Single', 'Multiple', 'Extended'],
+    ListViewSelectionMode: ['None', 'Single', 'Multiple', 'Extended'],
+    SelectionMode: ['Single', 'Multiple', 'Extended'],
     Stretch: ['None', 'Fill', 'Uniform', 'UniformToFill'],
     GridUnitType: ['Auto', 'Pixel', 'Star'],
     FlyoutPlacementMode: ['Top', 'Bottom', 'Left', 'Right', 'Full'],
@@ -84,7 +84,10 @@ export class XamlIntelliSenseProvider implements vscode.CompletionItemProvider, 
 
     public static register(context: vscode.ExtensionContext): void {
         const provider = new XamlIntelliSenseProvider();
-        const selector: vscode.DocumentSelector = { language: 'xaml' };
+        const selector: vscode.DocumentSelector = [
+            { language: 'xaml' },
+            { language: 'xml', pattern: '**/*.xaml' }
+        ];
         context.subscriptions.push(
             vscode.languages.registerCompletionItemProvider(selector, provider, '.', ':', '{'),
             vscode.languages.registerHoverProvider(selector, provider)
@@ -100,12 +103,12 @@ export class XamlIntelliSenseProvider implements vscode.CompletionItemProvider, 
         if (!context) { return undefined; }
 
         if (context.kind === 'element') {
-            return this.elementCompletions(context, document, position);
+            return this.elementCompletions(context, document);
         }
         if (context.kind === 'attribute') {
-            return this.attributeCompletions(context, document, position);
+            return this.attributeCompletions(context, document);
         }
-        return this.valueCompletions(context, document, position);
+        return this.valueCompletions(context, document);
     }
 
     public provideHover(
@@ -161,19 +164,16 @@ export class XamlIntelliSenseProvider implements vscode.CompletionItemProvider, 
 
     private elementCompletions(
         context: Extract<CompletionContext, { kind: 'element' }>,
-        document: vscode.TextDocument,
-        position: vscode.Position
+        document: vscode.TextDocument
     ): vscode.CompletionItem[] {
         if (context.prefix === 'x') {
             return [
-                { label: 'x:Null', description: 'Represents a null value.' },
-                { label: 'x:Array', description: 'Declares an array of objects.' },
                 { label: 'x:String', description: 'Creates a string value.' }
             ].filter(item => item.label.slice(2).startsWith(context.token))
                 .map(item => {
                     const completion = this.item(
                         item.label, item.description, vscode.CompletionItemKind.Keyword,
-                        context.tokenStart, document, position
+                        context.tokenStart, context.tokenEnd, document
                     );
                     completion.insertText = item.label.slice(2);
                     return completion;
@@ -184,7 +184,10 @@ export class XamlIntelliSenseProvider implements vscode.CompletionItemProvider, 
             .filter(([type]) => type.toLowerCase().startsWith(context.token.toLowerCase()))
             .map(([type, description]) => {
                 const label = context.prefix ? `${context.prefix}:${type}` : type;
-                const item = this.item(label, description, vscode.CompletionItemKind.Class, context.tokenStart, document, position);
+                const item = this.item(
+                    label, description, vscode.CompletionItemKind.Class,
+                    context.tokenStart, context.tokenEnd, document
+                );
                 if (context.prefix) { item.insertText = type; }
                 return item;
             });
@@ -192,15 +195,14 @@ export class XamlIntelliSenseProvider implements vscode.CompletionItemProvider, 
 
     private attributeCompletions(
         context: Extract<CompletionContext, { kind: 'attribute' }>,
-        document: vscode.TextDocument,
-        position: vscode.Position
+        document: vscode.TextDocument
     ): vscode.CompletionItem[] {
         const prefix = context.token.toLowerCase();
         const items: vscode.CompletionItem[] = [];
         const add = (name: string, detail: string, kind: vscode.CompletionItemKind): void => {
             if (!name.toLowerCase().startsWith(prefix) || context.used.has(name)) { return; }
-            const item = this.item(name, detail, kind, context.tokenStart, document, position);
-            item.insertText = new vscode.SnippetString(`${name}="$1"`);
+            const item = this.item(name, detail, kind, context.tokenStart, context.tokenEnd, document);
+            item.insertText = context.hasAssignment ? name : new vscode.SnippetString(`${name}="$1"`);
             items.push(item);
         };
 
@@ -221,8 +223,7 @@ export class XamlIntelliSenseProvider implements vscode.CompletionItemProvider, 
 
     private valueCompletions(
         context: Extract<CompletionContext, { kind: 'value' }>,
-        document: vscode.TextDocument,
-        position: vscode.Position
+        document: vscode.TextDocument
     ): vscode.CompletionItem[] {
         const values = valuesForType(findProperty(context.tagName, context.attributeName)?.type ?? '');
         const candidates = [
@@ -234,7 +235,10 @@ export class XamlIntelliSenseProvider implements vscode.CompletionItemProvider, 
         ];
         return candidates
             .filter(candidate => candidate.label.toLowerCase().startsWith(context.token.toLowerCase()))
-            .map(candidate => this.item(candidate.label, candidate.detail, vscode.CompletionItemKind.Value, context.tokenStart, document, position));
+            .map(candidate => this.item(
+                candidate.label, candidate.detail, vscode.CompletionItemKind.Value,
+                context.tokenStart, context.tokenEnd, document
+            ));
     }
 
     private item(
@@ -242,14 +246,14 @@ export class XamlIntelliSenseProvider implements vscode.CompletionItemProvider, 
         detail: string,
         kind: vscode.CompletionItemKind,
         tokenStart: number,
-        document: vscode.TextDocument,
-        position: vscode.Position
+        tokenEnd: number,
+        document: vscode.TextDocument
     ): vscode.CompletionItem {
         const item = new vscode.CompletionItem(label, kind);
         item.detail = detail;
         item.range = new vscode.Range(
             document.positionAt(tokenStart),
-            position
+            document.positionAt(tokenEnd)
         );
         return item;
     }
@@ -257,7 +261,8 @@ export class XamlIntelliSenseProvider implements vscode.CompletionItemProvider, 
 
 function getCompletionContext(document: vscode.TextDocument, position: vscode.Position): CompletionContext | undefined {
     const offset = document.offsetAt(position);
-    const tag = findOpenTag(document.getText().slice(0, offset));
+    const text = document.getText();
+    const tag = findOpenTag(text, offset);
     if (!tag) { return undefined; }
 
     const body = tag.text;
@@ -265,42 +270,48 @@ function getCompletionContext(document: vscode.TextDocument, position: vscode.Po
     const nameMatch = /^<([A-Za-z_][\w:.-]*)?/.exec(body);
     const rawName = nameMatch?.[1] ?? '';
     const nameEnd = tag.start + 1 + rawName.length;
-    const tokenStart = findTokenStart(document.getText(), offset);
     if (offset <= nameEnd) {
-        const token = document.getText().slice(tokenStart, offset);
-        const colon = token.lastIndexOf(':');
+        const nameStart = tag.start + 1;
+        const colon = rawName.lastIndexOf(':', Math.max(0, offset - nameStart - 1));
+        const tokenStart = colon >= 0 ? nameStart + colon + 1 : nameStart;
+        const tokenEnd = nameStart + rawName.length;
+        const token = text.slice(tokenStart, offset);
         return {
             kind: 'element',
-            token: colon >= 0 ? token.slice(colon + 1) : token,
-            tokenStart: colon >= 0 ? tokenStart + colon + 1 : tokenStart,
-            ...(colon >= 0 && { prefix: token.slice(0, colon) })
+            token,
+            tokenStart,
+            tokenEnd,
+            ...(colon >= 0 && { prefix: rawName.slice(0, colon) })
         };
     }
 
     const tagName = rawName.split(':').pop() ?? rawName;
-    return parseAttributeContext(body.slice(1 + rawName.length), tagName, tag.start + 1 + rawName.length, document.getText(), offset);
+    return parseAttributeContext(
+        body.slice(1 + rawName.length), tagName, nameEnd, text, offset
+    );
 }
 
-function findOpenTag(text: string): OpenTag | undefined {
+function findOpenTag(text: string, cursorOffset: number): OpenTag | undefined {
+    const prefix = text.slice(0, cursorOffset);
     let tagStart = -1;
     let quote: string | undefined;
-    for (let index = 0; index < text.length; index++) {
+    for (let index = 0; index < prefix.length; index++) {
         if (tagStart < 0) {
-            if (text.startsWith('<!--', index)) {
-                const end = text.indexOf('-->', index + 4);
+            if (prefix.startsWith('<!--', index)) {
+                const end = prefix.indexOf('-->', index + 4);
                 if (end < 0) { return undefined; }
                 index = end + 2;
                 continue;
             }
-            if (text.startsWith('<![CDATA[', index)) {
-                const end = text.indexOf(']]>', index + 9);
+            if (prefix.startsWith('<![CDATA[', index)) {
+                const end = prefix.indexOf(']]>', index + 9);
                 if (end < 0) { return undefined; }
                 index = end + 2;
                 continue;
             }
-            if (text[index] === '<') {
-                if (text[index + 1] === '!' || text[index + 1] === '?') {
-                    const end = text.indexOf('>', index + 2);
+            if (prefix[index] === '<') {
+                if (prefix[index + 1] === '!' || prefix[index + 1] === '?') {
+                    const end = prefix.indexOf('>', index + 2);
                     if (end < 0) { return undefined; }
                     index = end;
                     continue;
@@ -309,7 +320,7 @@ function findOpenTag(text: string): OpenTag | undefined {
             }
             continue;
         }
-        const character = text[index];
+        const character = prefix[index];
         if (quote) {
             if (character === quote) { quote = undefined; }
         } else if (character === '"' || character === "'") {
@@ -318,7 +329,22 @@ function findOpenTag(text: string): OpenTag | undefined {
             tagStart = -1;
         }
     }
-    return tagStart >= 0 ? { text: text.slice(tagStart), start: tagStart } : undefined;
+    if (tagStart < 0) { return undefined; }
+
+    quote = undefined;
+    let tagEnd = text.length;
+    for (let index = tagStart; index < text.length; index++) {
+        const character = text[index];
+        if (quote) {
+            if (character === quote) { quote = undefined; }
+        } else if (character === '"' || character === "'") {
+            quote = character;
+        } else if (character === '>') {
+            tagEnd = index + 1;
+            break;
+        }
+    }
+    return { text: text.slice(tagStart, tagEnd), start: tagStart };
 }
 
 function parseAttributeContext(
@@ -329,64 +355,79 @@ function parseAttributeContext(
     cursorOffset: number
 ): CompletionContext | undefined {
     const used = new Set<string>();
+    let currentAttribute: CompletionContext | undefined;
     let index = 0;
+    const cursorIndex = cursorOffset - tailOffset;
+    if (tail[cursorIndex] === '/' || tail[cursorIndex] === '>') { return undefined; }
+
     while (index < tail.length) {
         while (/\s/.test(tail[index] ?? '')) { index++; }
-        if (index >= tail.length) {
-            const tokenStart = findTokenStart(fullText, cursorOffset);
-            return { kind: 'attribute', tagName, token: fullText.slice(tokenStart, cursorOffset), tokenStart, used };
-        }
-        if (tail[index] === '/' || tail[index] === '>') { return undefined; }
+        if (index >= tail.length || tail[index] === '/' || tail[index] === '>') { break; }
 
         const attributeStart = index;
         while (index < tail.length && !/[\s=/>]/.test(tail[index] ?? '')) { index++; }
-        const attributeName = tail.slice(attributeStart, index);
-        if (!attributeName) { return undefined; }
+        if (index === attributeStart) { index++; continue; }
+        const attributeEnd = index;
+        const attributeName = tail.slice(attributeStart, attributeEnd);
+        const absoluteStart = tailOffset + attributeStart;
+        const absoluteEnd = tailOffset + attributeEnd;
         while (/\s/.test(tail[index] ?? '')) { index++; }
-        if (index >= tail.length) {
-            return {
-                kind: 'attribute', tagName, token: attributeName,
-                tokenStart: tailOffset + attributeStart, used
+        const hasAssignment = tail[index] === '=';
+
+        if (cursorOffset >= absoluteStart && cursorOffset <= absoluteEnd) {
+            currentAttribute = {
+                kind: 'attribute', tagName, token: fullText.slice(absoluteStart, cursorOffset),
+                tokenStart: absoluteStart, tokenEnd: absoluteEnd, used, hasAssignment
             };
-        }
-        if (tail[index] !== '=') {
+        } else {
             used.add(attributeName);
-            continue;
         }
+
+        if (!hasAssignment) { continue; }
         index++;
         while (/\s/.test(tail[index] ?? '')) { index++; }
-        if (tail[index] === '"' || tail[index] === "'") {
-            const quote = tail[index++]!;
-            const valueStart = index;
+        let valueStart = index;
+        let valueEnd = index;
+        const quote = tail[index] === '"' || tail[index] === "'" ? tail[index++] : undefined;
+        if (quote) {
+            valueStart = index;
             while (index < tail.length && tail[index] !== quote) { index++; }
-            if (index >= tail.length) {
-                return {
-                    kind: 'value', tagName, attributeName,
-                    token: tail.slice(valueStart), tokenStart: tailOffset + valueStart
-                };
-            }
-            index++;
+            valueEnd = index;
+            if (index < tail.length) { index++; }
         } else {
-            const valueStart = index;
+            valueStart = index;
             while (index < tail.length && !/[\s/>]/.test(tail[index] ?? '')) { index++; }
-            if (index >= tail.length) {
-                return {
-                    kind: 'value', tagName, attributeName,
-                    token: tail.slice(valueStart), tokenStart: tailOffset + valueStart
-                };
-            }
+            valueEnd = index;
         }
-        used.add(attributeName);
+
+        const absoluteValueStart = tailOffset + valueStart;
+        const absoluteValueEnd = tailOffset + valueEnd;
+        if (cursorOffset >= absoluteValueStart && cursorOffset <= absoluteValueEnd) {
+            const [tokenStart, tokenEnd] = findTokenRange(fullText, cursorOffset);
+            currentAttribute = {
+                kind: 'value', tagName, attributeName,
+                token: fullText.slice(tokenStart, cursorOffset), tokenStart, tokenEnd
+            };
+        }
     }
 
-    const tokenStart = findTokenStart(fullText, cursorOffset);
-    return { kind: 'attribute', tagName, token: fullText.slice(tokenStart, cursorOffset), tokenStart, used };
+    if (currentAttribute) {
+        return currentAttribute;
+    }
+
+    const [tokenStart, tokenEnd] = findTokenRange(fullText, cursorOffset);
+    return {
+        kind: 'attribute', tagName, token: fullText.slice(tokenStart, cursorOffset),
+        tokenStart, tokenEnd, used, hasAssignment: false
+    };
 }
 
-function findTokenStart(text: string, offset: number): number {
-    let index = offset;
-    while (index > 0 && /[A-Za-z0-9_.:{}-]/.test(text[index - 1] ?? '')) { index--; }
-    return index;
+function findTokenRange(text: string, offset: number): [number, number] {
+    let start = offset;
+    let end = offset;
+    while (start > 0 && /[A-Za-z0-9_.:{}-]/.test(text[start - 1] ?? '')) { start--; }
+    while (end < text.length && /[A-Za-z0-9_.:{}-]/.test(text[end] ?? '')) { end++; }
+    return [start, end];
 }
 
 function findProperty(tagName: string, attributeName: string): PropertyMetadata | undefined {

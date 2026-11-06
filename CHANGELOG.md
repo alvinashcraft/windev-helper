@@ -18,6 +18,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - **Legacy WinUI F5 target selection** - Honor the launch configuration's platform and build configuration both when building and resolving the executable path, instead of using workspace-global status-bar defaults.
+- **XAML completion validity** - Preserve existing assignments and complete the full token, avoid duplicate attributes and unsupported suggestions, and use selection values matching each metadata enum.
+- **Packaged custom configurations** - Preserve project-defined build configurations when legacy WinUI debug profiles delegate packaged launches to winapp.
 
 ## [4.4.0] - 2026-10-19
 

@@ -40,6 +40,7 @@
   ],
   "activationEvents": [
     "workspaceContains:**/Package.appxmanifest",
+    "onLanguage:xml",
     "onLanguage:xaml"
   ],
   "main": "./dist/extension.js",

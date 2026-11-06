@@ -664,7 +664,7 @@ Sanitizes XAML before sending it to the native renderer, handling third-party co
 
 ### Experimental XAML IntelliSense (`xamlIntelliSense.ts`)
 
-Registers optional completion and hover providers for XAML text documents. It reuses the designer control catalog and property metadata, and remains disabled by default to avoid overlap with other XAML language services. This static metadata provider does not depend on C# tooling or a project build and does not claim semantic diagnostics, custom-control discovery, or code-behind symbol resolution.
+Registers optional completion and hover providers for `.xaml` text documents in either the `xaml` or `xml` language mode. It reuses the designer control catalog and property metadata, and remains disabled by default to avoid overlap with other XAML language services. This static metadata provider does not depend on C# tooling or a project build and does not claim semantic diagnostics, custom-control discovery, or code-behind symbol resolution.
 
 ### Native Preview (`xamlPreview/nativeRenderer.ts`)
 

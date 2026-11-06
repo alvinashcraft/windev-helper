@@ -71,12 +71,8 @@ export class DebugConfigurationProvider implements vscode.DebugConfigurationProv
     ): Promise<vscode.DebugConfiguration | undefined> {
         // For winui type, convert to coreclr
         if (config.type === DEBUG_TYPES.WINUI) {
-            const buildOptions = this.getBuildOptions(config);
-            if (!buildOptions) {
-                return undefined;
-            }
             const projectPath = config.project || (await this.projectManager.selectProject())?.fsPath;
-            
+
             if (!projectPath) {
                 return undefined;
             }
@@ -88,12 +84,17 @@ export class DebugConfigurationProvider implements vscode.DebugConfigurationProv
             }
             const isUnpackaged = projectInfo?.windowsPackageType?.toLowerCase() === 'none';
             if (!isUnpackaged) {
+                const platform = this.getBuildPlatform(config);
+                if (!platform) {
+                    return undefined;
+                }
                 if (this.winAppDebugProvider) {
                     return this.winAppDebugProvider.resolveDebugConfigurationWithSubstitutedVariables(
                         vscode.workspace.getWorkspaceFolder(vscode.Uri.file(projectPath)), {
                             type: DEBUG_TYPES.WINAPP, request: 'launch', name: config.name,
-                            input: projectPath, configuration: buildOptions.configuration,
-                            arch: buildOptions.platform.toLowerCase(),
+                        input: projectPath,
+                        configuration: config.configuration ?? this.buildManager.currentConfiguration,
+                            arch: platform.toLowerCase(),
                             args: config.args ?? []
                         }, _token);
                 }
@@ -101,6 +102,10 @@ export class DebugConfigurationProvider implements vscode.DebugConfigurationProv
                 return undefined;
             }
 
+            const buildOptions = this.getBuildOptions(config);
+            if (!buildOptions) {
+                return undefined;
+            }
             const projectUri = vscode.Uri.file(projectPath);
             const buildSuccess = await this.buildManager.build(projectUri, undefined, buildOptions);
             if (!buildSuccess) {
@@ -169,6 +174,12 @@ export class DebugConfigurationProvider implements vscode.DebugConfigurationProv
             return undefined;
         }
 
+        const platform = this.getBuildPlatform(config);
+        if (!platform) { return undefined; }
+        return { configuration: requestedConfiguration, platform };
+    }
+
+    private getBuildPlatform(config: vscode.DebugConfiguration): BuildPlatform | undefined {
         const requestedPlatform = String(config.platform ?? this.buildManager.currentPlatform).toLowerCase();
         const platform: BuildPlatform | undefined = requestedPlatform === 'arm64' ? 'ARM64'
             : requestedPlatform === 'x64' ? 'x64'
@@ -179,7 +190,7 @@ export class DebugConfigurationProvider implements vscode.DebugConfigurationProv
             );
             return undefined;
         }
-        return { configuration: requestedConfiguration, platform };
+        return platform;
     }
 
     private async getExecutablePath(

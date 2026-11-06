@@ -56,7 +56,7 @@ The text document is authoritative. Each visual change includes the exact source
 
 ## Experimental XAML IntelliSense
 
-The optional text-editor provider offers metadata-based completions for WinUI controls, known properties, attached properties, selected events, XAML directives, and a curated set of enum/boolean/markup-extension values. Hover shows locally bundled control/property metadata. It runs only in the XAML text editor; it does not change the visual designer or require C# Dev Kit, a language server, or a .NET SDK.
+The optional text-editor provider offers metadata-based completions for WinUI controls, known properties, attached properties, selected events, XAML directives, and a curated set of enum/boolean/markup-extension values. Hover shows locally bundled control/property metadata. It supports `.xaml` documents in either the `xaml` or default `xml` language mode; it does not change the visual designer or require C# Dev Kit, a language server, or a .NET SDK.
 
 Enable it with:
 
