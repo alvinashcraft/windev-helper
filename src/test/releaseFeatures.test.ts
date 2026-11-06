@@ -275,7 +275,7 @@ suite('Release 4.4 workflows', () => {
         assert.strictEqual(cli.calls.length, 0);
     });
 
-    windowsTest('legacy packaged debugging delegates without a second build', async () => {
+    windowsTest('legacy packaged debugging preserves custom configurations without a second build', async () => {
         const subscriptions: vscode.Disposable[] = [];
         const projects = new WinUIProjectManager({ subscriptions }, cli);
         const build = new BuildManager(cli);
@@ -291,12 +291,12 @@ suite('Release 4.4 workflows', () => {
             const legacy = new DebugConfigurationProvider(projects, build, debuggerProvider);
             await legacy.resolveDebugConfigurationWithSubstitutedVariables(undefined, {
                 type: 'winui', name: 'Legacy', request: 'launch',
-                project: path.join(directory, 'App.csproj'), configuration: 'Release', platform: 'ARM64'
+                project: path.join(directory, 'App.csproj'), configuration: 'Staging', platform: 'ARM64'
             });
             assert.strictEqual(builder.mock.callCount(), 0);
             assert.strictEqual(attach.mock.callCount(), 1);
             const run = cli.calls.find(call => call.command === 'run')!;
-            assert.strictEqual(run.args[run.args.indexOf('--configuration') + 1], 'Release');
+            assert.strictEqual(run.args[run.args.indexOf('--configuration') + 1], 'Staging');
             assert.strictEqual(run.args[run.args.indexOf('--arch') + 1], 'arm64');
         } finally {
             subscriptions.forEach(subscription => subscription.dispose());

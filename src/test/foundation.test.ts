@@ -354,17 +354,24 @@ suite('Release foundation', () => {
                     targetFramework: 'net10.0-windows10.0.26100.0', windowsPackageType: 'None'
                 };
             });
+            mock.method(vscode.workspace, 'getConfiguration', () => ({
+                get: (key: string) => key === 'defaultPlatform' ? 'ARM64'
+                    : key === 'defaultConfiguration' ? 'Release' : undefined
+            }));
             const build = new BuildManager(cli);
             const builder = mock.method(build, 'build', async () => true);
             try {
                 const provider = new DebugConfigurationProvider(manager, build);
                 const result = await provider.resolveDebugConfigurationWithSubstitutedVariables(undefined, {
-                    type: 'winui', request: 'launch', name: 'Requested project', project: project.fsPath
+                    type: 'winui', request: 'launch', name: 'Requested project', project: project.fsPath,
+                    configuration: 'Debug', platform: 'x64'
                 });
                 assert.strictEqual(result?.type, 'coreclr');
                 assert.strictEqual(result?.cwd, path.dirname(project.fsPath));
                 assert.ok(result?.program.includes('net10.0-windows10.0.26100.0'));
+                assert.ok(result?.program.includes(path.join('bin', 'x64', 'Debug', 'net10.0-windows10.0.26100.0', 'win-x64')));
                 assert.strictEqual(builder.mock.calls[0]?.arguments[0]?.fsPath, project.fsPath);
+                assert.deepStrictEqual(builder.mock.calls[0]?.arguments[2], { configuration: 'Debug', platform: 'x64' });
                 assert.strictEqual(info.mock.callCount(), 2);
             } finally {
                 build.dispose();

@@ -6,7 +6,7 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
 import { WinUIProjectManager } from './projectManager';
-import { BuildManager } from './buildManager';
+import { BuildManager, BuildConfiguration, BuildOptions, BuildPlatform } from './buildManager';
 import { DEBUG_TYPES } from './constants';
 import { WinAppDebugConfigurationProvider } from './winAppDebugProvider';
 
@@ -72,7 +72,7 @@ export class DebugConfigurationProvider implements vscode.DebugConfigurationProv
         // For winui type, convert to coreclr
         if (config.type === DEBUG_TYPES.WINUI) {
             const projectPath = config.project || (await this.projectManager.selectProject())?.fsPath;
-            
+
             if (!projectPath) {
                 return undefined;
             }
@@ -84,12 +84,17 @@ export class DebugConfigurationProvider implements vscode.DebugConfigurationProv
             }
             const isUnpackaged = projectInfo?.windowsPackageType?.toLowerCase() === 'none';
             if (!isUnpackaged) {
+                const platform = this.getBuildPlatform(config);
+                if (!platform) {
+                    return undefined;
+                }
                 if (this.winAppDebugProvider) {
                     return this.winAppDebugProvider.resolveDebugConfigurationWithSubstitutedVariables(
                         vscode.workspace.getWorkspaceFolder(vscode.Uri.file(projectPath)), {
                             type: DEBUG_TYPES.WINAPP, request: 'launch', name: config.name,
-                            input: projectPath, configuration: config.configuration ?? this.buildManager.currentConfiguration,
-                            arch: (config.platform ?? this.buildManager.currentPlatform).toLowerCase(),
+                        input: projectPath,
+                        configuration: config.configuration ?? this.buildManager.currentConfiguration,
+                            arch: platform.toLowerCase(),
                             args: config.args ?? []
                         }, _token);
                 }
@@ -97,14 +102,19 @@ export class DebugConfigurationProvider implements vscode.DebugConfigurationProv
                 return undefined;
             }
 
-            const buildSuccess = await this.buildManager.build(vscode.Uri.file(projectPath));
+            const buildOptions = this.getBuildOptions(config);
+            if (!buildOptions) {
+                return undefined;
+            }
+            const projectUri = vscode.Uri.file(projectPath);
+            const buildSuccess = await this.buildManager.build(projectUri, undefined, buildOptions);
             if (!buildSuccess) {
                 vscode.window.showErrorMessage('Build failed. Cannot start debugging.');
                 return undefined;
             }
 
             // Convert to coreclr configuration
-            const executablePath = await this.getExecutablePath(vscode.Uri.file(projectPath));
+            const executablePath = await this.getExecutablePath(projectUri, buildOptions);
             
             return {
                 type: DEBUG_TYPES.CORECLR,
@@ -153,7 +163,40 @@ export class DebugConfigurationProvider implements vscode.DebugConfigurationProv
      * @param projectUri - URI to the project file
      * @returns The full path to the executable
      */
-    private async getExecutablePath(projectUri: vscode.Uri): Promise<string> {
+    private getBuildOptions(
+        config: vscode.DebugConfiguration
+    ): { configuration: BuildConfiguration; platform: BuildPlatform } | undefined {
+        const requestedConfiguration = config.configuration ?? this.buildManager.currentConfiguration;
+        if (requestedConfiguration !== 'Debug' && requestedConfiguration !== 'Release') {
+            void vscode.window.showErrorMessage(
+                `Invalid WinUI debug configuration '${requestedConfiguration}'. Choose Debug or Release.`
+            );
+            return undefined;
+        }
+
+        const platform = this.getBuildPlatform(config);
+        if (!platform) { return undefined; }
+        return { configuration: requestedConfiguration, platform };
+    }
+
+    private getBuildPlatform(config: vscode.DebugConfiguration): BuildPlatform | undefined {
+        const requestedPlatform = String(config.platform ?? this.buildManager.currentPlatform).toLowerCase();
+        const platform: BuildPlatform | undefined = requestedPlatform === 'arm64' ? 'ARM64'
+            : requestedPlatform === 'x64' ? 'x64'
+                : requestedPlatform === 'x86' ? 'x86' : undefined;
+        if (!platform) {
+            void vscode.window.showErrorMessage(
+                `Invalid WinUI debug platform '${config.platform}'. Choose x86, x64, or ARM64.`
+            );
+            return undefined;
+        }
+        return platform;
+    }
+
+    private async getExecutablePath(
+        projectUri: vscode.Uri,
+        buildOptions: BuildOptions = {}
+    ): Promise<string> {
         const projectInfo = await this.projectManager.getProjectInfo(projectUri);
         const projectName = path.basename(projectUri.fsPath, '.csproj');
         const targetFramework = projectInfo?.targetFramework;
@@ -165,14 +208,24 @@ export class DebugConfigurationProvider implements vscode.DebugConfigurationProv
 
         if (isUnpackaged) {
             // Unpackaged apps: RID subfolder is the primary location
-            candidates.push(path.join(this.buildManager.getOutputPath(projectUri.fsPath, targetFramework, true), exeName));
-            candidates.push(path.join(this.buildManager.getOutputPath(projectUri.fsPath, targetFramework, false), exeName));
+            candidates.push(path.join(this.buildManager.getOutputPath(
+                projectUri.fsPath, targetFramework, true, buildOptions.platform, buildOptions.configuration
+            ), exeName));
+            candidates.push(path.join(this.buildManager.getOutputPath(
+                projectUri.fsPath, targetFramework, false, buildOptions.platform, buildOptions.configuration
+            ), exeName));
         } else {
             // Packaged apps: no RID subfolder is the primary location
-            candidates.push(path.join(this.buildManager.getOutputPath(projectUri.fsPath, targetFramework, false), exeName));
-            candidates.push(path.join(this.buildManager.getOutputPath(projectUri.fsPath, targetFramework, true), exeName));
+            candidates.push(path.join(this.buildManager.getOutputPath(
+                projectUri.fsPath, targetFramework, false, buildOptions.platform, buildOptions.configuration
+            ), exeName));
+            candidates.push(path.join(this.buildManager.getOutputPath(
+                projectUri.fsPath, targetFramework, true, buildOptions.platform, buildOptions.configuration
+            ), exeName));
             // Also check AppX layout for packaged apps
-            candidates.push(path.join(this.buildManager.getOutputPath(projectUri.fsPath, targetFramework, true), 'AppX', exeName));
+            candidates.push(path.join(this.buildManager.getOutputPath(
+                projectUri.fsPath, targetFramework, true, buildOptions.platform, buildOptions.configuration
+            ), 'AppX', exeName));
         }
 
         // Return the first path that exists, or fall back to the primary candidate

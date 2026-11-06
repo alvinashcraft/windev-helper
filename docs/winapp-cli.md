@@ -401,7 +401,9 @@ winapp ui record -a MyApp --duration-sec 10 --output demo.mp4
 
 The `winapp store` subcommand provides integrated Microsoft Store Developer CLI functionality.
 
-WinDev Helper is compatible with Microsoft Store CLI v0.4.3 behavior changes: human-readable output can now arrive on stdout, and publishing preserves the existing base price unless you explicitly change it in Partner Center or the CLI workflow.
+WinDev Helper is compatible with Microsoft Store CLI v0.4.3 behavior changes: human-readable output can arrive on stdout, and publishing preserves the existing base price unless explicitly changed. Microsoft Store CLI v0.4.4 adds no command-contract changes for the commands this extension uses; its SSRF hardening concerns listing-image downloads.
+
+WinDev Helper invokes Store operations through `winapp store` and does not install or pin a separate `msstore` executable. WinApp CLI v0.7.1 downloads and checksum-verifies the latest Store CLI when its local copy is missing, then reuses that copy; it does not refresh an existing copy automatically. Thus the exact Store CLI version is controlled by the installed WinApp CLI/cache, not by this extension. No `msstore` version minimum is pinned here; the extension relies on the documented `winapp store` command surface and preserves stdout/stderr separately.
 
 #### winapp store reconfigure
 

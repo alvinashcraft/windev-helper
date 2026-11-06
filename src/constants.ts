@@ -24,6 +24,7 @@ export const CONFIG = {
     TEMPLATES_SOURCE: 'templates.source',
     TEMPLATES_ALLOW_PRERELEASE: 'templates.allowPrerelease',
     REACTOR_REPO_PATH: 'reactor.repoPath',
+    XAML_INTELLISENSE_ENABLED: 'xaml.intelliSense.enabled',
 } as const;
 
 /**

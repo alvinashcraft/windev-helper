@@ -662,6 +662,10 @@ Sanitizes XAML before sending it to the native renderer, handling third-party co
 - **Resource cleanup**: Strips unknown namespace entries from resource dictionaries
 - **Warning collection**: Reports all replaced/removed elements so the preview can display warnings
 
+### Experimental XAML IntelliSense (`xamlIntelliSense.ts`)
+
+Registers optional completion and hover providers for `.xaml` text documents in either the `xaml` or `xml` language mode. It reuses the designer control catalog and property metadata, and remains disabled by default to avoid overlap with other XAML language services. This static metadata provider does not depend on C# tooling or a project build and does not claim semantic diagnostics, custom-control discovery, or code-behind symbol resolution.
+
 ### Native Preview (`xamlPreview/nativeRenderer.ts`)
 
 Manages the WinUI 3 host process for rendering XAML:
@@ -679,7 +683,7 @@ Manages the WinUI 3 host process for rendering XAML:
 ### Planned Features
 
 1. Debugger attachment for MSIX-packaged apps
-2. XAML IntelliSense integration
+2. Project-aware XAML diagnostics, quick fixes, and symbol navigation
 3. Hot Reload support
 4. C++ WinUI project support
 5. Additional project templates

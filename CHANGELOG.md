@@ -5,6 +5,22 @@ All notable changes to the WinDev Helper extension will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.5.0] - 2026-11-06
+
+### Added
+
+- **Experimental XAML IntelliSense** - Added opt-in metadata-backed control, property, attached-property, event, directive, enum, boolean, and markup-extension completions with control/property/value hovers in the XAML text editor.
+
+### Changed
+
+- **Store CLI compatibility notes** - Documented msstore CLI v0.4.4's lack of command-contract changes and WinApp CLI v0.7.1's first-install-only Store CLI download/cache behavior.
+
+### Fixed
+
+- **Legacy WinUI F5 target selection** - Honor the launch configuration's platform and build configuration both when building and resolving the executable path, instead of using workspace-global status-bar defaults.
+- **XAML completion validity** - Preserve existing assignments and complete the full token, avoid duplicate attributes and unsupported suggestions, and use selection values matching each metadata enum.
+- **Packaged custom configurations** - Preserve project-defined build configurations when legacy WinUI debug profiles delegate packaged launches to winapp.
+
 ## [4.4.0] - 2026-10-19
 
 ### Added

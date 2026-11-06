@@ -10,6 +10,7 @@ import { ServiceLocator } from './serviceLocator';
 import { COMMANDS, CONFIG, DEBUG_TYPES } from './constants';
 import { XamlPreviewController } from './xamlPreview';
 import { XamlDesignerEditorProvider } from './designer';
+import { XamlIntelliSenseProvider } from './xamlIntelliSense';
 
 let services: ServiceLocator;
 let previewController: XamlPreviewController;
@@ -25,6 +26,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     previewController = new XamlPreviewController(context.extensionPath);
     context.subscriptions.push(previewController);
     context.subscriptions.push(XamlDesignerEditorProvider.register(context, previewController));
+    XamlIntelliSenseProvider.register(context);
 
     // Register debug configuration provider
     winAppDebugProvider = new WinAppDebugConfigurationProvider(services.winAppCli);

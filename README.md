@@ -23,6 +23,7 @@ This extension leverages **winapp**, the Windows App Development CLI, to provide
 - **Two-way source synchronization** - Designer edits use VS Code document edits for native undo/redo and reject stale changes when the XAML source has changed concurrently
 - **C# event generation** - Double-click a supported control to wire its default event and add the matching handler to the `.xaml.cs` file
 - **Native Preview on Windows** - Switch to Preview mode to render with the bundled WinUI host, including project resources and theme support
+- **Experimental XAML IntelliSense** - Opt-in metadata-based control/property/value completion and hover in the XAML text editor
 
 The editable surface is cross-platform. Native Preview requires Windows and a bundled renderer matching the current architecture. Use **WinDev: Open XAML as Text** or the `</>` toolbar button whenever direct source editing is preferable. See the [XAML Designer guide](docs/xaml-designer.md).
 
@@ -351,7 +352,7 @@ MyApp/
 - **Designer fidelity**: The editable canvas approximates WinUI in HTML/CSS; use Windows native Preview to verify final rendering
 - **Custom controls**: Third-party controls appear as generic placeholders and do not receive full metadata-driven property editors
 - **Layout editing**: Direct movement currently applies to Canvas children; use attached properties for Grid and RelativePanel placement
-- XAML IntelliSense and Hot Reload are planned for future releases
+- Project-aware XAML diagnostics, quick fixes, and symbol navigation are planned; current completion/hover is opt-in and metadata-based
 - Some advanced debugging scenarios may require Visual Studio
 - Native Preview requires Windows; visual XAML editing remains available on macOS and Linux
 
