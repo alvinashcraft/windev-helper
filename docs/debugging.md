@@ -44,12 +44,18 @@ Optional properties:
 | `aot` | Use the project's configured Native AOT publish; requires effective `PublishAot=true` |
 | `manifest`, `executable`, `outputAppxDirectory` | Manifest override, folder executable disambiguation, and layout output |
 | `clean` | Clear app data before deployment |
+| `devTools` | `auto` (CLI default), `on`, `headless`, or `off`; explicit modes require Windows and winapp CLI 0.8+ |
+| `uniqueIdentity` | Opt into a checkout-specific package registration; requires Windows and winapp CLI 0.8+ |
 | `debuggerType` | `coreclr` (default), `cppvsdbg` (automatic for AOT), or `node` |
 | `workingDirectory`, `args` | CLI working directory and app arguments; arrays preserve argument boundaries |
 
 Missing C#/C++ debuggers prompt for installation **before** app launch, and installation requires consent. Native AOT rejects a managed debugger override. IDE debugging does not enable CLI `--debug-output` or `--symbols`, because only one debugger can attach. Console apps launch without an execution alias to keep launch JSON separate from app output; use Run as Packaged App for console stream forwarding.
 
 This is launch-then-attach debugging, so code executed before attachment may not hit breakpoints. No debugger or AI extension is installed silently.
+
+On winapp CLI 0.8+, DevTools starts automatically for supported local WinUI project launches (not by default in CI or Sandbox). Set `"devTools": "off"` to disable it, or `"headless"` for CLI inspection without its toolbar. DevTools is experimental; live property changes do not update your source files.
+
+F5 supports **host processes only**. Use **WinDev: Run in Windows Sandbox** for guest runs; a Sandbox PID is never passed to the local debugger. Existing pre-0.8 host launches remain supported when no new options are requested.
 
 ## Debug Configuration
 

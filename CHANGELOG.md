@@ -5,6 +5,19 @@ All notable changes to the WinDev Helper extension will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.6.0] - 2026-11-10
+
+### Added
+
+- **Windows Sandbox development loop** - Run a project or build-output folder in Sandbox and inspect prerequisite/readiness status without starting a guest. Existing UI automation commands offer an explicit Host/Sandbox choice on winapp CLI v0.8.0+.
+- **Experimental WinUI DevTools** - Select automatic, enabled, headless, or disabled DevTools when running a project; inspect a live WinUI tree and look up an element's XAML source. WinApp F5 supports `devTools` and checkout-specific `uniqueIdentity` options.
+
+### Changed
+
+- **Cross-platform safeguards** - Sandbox, DevTools, packaged-run, and UI automation commands are Windows-only in the Command Palette and reject execution on macOS/Linux. New CLI options are version-gated; no new dependencies or marketplace restrictions were added.
+- **Skills catalogs** - Choose the current WinApp CLI catalog for WinUI/WinApp skills or the existing Windows development catalog; WinDbg remains in the Windows development catalog. Installation still requires an explicit action.
+- **Debugger scope** - Local F5 refuses Sandbox targets and non-host process IDs instead of attaching to an unrelated host process.
+
 ## [4.5.0] - 2026-11-06
 
 ### Added

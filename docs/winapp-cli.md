@@ -2,7 +2,7 @@
 
 This document provides a comprehensive guide to using the Windows App Development CLI (winapp) with the WinDev Helper extension.
 
-> **Note:** This guide covers winapp CLI v0.3.0 and later, including the v0.7.0 project packaging and API discovery additions. See [Breaking Changes](#breaking-changes) for migration notes.
+> **Note:** This guide covers winapp CLI v0.3.0 and later, including the v0.8.0 Sandbox and experimental DevTools integration. Existing commands retain their older CLI requirements. See [Breaking Changes](#breaking-changes) for migration notes.
 
 ## Overview
 
@@ -42,6 +42,56 @@ winapp --version
 ```
 
 Or use the VS Code command: **WinUI: Check WinApp CLI Installation**
+
+## Windows Sandbox and DevTools (v0.8.0+)
+
+The following workflows are Windows-only. Commands are hidden/disabled on macOS/Linux and reject programmatic invocation there. No Sandbox/MCP package, AI extension, or C# Dev Kit dependency is added. A detectable winapp CLI 0.8+ is required for new flags; the overall CLI minimum is not raised.
+
+### Sandbox development loop
+
+1. Run **WinDev: Check Windows Sandbox Status**. This read-only command reports Windows/feature/client/`wsb` prerequisites, pending restarts, and guest readiness without starting or repairing a Sandbox.
+2. Prerequisites: Windows 11 24H2+ on a supported edition (Pro/Enterprise/Education), hardware virtualization, and an enabled/updated Windows Sandbox client. Enable the Windows feature manually if needed; the extension does not elevate, enable features, or restart your PC.
+3. Run **WinDev: Run in Windows Sandbox**. Confirm that builds still run on the host and that winapp can reuse/prepare a shared guest and provision supported guest runtimes. Choose the project or existing build-output folder and launch options. Detached mode returns after launch; wait mode waits for exit.
+4. Existing **WinDev: UI:** commands offer Host or Windows Sandbox on each invocation. Use the guest app name/PID and selectors from guest inspection. Cancelling never reuses a previous target.
+
+Equivalent CLI examples:
+
+```powershell
+winapp target snapshot sandbox --json
+winapp run .\MyApp.csproj --on sandbox --detach --unique-identity
+winapp ui inspect --on sandbox -a MyApp
+winapp ui screenshot --on sandbox -a MyApp -o .\result.png
+```
+
+Sandbox requests run there or fail; there is no silent host fallback. Windows supports only one Sandbox at a time, and winapp may adopt an existing guest. The extension does not stop/reset it automatically or orchestrate another tool against the same session. Guest PIDs and selectors must be rediscovered after the guest is recreated. Real input/capture requires an unlocked host session and connected, nonminimized Sandbox client; inspection alone does not prove input readiness.
+
+**Builds are not isolated.** Do not treat Sandbox execution as permission to build an untrusted project on your host. **This is not a clean-machine dependency test:** winapp can install missing supported runtimes in the guest. Close the Sandbox window and confirm when you are finished; handle externally started/shared sessions according to their owner's workflow.
+
+### Experimental WinUI DevTools
+
+For project runs, choose **Auto**, **Off**, **On**, or **Headless**. Auto omits the option and follows CLI defaults: enabled for supported local WinUI projects, disabled by default in Sandbox/CI. Explicit on/headless requires a supported WinUI project with XAML sources, not just an output folder. Native AOT/C++ do not support all managed binding diagnostics.
+
+```powershell
+winapp run .\MyApp.csproj --devtools headless --detach
+winapp devtools inspect -a MyApp
+winapp devtools get-source SaveButton -a MyApp
+```
+
+Use **WinDev: DevTools: Inspect Live WinUI Tree (Experimental)** or **Look Up Element Source (Experimental)** to display the corresponding report. Select the desktop and an app PID/qualified DevTools selector; guest commands are explicitly scoped with `--on sandbox`. These commands do not inject DevTools into an arbitrary process. Launch with DevTools enabled first. Live property edits in the CLI's DevTools UI are experiments, **not source edits**, and disappear on restart.
+
+WinApp F5 supports `"devTools": "off"` (or on/headless/auto) and `"uniqueIdentity": true` in its launch configuration. F5 remains host-only: guest PIDs are rejected before local debugger attachment. See [debugging](debugging.md).
+
+### Optional clean-machine release testing
+
+[sandbox-mcp](https://github.com/shanselman/sandbox-mcp) provides a standalone `sbx` CLI and optional MCP adapter. It is not installed or required by WinDev Helper. Use it separately for fresh-by-default, network-off release-artifact tests, missing-runtime diagnosis, crash/exit evidence, scripted UI checks, and retained reports. Explicit runtime provisioning changes the baseline and should be reported as a provisioned pass, not a clean-machine pass.
+
+Do not run competing winapp and `sbx` lifecycle workflows against the same Sandbox. Optional `sbx` task integration, profiling commands, and broader C++ project support are follow-up work, not commands supplied by this slice.
+
+### Agent skills catalogs
+
+**WinDev: Install Windows Development Skills Plugin** offers the current `microsoft/winappCli` catalog for WinUI/WinApp skills (including new DevTools/performance guidance), or the existing `microsoft/win-dev-skills` catalog, which can pin an older plugin. WinDbg continues to use `win-dev-skills`. Choose one catalog per plugin; the extension does not uninstall or migrate existing catalogs automatically. Installation/copying remains explicit and available cross-platform.
+
+References: [v0.8 release](https://github.com/microsoft/winappCli/releases/tag/v0.8.0), [Sandbox execution](https://learn.microsoft.com/windows/apps/dev-tools/winapp-cli/sandbox-execution), [DevTools guide](https://github.com/microsoft/winappCli/blob/v0.8.0/docs/guides/devtools.md).
 
 ## CLI Commands
 

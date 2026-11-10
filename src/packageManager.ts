@@ -5,7 +5,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
-import { AzureSignOptions, CertificateOptions, FindApiOptions, FindUiOptions, SignOptions, StoreConfigureOptions, WinAppCli } from './winAppCli';
+import { AzureSignOptions, CertificateOptions, DevToolsMode, ExecutionTarget, FindApiOptions, FindUiOptions, SignOptions, StoreConfigureOptions, WinAppCli } from './winAppCli';
 import { CONFIG, OUTPUT_CHANNELS, DEFAULTS } from './constants';
 
 /**
@@ -967,7 +967,15 @@ export class PackageManager {
     /**
      * Run application as a packaged app (v0.3.0+)
      */
-    public async runPackagedApp(projectUri?: vscode.Uri): Promise<void> {
+    public async runPackagedApp(projectUri?: vscode.Uri, executionTarget: ExecutionTarget = 'host'): Promise<void> {
+        if (!this.ensureWindows()) { return; }
+        if (executionTarget === 'sandbox') {
+            if (!await this.ensureV080Windows()) { return; }
+            const consent = await vscode.window.showWarningMessage(
+                'Builds run on your host, not inside Sandbox. winapp may reuse an existing shared Sandbox and install guest runtimes. This is not a clean-machine dependency test.',
+                { modal: true }, 'Continue');
+            if (consent !== 'Continue') { return; }
+        }
         const projectPath = projectUri ? path.dirname(projectUri.fsPath) :
             vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
 
@@ -1066,6 +1074,31 @@ export class PackageManager {
             inputPath = folderUris[0].fsPath;
         }
 
+        let devTools: DevToolsMode | undefined;
+        let uniqueIdentity = false;
+        if (await this.winAppCli.supportsVersion(0, 8)) {
+            if (target.mode === 'project') {
+                const modes: { label: string; mode: DevToolsMode }[] = [
+                    { label: 'Auto (CLI default)', mode: 'auto' },
+                    { label: 'Off', mode: 'off' },
+                    { label: 'On (toolbar and inspector)', mode: 'on' },
+                    { label: 'Headless (CLI inspection only)', mode: 'headless' }
+                ];
+                const mode = await vscode.window.showQuickPick(modes, {
+                    title: 'Experimental WinUI DevTools',
+                    placeHolder: 'Auto: enabled for supported local projects, disabled in Sandbox/CI. Live edits are temporary.'
+                });
+                if (!mode) { return; }
+                devTools = mode.mode;
+            }
+            const identity = await vscode.window.showQuickPick(['No', 'Yes'], {
+                title: 'Checkout-specific Package Identity',
+                placeHolder: 'Use a unique identity to avoid replacing the app registration from another checkout?'
+            });
+            if (!identity) { return; }
+            uniqueIdentity = identity === 'Yes';
+        }
+
         // Ask for run options
         type RunModePick = vscode.QuickPickItem & {
             mode: 'wait' | 'detach' | 'debugOutput';
@@ -1075,7 +1108,9 @@ export class PackageManager {
             [
                 { label: 'Run (wait for exit)', description: 'Launch and wait for the app to close', mode: 'wait' },
                 { label: 'Run detached', description: 'Launch and return control immediately', mode: 'detach' },
-                { label: 'Run with debug output', description: 'Capture diagnostics and automatically triage WinUI crashes', mode: 'debugOutput' },
+                ...(executionTarget === 'host' ? [{
+                    label: 'Run with debug output', description: 'Capture diagnostics and automatically triage WinUI crashes', mode: 'debugOutput' as const
+                }] : []),
             ],
             { placeHolder: 'Select run mode' }
         );
@@ -1113,12 +1148,15 @@ export class PackageManager {
 
         await vscode.window.withProgress({
             location: vscode.ProgressLocation.Notification,
-            title: 'Launching packaged app...',
+            title: executionTarget === 'sandbox' ? 'Launching app in Windows Sandbox...' : 'Launching packaged app...',
             cancellable: false
         }, async () => {
             try {
                 await this.winAppCli.run({
                     inputPath,
+                    executionTarget,
+                    ...(devTools && { devTools }),
+                    uniqueIdentity,
                     detach: runMode.mode === 'detach',
                     debugOutput: runMode.mode === 'debugOutput',
                     symbols,
@@ -1278,15 +1316,88 @@ export class PackageManager {
     // UI Automation Operations (v0.3.0+)
     // ============================================
 
+    private ensureWindows(): boolean {
+        if (process.platform === 'win32') { return true; }
+        void vscode.window.showErrorMessage('Running Windows apps and UI automation require Windows.');
+        return false;
+    }
+
+    private async ensureV080Windows(): Promise<boolean> {
+        try {
+            await this.winAppCli.requireV080Windows();
+            return true;
+        } catch (error) {
+            void vscode.window.showErrorMessage(String(error));
+            return false;
+        }
+    }
+
+    private async selectUiExecutionTarget(): Promise<ExecutionTarget | undefined> {
+        if (!this.ensureWindows()) { return undefined; }
+        if (!await this.winAppCli.supportsVersion(0, 8)) { return 'host'; }
+        const choice = await vscode.window.showQuickPick([
+            { label: 'Host', target: 'host' as const, description: 'This Windows desktop' },
+            { label: 'Windows Sandbox', target: 'sandbox' as const, description: 'Shared guest; may start/prepare Sandbox. Use guest app names, PIDs and selectors.' }
+        ], { title: 'UI Execution Target', placeHolder: 'Choose a desktop for this operation (not remembered)' });
+        return choice?.target;
+    }
+
+    /** Reports Sandbox setup and readiness without starting or changing the guest. */
+    public async sandboxStatus(): Promise<void> {
+        if (!await this.ensureV080Windows()) { return; }
+        try {
+            const result = await this.winAppCli.sandboxStatus();
+            this.outputChannel.appendLine('--- Windows Sandbox Status (no guest started) ---');
+            this.outputChannel.appendLine(result);
+            this.outputChannel.show(true);
+        } catch (error) {
+            void vscode.window.showErrorMessage(`Failed to check Windows Sandbox: ${error}`);
+        }
+    }
+
+    /** Inspects a WinUI DevTools tree or looks up source for an element in the selected desktop. */
+    public async inspectDevTools(source: boolean = false): Promise<void> {
+        if (!await this.ensureV080Windows()) { return; }
+        const target = await this.selectUiExecutionTarget();
+        if (!target) { return; }
+        const app = await vscode.window.showInputBox({
+            title: 'Experimental WinUI DevTools',
+            prompt: `Enter a ${target} app PID or qualified app selector from winapp DevTools. Launch with DevTools enabled first.`,
+            ignoreFocusOut: true,
+            validateInput: value => value.trim() ? null : 'App PID or selector is required'
+        });
+        if (!app?.trim()) { return; }
+        let selector: string | undefined;
+        if (source) {
+            selector = await vscode.window.showInputBox({
+                prompt: 'Enter the element name or selector from the DevTools tree',
+                ignoreFocusOut: true,
+                validateInput: value => value.trim() ? null : 'Element selector is required'
+            });
+            if (!selector?.trim()) { return; }
+        }
+        try {
+            const result = await this.winAppCli.devToolsInspect(app.trim(), target, selector?.trim());
+            this.outputChannel.appendLine(`--- DevTools ${source ? 'Source' : 'Tree'} (${target}) ---`);
+            this.outputChannel.appendLine(result);
+            this.outputChannel.show(true);
+        } catch (error) {
+            void vscode.window.showErrorMessage(`DevTools request failed: ${error}`);
+        }
+    }
+
     /**
      * List all visible windows (v0.3.0+)
      */
     public async uiListWindows(): Promise<void> {
+        const executionTarget = await this.selectUiExecutionTarget();
+        if (!executionTarget) { return; }
         const appName = await vscode.window.showInputBox({
             prompt: 'Enter app name to filter (leave empty for all windows)',
             placeHolder: 'App name (optional)',
             ignoreFocusOut: true
         });
+        if (appName === undefined) { return; }
 
         let showHidden = false;
         if (await this.winAppCli.supportsUiV040Features()) {
@@ -1303,7 +1414,7 @@ export class PackageManager {
             title: 'Listing windows...',
             cancellable: false
         }, async () => {
-            const result = await this.winAppCli.uiListWindows(appName || undefined, showHidden);
+            const result = await this.winAppCli.uiListWindows(appName || undefined, showHidden, executionTarget);
             if (result) {
                 this.outputChannel.appendLine('--- Windows ---');
                 this.outputChannel.appendLine(result);
@@ -1316,6 +1427,8 @@ export class PackageManager {
      * Inspect UI tree of a running app (v0.3.0+)
      */
     public async uiInspect(): Promise<void> {
+        const executionTarget = await this.selectUiExecutionTarget();
+        if (!executionTarget) { return; }
         const appName = await vscode.window.showInputBox({
             prompt: 'Enter the app name to inspect',
             placeHolder: 'App name',
@@ -1328,7 +1441,7 @@ export class PackageManager {
             title: 'Inspecting UI tree...',
             cancellable: false
         }, async () => {
-            const result = await this.winAppCli.uiInspect(appName);
+            const result = await this.winAppCli.uiInspect(appName, false, executionTarget);
             if (result) {
                 this.outputChannel.appendLine(`--- UI Tree: ${appName} ---`);
                 this.outputChannel.appendLine(result);
@@ -1341,6 +1454,8 @@ export class PackageManager {
      * Take a screenshot of an app window (v0.3.0+)
      */
     public async uiScreenshot(): Promise<void> {
+        const executionTarget = await this.selectUiExecutionTarget();
+        if (!executionTarget) { return; }
         const appName = await vscode.window.showInputBox({
             prompt: 'Enter the app name to screenshot',
             placeHolder: 'App name',
@@ -1379,7 +1494,7 @@ export class PackageManager {
             title: 'Taking screenshot...',
             cancellable: false
         }, async () => {
-            await this.winAppCli.uiScreenshot(appName, outputUri.fsPath, focus);
+            await this.winAppCli.uiScreenshot(appName, outputUri.fsPath, focus, executionTarget);
         });
     }
 
@@ -1387,6 +1502,8 @@ export class PackageManager {
      * Hover over a UI element to trigger tooltip/flyout behavior (v0.4.0+)
      */
     public async uiHover(): Promise<void> {
+        const executionTarget = await this.selectUiExecutionTarget();
+        if (!executionTarget) { return; }
         const v = await this.winAppCli.getVersion();
         if (!v) {
             vscode.window.showWarningMessage('Unable to determine winapp CLI version. Ensure winapp CLI is installed and v0.4.0 or newer is available.');
@@ -1410,6 +1527,7 @@ export class PackageManager {
             placeHolder: 'App name (optional)',
             ignoreFocusOut: true
         });
+        if (appName === undefined) { return; }
 
         const dwellInput = await vscode.window.showInputBox({
             prompt: 'Hover dwell time in milliseconds (optional, default 800)',
@@ -1432,7 +1550,7 @@ export class PackageManager {
             title: 'Hovering UI element...',
             cancellable: false
         }, async () => {
-            const result = await this.winAppCli.uiHover(selector.trim(), appName?.trim() || undefined, dwellTime);
+            const result = await this.winAppCli.uiHover(selector.trim(), appName.trim() || undefined, dwellTime, executionTarget);
             if (result) {
                 this.outputChannel.appendLine(`--- Hover Result: ${selector.trim()} ---`);
                 this.outputChannel.appendLine(result);
@@ -1445,6 +1563,8 @@ export class PackageManager {
      * Send keyboard input to a running app or a specific UI element (v0.5.0+).
      */
     public async uiSendKeys(): Promise<void> {
+        const executionTarget = await this.selectUiExecutionTarget();
+        if (!executionTarget) { return; }
         if (!await this.ensureUiV050Support()) { return; }
 
         const keys = await vscode.window.showInputBox({
@@ -1509,7 +1629,8 @@ export class PackageManager {
                 transport.transport,
                 appName.trim() || undefined,
                 target.trim() || undefined,
-                allowSystemKeys
+                allowSystemKeys,
+                executionTarget
             );
             if (result) {
                 this.outputChannel.appendLine('--- Send Keys Result ---');
@@ -1523,6 +1644,8 @@ export class PackageManager {
      * Click a UI element in a running app (v0.5.0+).
      */
     public async uiClick(): Promise<void> {
+        const executionTarget = await this.selectUiExecutionTarget();
+        if (!executionTarget) { return; }
         if (!await this.ensureUiV050Support()) { return; }
 
         const selector = await vscode.window.showInputBox({
@@ -1545,7 +1668,7 @@ export class PackageManager {
             title: 'Clicking UI element...',
             cancellable: false
         }, async () => {
-            const result = await this.winAppCli.uiClick(selector.trim(), appName.trim() || undefined);
+            const result = await this.winAppCli.uiClick(selector.trim(), appName.trim() || undefined, executionTarget);
             if (result) {
                 this.outputChannel.appendLine(`--- Click Result: ${selector.trim()} ---`);
                 this.outputChannel.appendLine(result);
@@ -1558,6 +1681,8 @@ export class PackageManager {
      * Set the value of an editable UI element (v0.5.0+).
      */
     public async uiSetValue(): Promise<void> {
+        const executionTarget = await this.selectUiExecutionTarget();
+        if (!executionTarget) { return; }
         if (!await this.ensureUiV050Support()) { return; }
 
         const selector = await vscode.window.showInputBox({
@@ -1587,7 +1712,7 @@ export class PackageManager {
             title: 'Setting UI element value...',
             cancellable: false
         }, async () => {
-            const result = await this.winAppCli.uiSetValue(selector.trim(), value, appName.trim() || undefined);
+            const result = await this.winAppCli.uiSetValue(selector.trim(), value, appName.trim() || undefined, executionTarget);
             if (result) {
                 this.outputChannel.appendLine(`--- Set Value Result: ${selector.trim()} ---`);
                 this.outputChannel.appendLine(result);
@@ -1600,6 +1725,8 @@ export class PackageManager {
      * Record a running app interaction session to an MP4 file (v0.5.0+).
      */
     public async uiRecord(): Promise<void> {
+        const executionTarget = await this.selectUiExecutionTarget();
+        if (!executionTarget) { return; }
         if (!await this.ensureUiV050Support()) { return; }
 
         const appName = await vscode.window.showInputBox({
@@ -1640,7 +1767,7 @@ export class PackageManager {
             title: 'Recording app interaction...',
             cancellable: false
         }, async () => {
-            await this.winAppCli.uiRecord(appName.trim(), Number(durationInput), outputUri.fsPath);
+            await this.winAppCli.uiRecord(appName.trim(), Number(durationInput), outputUri.fsPath, executionTarget);
         });
     }
 

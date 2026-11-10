@@ -5,7 +5,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
-import { RunOptions, WinAppCli } from './winAppCli';
+import { DevToolsMode, RunOptions, WinAppCli } from './winAppCli';
 import { DEBUG_TYPES, OUTPUT_CHANNELS } from './constants';
 
 interface WinAppDebugConfiguration extends vscode.DebugConfiguration {
@@ -27,6 +27,8 @@ interface WinAppDebugConfiguration extends vscode.DebugConfiguration {
     aot?: boolean;
     clean?: boolean;
     executable?: string;
+    devTools?: DevToolsMode;
+    uniqueIdentity?: boolean;
 }
 
 /** Launches projects or existing layouts with identity, then attaches to the CLI-reported PID. */
@@ -63,6 +65,19 @@ export class WinAppDebugConfigurationProvider implements vscode.DebugConfigurati
         }
         const launch: WinAppDebugConfiguration = config;
         try {
+            if ((launch.on !== undefined && launch.on !== 'host') ||
+                (launch.executionTarget !== undefined && launch.executionTarget !== 'host')) {
+                throw new Error('F5 only supports host processes. Use Run in Windows Sandbox for guest execution.');
+            }
+            if (launch.devTools !== undefined && !['auto', 'on', 'headless', 'off'].includes(launch.devTools)) {
+                throw new Error('devTools must be auto, on, headless, or off.');
+            }
+            if (launch.uniqueIdentity !== undefined && typeof launch.uniqueIdentity !== 'boolean') {
+                throw new Error('uniqueIdentity must be a boolean.');
+            }
+            if (launch.uniqueIdentity || (launch.devTools && launch.devTools !== 'auto')) {
+                await this.winAppCli.requireV080Windows();
+            }
             if (launch.detach || launch.noLaunch || launch.debugOutput || launch.symbols ||
                 launch.unregisterOnExit || launch.withAlias) {
                 throw new Error('IDE debugging cannot use detach, noLaunch, debugOutput, symbols, unregisterOnExit, or withAlias. Use Run as Packaged App instead.');
@@ -87,6 +102,8 @@ export class WinAppDebugConfigurationProvider implements vscode.DebugConfigurati
                 ...(launch.framework && { framework: launch.framework }),
                 ...(launch.runtime && { runtime: launch.runtime }),
                 ...(launch.executable && { executable: launch.executable }),
+                ...(launch.devTools && { devTools: launch.devTools }),
+                ...(launch.uniqueIdentity && { uniqueIdentity: launch.uniqueIdentity }),
                 ...(launch.properties && { properties: Object.entries(launch.properties).map(([key, value]) => `${key}=${value}`) }),
                 noBuild: launch.noBuild ?? false,
                 noRestore: launch.noRestore ?? false,

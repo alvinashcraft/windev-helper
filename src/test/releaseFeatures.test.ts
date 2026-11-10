@@ -212,8 +212,11 @@ suite('Release 4.4 workflows', () => {
     for (const host of ['copilot', 'claude', 'codex']) {
         test(`copies verified ${host} skills commands without executing them`, async () => {
             let picks = 0;
-            mock.method(vscode.window, 'showQuickPick', async () => picks++ === 0
-                ? { label: host, value: host } : { label: 'WinApp', value: 'winappcli' });
+            mock.method(vscode.window, 'showQuickPick', async () => [
+                { label: host, value: host },
+                { label: 'WinApp', value: 'winappcli' },
+                { label: 'Windows development catalog', repository: 'microsoft/win-dev-skills', name: 'win-dev-skills' }
+            ][picks++]);
             mock.method(vscode.window, 'showInformationMessage', async () => 'Copy Commands');
             const copy = mock.fn(async (_text: string) => {});
             mock.getter(vscode.env, 'clipboard', () => ({ writeText: copy, readText: async () => '' }));

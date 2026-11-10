@@ -385,6 +385,12 @@ class DebugConfigurationProvider implements vscode.DebugConfigurationProvider {
 
 Store payload JSON stays on stdout, separate from human-readable stderr. Store initialization runs as an interactive process task. Submission polling uses cancellable process execution, including Windows process-tree termination for the CLI wrapper and its Store CLI child.
 
+### Windows-only CLI v0.8 Workflows
+
+`WinAppCli` adds typed execution-target, DevTools-mode, and unique-identity run options. Explicit new flags, Sandbox status, and DevTools queries require a detectable CLI 0.8+ and Windows. `PackageManager` presents stateless per-operation desktop selection for UI automation. Commands have both `isWindows` palette visibility/enablement and runtime platform guards; no new service, native binary, or runtime dependency is bundled.
+
+Sandbox runs use the CLI's guest deployment path, never the local debug provider. `runForDebug` rejects requested Sandbox targets and launch JSON indicating non-host process scope before returning a PID. Source lookup presents the CLI's report rather than treating uncertain source matches as authoritative file edits. Skills installation allows one selected upstream catalog per plugin and still requires explicit install/copy consent.
+
 ---
 
 ## Data Flow
