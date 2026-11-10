@@ -71,6 +71,11 @@ export class DebugConfigurationProvider implements vscode.DebugConfigurationProv
     ): Promise<vscode.DebugConfiguration | undefined> {
         // For winui type, convert to coreclr
         if (config.type === DEBUG_TYPES.WINUI) {
+            if ((config.on !== undefined && config.on !== 'host') ||
+                (config.executionTarget !== undefined && config.executionTarget !== 'host')) {
+                void vscode.window.showErrorMessage('F5 only supports host processes. Use Run in Windows Sandbox for guest execution.');
+                return undefined;
+            }
             const projectPath = config.project || (await this.projectManager.selectProject())?.fsPath;
 
             if (!projectPath) {
@@ -95,6 +100,10 @@ export class DebugConfigurationProvider implements vscode.DebugConfigurationProv
                         input: projectPath,
                         configuration: config.configuration ?? this.buildManager.currentConfiguration,
                             arch: platform.toLowerCase(),
+                        ...(config.devTools !== undefined && { devTools: config.devTools }),
+                        ...(config.uniqueIdentity !== undefined && { uniqueIdentity: config.uniqueIdentity }),
+                        ...(config.on !== undefined && { on: config.on }),
+                        ...(config.executionTarget !== undefined && { executionTarget: config.executionTarget }),
                             args: config.args ?? []
                         }, _token);
                 }

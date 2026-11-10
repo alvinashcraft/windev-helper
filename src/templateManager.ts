@@ -1012,12 +1012,19 @@ public partial class ${viewModelName} : BaseViewModel
             { label: 'WinDbg diagnostics', value: 'windbg', description: 'Advanced application and driver diagnostics' }
         ], { placeHolder: 'Select a plugin; install each plugin from only one catalog to avoid duplicates' });
         if (!plugin) { return; }
-        const docsUrl = EXTERNAL_URLS.WIN_DEV_SKILLS_REPO;
-        const marketplaceCommand = `${host.value} plugin marketplace add microsoft/win-dev-skills`;
-        const installCommand = `${host.value} plugin ${host.value === 'codex' ? 'add' : 'install'} ${plugin.value}@win-dev-skills`;
+        const catalog = plugin.value === 'windbg'
+            ? { repository: 'microsoft/win-dev-skills', name: 'win-dev-skills' }
+            : await vscode.window.showQuickPick([
+                { label: 'WinApp CLI catalog', repository: 'microsoft/winappCli', name: 'winappcli', description: 'Current WinUI and WinApp skills, including v0.8 DevTools and performance workflows' },
+                { label: 'Windows development catalog', repository: 'microsoft/win-dev-skills', name: 'win-dev-skills', description: 'May pin an older WinApp plugin; do not install the same plugin from both catalogs' }
+            ], { title: 'Skills Catalog', placeHolder: 'Choose one catalog for this plugin to avoid duplicate skills' });
+        if (!catalog) { return; }
+        const docsUrl = `https://github.com/${catalog.repository}`;
+        const marketplaceCommand = `${host.value} plugin marketplace add ${catalog.repository}`;
+        const installCommand = `${host.value} plugin ${host.value === 'codex' ? 'add' : 'install'} ${plugin.value}@${catalog.name}`;
         const updateCommand = host.value === 'codex'
-            ? 'codex plugin marketplace upgrade win-dev-skills'
-            : `${host.value} plugin marketplace update win-dev-skills; ${host.value} plugin update ${plugin.value}@win-dev-skills`;
+            ? `codex plugin marketplace upgrade ${catalog.name}`
+            : `${host.value} plugin marketplace update ${catalog.name}; ${host.value} plugin update ${plugin.value}@${catalog.name}`;
         const nextStep = host.value === 'codex'
             ? 'Codex loads skills, not agents. Start a new session and invoke the relevant skill by name.'
             : `Start a new ${host.label} session${plugin.value === 'winui' ? ' and run /winui-setup' : ' to load the plugin'}.`;
@@ -1107,7 +1114,7 @@ public partial class ${viewModelName} : BaseViewModel
         // WinApp CLI >= 0.7
         const winapp = await this.checkWinAppCliVersion();
         results.push({ ok: winapp.ok, label: 'WinApp CLI' });
-        channel.appendLine(`${winapp.ok ? '[ OK ]' : '[MISS]'} WinApp CLI (>= 0.7.0; 0.7.1 recommended): ${winapp.detail}`);
+        channel.appendLine(`${winapp.ok ? '[ OK ]' : '[MISS]'} WinApp CLI (>= 0.7.0; 0.8.0 recommended for Sandbox/DevTools): ${winapp.detail}`);
         if (!winapp.ok) {
             channel.appendLine('       Fix: winget install --id Microsoft.WinAppCli (or winget upgrade --id Microsoft.WinAppCli if already installed)');
         }

@@ -34,7 +34,12 @@ The editable surface is cross-platform. Native Preview requires Windows and a bu
 - Run your app without debugging
 - **MSIX packaged app support** - Automatic deployment and launch through package identity
 - **Project/solution F5** - Build through winapp and attach to its exact process ID; Native AOT selects the native debugger
+- **Windows Sandbox development runs** - On Windows with winapp CLI 0.8+, run projects or existing output in Sandbox, check readiness, and target existing UI automation commands at the guest
+- **Experimental WinUI DevTools** - Choose automatic, on, headless, or off modes for project runs; inspect the live WinUI tree and look up XAML source. Live property edits are temporary, not source edits
+- **Parallel checkout identity** - Opt into a checkout-specific package identity for runs and WinApp F5 with winapp CLI 0.8+
 - Write your WinUI C# and XAML anywhere VS Code runs
+
+Sandbox, DevTools, and app/UI execution commands are Windows-only; the extension and its XAML editing features remain usable on macOS/Linux and other marketplaces. Sandbox and agent tooling are optional, not extension dependencies. See [Sandbox and DevTools](docs/winapp-cli.md#windows-sandbox-and-devtools-v080).
 
 ### 🔨 Build & Configuration
 
@@ -89,7 +94,7 @@ The editable surface is cross-platform. Native Preview requires Windows and a bu
 
 ### 🤖 WinUI Agent Skills
 
-- **Install Windows Development Skills Plugin** - Choose `winui`, `winappcli`, or `windbg` from [microsoft/win-dev-skills](https://github.com/microsoft/win-dev-skills) for Copilot CLI, Claude Code, or Codex; copy commands or run them with consent
+- **Install Windows Development Skills Plugin** - Choose `winui`/`winappcli` from the current [WinApp CLI catalog](https://github.com/microsoft/winappCli) or [Windows development catalog](https://github.com/microsoft/win-dev-skills), or `windbg` from the latter, for Copilot CLI, Claude Code, or Codex; copy commands or run them with consent
 - **Open WinUI Agent Skills Repository** - Jump to the win-dev-skills repo to browse the available agents and skills
 - **Check Windows Dev Environment** - Diagnose your local toolchain (.NET SDK, WinApp CLI, WinUI templates, Developer Mode) with fix-up commands
 - Pairs naturally with this extension: the agent scaffolds and iterates on your WinUI app while VS Code handles building, debugging, packaging, and signing

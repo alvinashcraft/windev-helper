@@ -345,6 +345,12 @@ function registerCommands(context: vscode.ExtensionContext): void {
 
     // Run & manage commands (v0.3.0+)
     registerWorkspaceCommand(COMMANDS.RUN_PACKAGED_APP, project => services.packageManager.runPackagedApp(project));
+    registerWorkspaceCommand(COMMANDS.RUN_SANDBOX, project => services.packageManager.runPackagedApp(project, 'sandbox'));
+    context.subscriptions.push(
+        vscode.commands.registerCommand(COMMANDS.SANDBOX_STATUS, () => services.packageManager.sandboxStatus()),
+        vscode.commands.registerCommand(COMMANDS.DEVTOOLS_INSPECT, () => services.packageManager.inspectDevTools()),
+        vscode.commands.registerCommand(COMMANDS.DEVTOOLS_SOURCE, () => services.packageManager.inspectDevTools(true))
+    );
 
     registerWorkspaceCommand(COMMANDS.UNREGISTER_PACKAGE, project => services.packageManager.unregisterPackage(project));
 

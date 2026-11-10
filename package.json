@@ -2,7 +2,7 @@
   "name": "windev-helper",
   "displayName": "WinDev Helper",
   "description": "Build beautiful, performant WinUI apps with VS Code. Debug, build, package, and deploy Windows apps powered by the Windows App SDK.",
-  "version": "4.5.0",
+  "version": "4.6.0",
   "publisher": "alvinashcraft",
   "icon": "images/icon.png",
   "license": "MIT",
@@ -291,6 +291,31 @@
       {
         "command": "windev-helper.runPackagedApp",
         "title": "Run as Packaged App",
+        "enablement": "isWindows",
+        "category": "WinDev"
+      },
+      {
+        "command": "windev-helper.runSandbox",
+        "title": "Run in Windows Sandbox",
+        "enablement": "isWindows",
+        "category": "WinDev"
+      },
+      {
+        "command": "windev-helper.sandboxStatus",
+        "title": "Check Windows Sandbox Status",
+        "enablement": "isWindows",
+        "category": "WinDev"
+      },
+      {
+        "command": "windev-helper.devToolsInspect",
+        "title": "DevTools: Inspect Live WinUI Tree (Experimental)",
+        "enablement": "isWindows",
+        "category": "WinDev"
+      },
+      {
+        "command": "windev-helper.devToolsSource",
+        "title": "DevTools: Look Up Element Source (Experimental)",
+        "enablement": "isWindows",
         "category": "WinDev"
       },
       {
@@ -326,41 +351,49 @@
       {
         "command": "windev-helper.uiListWindows",
         "title": "UI: List Windows",
+        "enablement": "isWindows",
         "category": "WinDev"
       },
       {
         "command": "windev-helper.uiInspect",
         "title": "UI: Inspect App",
+        "enablement": "isWindows",
         "category": "WinDev"
       },
       {
         "command": "windev-helper.uiScreenshot",
         "title": "UI: Take Screenshot",
+        "enablement": "isWindows",
         "category": "WinDev"
       },
       {
         "command": "windev-helper.uiHover",
         "title": "UI: Hover Element",
+        "enablement": "isWindows",
         "category": "WinDev"
       },
       {
         "command": "windev-helper.uiSendKeys",
         "title": "UI: Send Keys",
+        "enablement": "isWindows",
         "category": "WinDev"
       },
       {
         "command": "windev-helper.uiClick",
         "title": "UI: Invoke/Click Element",
+        "enablement": "isWindows",
         "category": "WinDev"
       },
       {
         "command": "windev-helper.uiSetValue",
         "title": "UI: Set Element Value",
+        "enablement": "isWindows",
         "category": "WinDev"
       },
       {
         "command": "windev-helper.uiRecord",
         "title": "UI: Record App Interaction",
+        "enablement": "isWindows",
         "category": "WinDev"
       },
       {
@@ -472,6 +505,58 @@
         }
       ],
       "commandPalette": [
+        {
+          "command": "windev-helper.runSandbox",
+          "when": "isWindows"
+        },
+        {
+          "command": "windev-helper.sandboxStatus",
+          "when": "isWindows"
+        },
+        {
+          "command": "windev-helper.devToolsInspect",
+          "when": "isWindows"
+        },
+        {
+          "command": "windev-helper.devToolsSource",
+          "when": "isWindows"
+        },
+        {
+          "command": "windev-helper.runPackagedApp",
+          "when": "isWindows"
+        },
+        {
+          "command": "windev-helper.uiListWindows",
+          "when": "isWindows"
+        },
+        {
+          "command": "windev-helper.uiInspect",
+          "when": "isWindows"
+        },
+        {
+          "command": "windev-helper.uiScreenshot",
+          "when": "isWindows"
+        },
+        {
+          "command": "windev-helper.uiHover",
+          "when": "isWindows"
+        },
+        {
+          "command": "windev-helper.uiSendKeys",
+          "when": "isWindows"
+        },
+        {
+          "command": "windev-helper.uiClick",
+          "when": "isWindows"
+        },
+        {
+          "command": "windev-helper.uiSetValue",
+          "when": "isWindows"
+        },
+        {
+          "command": "windev-helper.uiRecord",
+          "when": "isWindows"
+        },
         {
           "command": "windev-helper.buildProject",
           "when": "windevHelper.isWinUIProject"
@@ -769,7 +854,11 @@
               },
               "arch": {
                 "type": "string",
-                "enum": ["x86", "x64", "arm64"]
+                "enum": [
+                  "x86",
+                  "x64",
+                  "arm64"
+                ]
               },
               "framework": {
                 "type": "string"
@@ -780,7 +869,9 @@
               },
               "properties": {
                 "type": "object",
-                "additionalProperties": { "type": "string" },
+                "additionalProperties": {
+                  "type": "string"
+                },
                 "description": "MSBuild property name/value pairs."
               },
               "noBuild": {
@@ -790,6 +881,22 @@
               "noRestore": {
                 "type": "boolean",
                 "default": false
+              },
+              "devTools": {
+                "type": "string",
+                "enum": [
+                  "auto",
+                  "on",
+                  "headless",
+                  "off"
+                ],
+                "default": "auto",
+                "description": "Experimental WinUI DevTools mode (explicit modes require winapp 0.8+). Auto preserves the CLI default. Live edits are temporary."
+              },
+              "uniqueIdentity": {
+                "type": "boolean",
+                "default": false,
+                "description": "Use a checkout-specific package identity (winapp 0.8+)."
               },
               "aot": {
                 "type": "boolean",

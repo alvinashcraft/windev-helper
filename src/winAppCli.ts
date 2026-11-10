@@ -967,11 +967,15 @@ export class WinAppCli {
      */
     public async run(options: RunOptions, cwd?: string): Promise<void> {
         await this.executeRun(options, cwd);
-        vscode.window.showInformationMessage('Packaged app launched successfully.');
+        vscode.window.showInformationMessage(options.executionTarget === 'sandbox'
+            ? 'Windows Sandbox run completed successfully.' : 'Packaged app launched successfully.');
     }
 
     /** Launches for IDE debugging and returns the exact process ID emitted by the CLI. */
     public async runForDebug(options: RunOptions, cwd: string): Promise<number> {
+        if (options.executionTarget === 'sandbox') {
+            throw new Error('Sandbox processes cannot be attached with the local debugger. Use Run in Windows Sandbox instead.');
+        }
         if (!await this.supportsVersion(0, 6)) {
             throw new Error('Project-aware debugging requires winapp CLI v0.6.0 or newer.');
         }
@@ -990,6 +994,13 @@ export class WinAppCli {
         if ('Error' in result && result.Error) {
             throw new Error(String(result.Error));
         }
+        if (('Sandbox' in result && result.Sandbox === true) ||
+            ('ProcessScope' in result && result.ProcessScope !== 'host') ||
+            ('ExecutionTarget' in result && typeof result.ExecutionTarget === 'object' &&
+                result.ExecutionTarget !== null && 'Kind' in result.ExecutionTarget &&
+                result.ExecutionTarget.Kind !== 'host')) {
+            throw new Error('winapp returned a non-host process. Refusing local debugger attach.');
+        }
         if (!('ProcessId' in result) || typeof result.ProcessId !== 'number' ||
             !Number.isInteger(result.ProcessId) || result.ProcessId <= 0) {
             throw new Error('winapp run did not return a valid process ID. The app may not have launched.');
@@ -1004,6 +1015,12 @@ export class WinAppCli {
         }
 
         const args: string[] = [inputPath];
+        if (options.uniqueIdentity || (options.devTools && options.devTools !== 'auto')) {
+            await this.requireV080Windows();
+        }
+        args.push(...await this.executionTargetArgs(options.executionTarget));
+        if (options.uniqueIdentity) { args.push('--unique-identity'); }
+        if (options.devTools && options.devTools !== 'auto') { args.push('--devtools', options.devTools); }
         if (options.manifest) {
             args.push('--manifest', options.manifest);
         }
@@ -1073,6 +1090,39 @@ export class WinAppCli {
             args.push('--', ...options.appArgs);
         }
         return this.execute('run', args, cwd);
+    }
+
+    /** Rejects Windows-only v0.8 operations before invoking an unsupported CLI. */
+    public async requireV080Windows(): Promise<void> {
+        if (process.platform !== 'win32') {
+            throw new Error('This operation requires Windows.');
+        }
+        if (!await this.supportsVersion(0, 8)) {
+            throw new Error('This operation requires winapp CLI v0.8.0 or newer (version must be detectable).');
+        }
+    }
+
+    private async executionTargetArgs(target: ExecutionTarget = 'host'): Promise<string[]> {
+        if (target === 'host') { return []; }
+        await this.requireV080Windows();
+        return ['--on', 'sandbox'];
+    }
+
+    /** Reports Sandbox prerequisites/readiness without starting or changing the guest. */
+    public async sandboxStatus(): Promise<string> {
+        await this.requireV080Windows();
+        return this.execute('target', ['snapshot', 'sandbox', '--json'],
+            vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? os.tmpdir());
+    }
+
+    /** Inspects a live WinUI tree or reports an element's XAML source, without attaching/injecting. */
+    public async devToolsInspect(
+        app: string, target: ExecutionTarget = 'host', selector?: string
+    ): Promise<string> {
+        await this.requireV080Windows();
+        const args = selector ? ['get-source', selector] : ['inspect'];
+        args.push('-a', app, ...await this.executionTargetArgs(target));
+        return this.execute('devtools', args, vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? os.tmpdir());
     }
 
     /**
@@ -1147,7 +1197,7 @@ export class WinAppCli {
      * List all visible windows (v0.3.0+)
      * @param appName Optional app name filter
      */
-    public async uiListWindows(appName?: string, showHidden: boolean = false): Promise<string> {
+    public async uiListWindows(appName?: string, showHidden: boolean = false, target: ExecutionTarget = 'host'): Promise<string> {
         try {
             const args: string[] = ['list-windows'];
             if (appName) {
@@ -1156,7 +1206,7 @@ export class WinAppCli {
             if (showHidden) {
                 args.push('--show-hidden');
             }
-            return await this.execute('ui', args);
+            return await this.execute('ui', [...args, ...await this.executionTargetArgs(target)]);
         } catch (error) {
             vscode.window.showErrorMessage(`Failed to list windows: ${error}`);
             return '';
@@ -1168,13 +1218,13 @@ export class WinAppCli {
      * @param appName App name to inspect
      * @param interactive Whether to use interactive mode
      */
-    public async uiInspect(appName: string, interactive: boolean = false): Promise<string> {
+    public async uiInspect(appName: string, interactive: boolean = false, target: ExecutionTarget = 'host'): Promise<string> {
         try {
             const args: string[] = ['inspect', '-a', appName];
             if (interactive) {
                 args.push('-i');
             }
-            return await this.execute('ui', args);
+            return await this.execute('ui', [...args, ...await this.executionTargetArgs(target)]);
         } catch (error) {
             vscode.window.showErrorMessage(`Failed to inspect UI: ${error}`);
             return '';
@@ -1187,14 +1237,14 @@ export class WinAppCli {
      * @param outputPath Output file path for the screenshot
      * @param focus Bring the target window to the foreground first (`--focus`, v0.3.2+)
      */
-    public async uiScreenshot(appName: string, outputPath: string, focus: boolean = false): Promise<void> {
+    public async uiScreenshot(appName: string, outputPath: string, focus: boolean = false, target: ExecutionTarget = 'host'): Promise<void> {
         try {
             const args = ['screenshot', '-a', appName, '-o', outputPath];
             // v0.3.2+: bring the target window to the foreground before capture.
             if (focus) {
                 args.push('--focus');
             }
-            await this.execute('ui', args);
+            await this.execute('ui', [...args, ...await this.executionTargetArgs(target)]);
             vscode.window.showInformationMessage(`Screenshot saved to ${outputPath}`);
         } catch (error) {
             vscode.window.showErrorMessage(`Failed to take screenshot: ${error}`);
@@ -1207,7 +1257,7 @@ export class WinAppCli {
      * @param appName Optional app name filter
      * @param dwellTime Optional dwell time in ms
      */
-    public async uiHover(selector: string, appName?: string, dwellTime?: number): Promise<string> {
+    public async uiHover(selector: string, appName?: string, dwellTime?: number, target: ExecutionTarget = 'host'): Promise<string> {
         try {
             const args: string[] = ['hover', selector];
             if (appName) {
@@ -1216,7 +1266,7 @@ export class WinAppCli {
             if (dwellTime !== undefined) {
                 args.push('--dwell-time', dwellTime.toString());
             }
-            return await this.execute('ui', args);
+            return await this.execute('ui', [...args, ...await this.executionTargetArgs(target)]);
         } catch (error) {
             vscode.window.showErrorMessage(`Failed to hover UI element: ${error}`);
             return '';
@@ -1236,7 +1286,8 @@ export class WinAppCli {
         transport: 'post-message' | 'send-input',
         appName?: string,
         target?: string,
-        allowSystemKeys: boolean = false
+        allowSystemKeys: boolean = false,
+        executionTarget: ExecutionTarget = 'host'
     ): Promise<string> {
         try {
             const args: string[] = ['send-keys', keys, '--via', transport];
@@ -1249,7 +1300,7 @@ export class WinAppCli {
             if (allowSystemKeys) {
                 args.push('--allow-system-keys');
             }
-            return await this.execute('ui', args);
+            return await this.execute('ui', [...args, ...await this.executionTargetArgs(executionTarget)]);
         } catch (error) {
             vscode.window.showErrorMessage(`Failed to send keys: ${error}`);
             return '';
@@ -1261,13 +1312,13 @@ export class WinAppCli {
      * @param selector Semantic slug or text selector
      * @param appName Optional app name filter
      */
-    public async uiClick(selector: string, appName?: string): Promise<string> {
+    public async uiClick(selector: string, appName?: string, target: ExecutionTarget = 'host'): Promise<string> {
         try {
             const args: string[] = ['click', selector];
             if (appName) {
                 args.push('-a', appName);
             }
-            return await this.execute('ui', args);
+            return await this.execute('ui', [...args, ...await this.executionTargetArgs(target)]);
         } catch (error) {
             vscode.window.showErrorMessage(`Failed to click UI element: ${error}`);
             return '';
@@ -1280,13 +1331,13 @@ export class WinAppCli {
      * @param value Value to assign; may be empty to clear the control
      * @param appName Optional app name filter
      */
-    public async uiSetValue(selector: string, value: string, appName?: string): Promise<string> {
+    public async uiSetValue(selector: string, value: string, appName?: string, target: ExecutionTarget = 'host'): Promise<string> {
         try {
             const args: string[] = ['set-value', selector, value];
             if (appName) {
                 args.push('-a', appName);
             }
-            return await this.execute('ui', args);
+            return await this.execute('ui', [...args, ...await this.executionTargetArgs(target)]);
         } catch (error) {
             vscode.window.showErrorMessage(`Failed to set UI element value: ${error}`);
             return '';
@@ -1299,13 +1350,14 @@ export class WinAppCli {
      * @param durationSeconds Positive recording duration in seconds
      * @param outputPath Destination MP4 file path
      */
-    public async uiRecord(appName: string, durationSeconds: number, outputPath: string): Promise<void> {
+    public async uiRecord(appName: string, durationSeconds: number, outputPath: string, target: ExecutionTarget = 'host'): Promise<void> {
         try {
             await this.execute('ui', [
                 'record',
                 '-a', appName,
                 '--duration-sec', durationSeconds.toString(),
-                '--output', outputPath
+                '--output', outputPath,
+                ...await this.executionTargetArgs(target)
             ]);
             vscode.window.showInformationMessage(`Recording saved to ${outputPath}`);
         } catch (error) {
@@ -1318,9 +1370,9 @@ export class WinAppCli {
      * @param query Search query
      * @param appName App name to search in
      */
-    public async uiSearch(query: string, appName: string): Promise<string> {
+    public async uiSearch(query: string, appName: string, target: ExecutionTarget = 'host'): Promise<string> {
         try {
-            return await this.execute('ui', ['search', query, '-a', appName]);
+            return await this.execute('ui', ['search', query, '-a', appName, ...await this.executionTargetArgs(target)]);
         } catch (error) {
             vscode.window.showErrorMessage(`Failed to search UI elements: ${error}`);
             return '';
@@ -1444,9 +1496,18 @@ export interface StorePackageOptions {
 
 // Run options (v0.3.0+)
 
+export type ExecutionTarget = 'host' | 'sandbox';
+export type DevToolsMode = 'auto' | 'on' | 'headless' | 'off';
+
 export interface RunOptions {
     /** Build-output folder or .csproj/.sln project input (v0.6.0+). */
     inputPath: string;
+    /** Guest execution is opt-in and requires Windows and CLI v0.8.0+. */
+    executionTarget?: ExecutionTarget;
+    /** Auto omits the flag and preserves the CLI's context-specific default. */
+    devTools?: DevToolsMode;
+    /** Isolates package registration by checkout (v0.8.0+). */
+    uniqueIdentity?: boolean;
     manifest?: string;
     detach?: boolean;
     unregisterOnExit?: boolean;

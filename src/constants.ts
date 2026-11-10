@@ -85,6 +85,10 @@ export const COMMANDS = {
     CERTIFICATE_INFO: 'windev-helper.certificateInfo',
     // Run & manage commands (v0.3.0+)
     RUN_PACKAGED_APP: 'windev-helper.runPackagedApp',
+    RUN_SANDBOX: 'windev-helper.runSandbox',
+    SANDBOX_STATUS: 'windev-helper.sandboxStatus',
+    DEVTOOLS_INSPECT: 'windev-helper.devToolsInspect',
+    DEVTOOLS_SOURCE: 'windev-helper.devToolsSource',
     UNREGISTER_PACKAGE: 'windev-helper.unregisterPackage',
     MANIFEST_ADD_ALIAS: 'windev-helper.manifestAddAlias',
     // winapp CLI v0.6.0 commands

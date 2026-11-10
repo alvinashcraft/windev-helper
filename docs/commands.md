@@ -190,17 +190,17 @@ dotnet new winui-resourcedictionary -n DictionaryName
 
 **Command ID:** `windev-helper.installCopilotPlugin`
 
-Installs `winui`, `winappcli`, or `windbg` from [microsoft/win-dev-skills](https://github.com/microsoft/win-dev-skills) for Copilot CLI, Claude Code, or Codex. The existing command ID is retained for compatibility.
+Installs `winui` or `winappcli` from your choice of the current [WinApp CLI catalog](https://github.com/microsoft/winappCli) or [Windows development catalog](https://github.com/microsoft/win-dev-skills) for Copilot CLI, Claude Code, or Codex. WinDbg remains in the Windows development catalog. The existing command ID is retained for compatibility.
 
 **Usage:**
 
 1. Run from the Command Palette
-2. Choose your host and plugin, then pick **Install in Terminal**, **Copy Commands**, or **Open Docs**
-3. The commands that run are:
+2. Choose your host, plugin, and (for WinUI/WinApp) one catalog, then pick **Install in Terminal**, **Copy Commands**, or **Open Docs**
+3. For example, the current CLI catalog uses:
 
    ```text
-   copilot plugin marketplace add microsoft/win-dev-skills
-   copilot plugin install winui@win-dev-skills
+   copilot plugin marketplace add microsoft/winappCli
+   copilot plugin install winui@winappcli
    ```
 
 4. Start a new session. The WinUI plugin offers `/winui-setup`. Codex loads skills, not agents. Claude uses `claude plugin install`; Codex uses `codex plugin add`.
@@ -226,7 +226,7 @@ Runs a diagnostic check of your local Windows development toolchain and reports 
 **Checks:**
 
 - **.NET SDK** — verifies a stable version >= 8.0.100 is installed
-- **WinApp CLI** — verifies the configured CLI is >= 0.7.0; recommends 0.7.1
+- **WinApp CLI** — verifies the configured CLI is >= 0.7.0; recommends 0.8.0 for Sandbox and DevTools features
 - **WinUI templates** — reports installation status without failing when official templates can be installed on demand by `winapp new`
 - **Developer Mode** — verifies Windows Developer Mode is enabled (Windows only)
 
@@ -563,6 +563,19 @@ Creates an external catalog for streamlined asset management across applications
 
 These commands provide packaged app launch and UI automation capabilities. They require winapp CLI v0.3.0 or later; commands added in WinDev Helper 4.2 require winapp CLI v0.6.0 or later.
 
+Packaged-run and UI automation commands are visible/enabled only on Windows and also reject programmatic execution on macOS/Linux. With winapp CLI 0.8+, every UI operation first offers **Host** or **Windows Sandbox**. Cancelling stops the operation; the target is not remembered. Use guest app names/PIDs/selectors for Sandbox, and host identifiers for Host. Older CLIs retain host-only UI behavior.
+
+### Windows Sandbox and WinUI DevTools (winapp CLI 0.8+)
+
+| Command | ID | Behavior |
+|---|---|---|
+| Run in Windows Sandbox | `windev-helper.runSandbox` | Uses the existing project/output-folder run flow with `--on sandbox`; confirms host builds and guest preparation before proceeding |
+| Check Windows Sandbox Status | `windev-helper.sandboxStatus` | Displays `target snapshot sandbox --json`, including host prerequisites, without starting or changing the guest |
+| DevTools: Inspect Live WinUI Tree (Experimental) | `windev-helper.devToolsInspect` | Select a desktop and app PID/qualified selector to inspect a DevTools-enabled WinUI app; no automatic injection |
+| DevTools: Look Up Element Source (Experimental) | `windev-helper.devToolsSource` | Select a desktop, app, and element; displays the CLI's source-match report in the output channel |
+
+These commands require Windows and a detectable winapp CLI 0.8+; they do not enable Windows features, install MCP servers, restart Windows, or silently fall back to host execution. A status report with no running guest does not mean all prerequisites passed: read the checks. See [Sandbox and DevTools](winapp-cli.md#windows-sandbox-and-devtools-v080) for prerequisites and limitations.
+
 ### WinDev: Run as Packaged App
 
 **Command ID:** `windev-helper.runPackagedApp`
@@ -576,6 +589,8 @@ Launches an application as a packaged app from a build output folder, or builds 
 5. Optional application arguments when supported by the installed CLI
 
 On winapp CLI v0.5.0+, debug-output mode automatically triages WinUI stowed exceptions after a crash. Symbol resolution is only offered in this mode so `--symbols` is never passed alone.
+
+On winapp CLI 0.8+, project mode also prompts for experimental DevTools mode (automatic/off/on/headless). Both modes offer checkout-specific identity. Auto omits `--devtools` and follows CLI defaults; choosing a new explicit mode never sends an unsupported flag to an older CLI. Sandbox runs omit the debug-output choice, since guest unpackaged apps do not support it.
 
 **Uses:** `winapp run` CLI command
 
